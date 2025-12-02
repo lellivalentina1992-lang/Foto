@@ -24,7 +24,7 @@
             height: 60vh; width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto 1fr 1fr 1fr 1fr auto auto auto; 
+            grid-template-rows: auto auto 1fr 1fr 1fr 1fr auto auto auto;
             gap: 8px; padding: 8px; box-sizing: border-box;
             background: #000; border-top: 4px solid #333;
         }
@@ -38,10 +38,10 @@
         }
         button:active { background: #555; transform: scale(0.98); }
 
-        .top-bar { 
-            grid-column: 1 / -1; 
-            display: flex; 
-            gap: 10px; 
+        .top-bar {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 10px;
         }
 
         #btn-scene { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.1rem; }
@@ -66,7 +66,7 @@
         .hidden { display: none !important; }
         .loader { border: 6px solid #333; border-top: 6px solid #D4AF37; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
+
         input { background: #333; color: #FFF; border: 1px solid #777; }
 
         #download-link {
@@ -95,8 +95,8 @@
                     aria-label="Attiva o disattiva guida di centraggio oggetto">
                 GUIDA CENTRAGGIO
             </button>
-            <button class="small-btn" id="btn-shot" onclick="takeShot()"
-                    aria-label="Scatta una foto senza analizzarla, poi scegli come farla descrivere">
+            <button class="small-btn" id="btn-shot" onclick="takeShot()
+                    " aria-label="Scatta una foto senza analizzarla, poi scegli come farla descrivere">
                 SCATTA
             </button>
         </div>
@@ -118,49 +118,49 @@
         </div>
 
         <!-- RIGA 2: scena generale + selfie -->
-        <button id="btn-scene" 
-                onclick="describeWithMode('scene')" 
+        <button id="btn-scene"
+                onclick="describeWithMode('scene')"
                 aria-label="Scatta e analizza come scena generale con descrizione dettagliata e qualità della foto">
             SCENA GENERALE
         </button>
-        <button id="btn-selfie" 
-                onclick="describeWithMode('selfie')" 
+        <button id="btn-selfie"
+                onclick="describeWithMode('selfie')"
                 aria-label="Scatta e analizza come selfie o volto e controlla se è adatta come foto profilo">
             SELFIE / VOLTO
         </button>
-        
+
         <!-- RIGA 3: esterno + interno -->
-        <button id="btn-outdoor" 
-                onclick="describeWithMode('outdoor')" 
+        <button id="btn-outdoor"
+                onclick="describeWithMode('outdoor')"
                 aria-label="Scatta e analizza come ambiente esterno o paesaggio, con descrizione e qualità foto">
             ESTERNO / PAESAGGIO
         </button>
-        <button id="btn-indoor" 
-                onclick="describeWithMode('indoor')" 
+        <button id="btn-indoor"
+                onclick="describeWithMode('indoor')"
                 aria-label="Scatta e analizza come ambiente interno, come stanza o negozio">
             INTERNO / STANZA
         </button>
 
         <!-- RIGA 4: oggetto + testo -->
-        <button id="btn-object" 
-                onclick="describeWithMode('object')" 
+        <button id="btn-object"
+                onclick="describeWithMode('object')"
                 aria-label="Scatta e analizza per descrivere un oggetto in dettaglio, con qualità foto">
             OGGETTO
         </button>
-        <button id="btn-text" 
-                onclick="describeWithMode('text')" 
+        <button id="btn-text"
+                onclick="describeWithMode('text')"
                 aria-label="Scatta e analizza leggendo il testo o documento nell’immagine">
             TESTO / DOCUMENTO
         </button>
 
         <!-- RIGA 5: cibo + sicurezza -->
-        <button id="btn-food" 
-                onclick="describeWithMode('food')" 
+        <button id="btn-food"
+                onclick="describeWithMode('food')"
                 aria-label="Scatta e analizza per descrivere un piatto o del cibo, con qualità foto">
             CIBO / PIATTO
         </button>
-        <button id="btn-safety" 
-                onclick="describeWithMode('safety')" 
+        <button id="btn-safety"
+                onclick="describeWithMode('safety')"
                 aria-label="Scatta e analizza per ostacoli e sicurezza">
             SICUREZZA / OSTACOLI
         </button>
@@ -202,23 +202,23 @@
     <script>
         // --- CONFIGURAZIONE ---
         let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
-        const MODEL_NAME = "gemini-3-pro-preview"; 
+        const MODEL_NAME = "gemini-3-pro-preview";
         const API_ENDPOINT = "v1beta";
 
         let audioCtx, lightOsc, lightGain;
         let objectDetector = null;
         let isRunning = false;
         let videoTrack = null;
-        
+
         const tempCanvas = document.createElement('canvas');
         let tempCtx = null;
 
-        let mode = 'idle'; 
+        let mode = 'idle';
         let lightActive = false, colorActive = false, levelActive = false, torchActive = false;
         let discreteMode = false;
         let lastSpeak = 0;
         let centeredCount = 0;
-        const SNAP_THRESHOLD = 20; 
+        const SNAP_THRESHOLD = 20;
 
         // guida: anti-ripetizione
         let lastGuideMessage = "";
@@ -232,14 +232,14 @@
         let lastShotUrl = null;
 
         function announce(text) {
-            if(discreteMode) return;
+            if (discreteMode) return;
             const el = document.getElementById('sr-announcer');
-            el.textContent = ""; 
+            el.textContent = "";
             setTimeout(() => el.textContent = text, 50);
         }
 
         function vibrate(pattern) {
-            if(navigator.vibrate) navigator.vibrate(pattern);
+            if (navigator.vibrate) navigator.vibrate(pattern);
         }
 
         // --- SCATTO GENERALE RIUTILIZZABILE ---
@@ -281,7 +281,6 @@
         }
 
         // --- SCATTA + ANALIZZA IN UNA VOLTA (SCENA / SELFIE / ECC.) ---
-                // --- SCATTA + ANALIZZA IN UNA VOLTA (SCENA / SELFIE / ECC.) ---
         async function describeWithMode(context) {
             if (!GEMINI_KEY) {
                 announce("Per questa analisi serve una chiave API Gemini. Apro le impostazioni.");
@@ -349,7 +348,7 @@ Se noti problemi concreti (ad esempio: soggetto tagliato, troppo lontano, troppo
 - indica chiaramente qual è il problema principale;
 - proponi da 1 a 3 consigli molto concreti e semplici per migliorare un prossimo scatto, ad esempio: “avvicina un po’ il telefono”, “sposta la fotocamera leggermente verso sinistra”, “scegli un punto più illuminato”, “tieni il telefono più fermo”, “alza leggermente l’inquadratura”.
 
-Poi valuta separatamente la foto pensando alle inquadrature tipiche e alle zone a rischio taglio sui social. 
+Poi valuta separatamente la foto pensando alle inquadrature tipiche e alle zone a rischio taglio sui social.
 Non serve essere perfetto sui numeri, basta un controllo pratico e chiaro:
 
 - POST FEED (Instagram, Facebook), spesso croppato in quadrato o quasi quadrato:
@@ -400,7 +399,7 @@ Evita giudizi personali o psicologici sulle persone (non dire se sono belle o br
             switch (context) {
                 case 'scene':
                     return `
-Descrivi questa immagine come se la stessi spiegando a una persona non vedente. 
+Descrivi questa immagine come se la stessi spiegando a una persona non vedente.
 Concentrati su:
 - cosa c’è in primo piano,
 - cosa c’è al centro dell’immagine,
@@ -418,11 +417,11 @@ Usa frasi semplici e dirette. Non inventare dettagli se non sei sicuro.
 Analizza la foto come selfie o ritratto, con un obiettivo: valutare se il volto è adatto come foto profilo o immagine personale per social, app di messaggistica o documenti informali.
 
 1) RICONOSCIMENTO VOLTO
-- Di’ se è presente 1 volto principale.  
+- Di’ se è presente 1 volto principale.
 - Ignora volti secondari o molto piccoli.
 - Indica chiaramente la DIREZIONE DEL VOLTO usando una delle tre categorie:
-  • “fronte” → il volto guarda direttamente l'obiettivo;  
-  • “tre quarti” → metà del volto è più visibile dell’altra, il naso punta leggermente di lato;  
+  • “fronte” → il volto guarda direttamente l'obiettivo;
+  • “tre quarti” → metà del volto è più visibile dell’altra, il naso punta leggermente di lato;
   • “profilo” → si vede un solo lato del volto, con naso e bocca di lato.
 
 2) POSIZIONE DEL VOLTO
@@ -452,9 +451,9 @@ Valuta:
 - eventuale rumore o movimento.
 
 6) ADATTA COME FOTO PROFILO?
-Valuta oggettivamente se questa foto è adatta come foto profilo.  
-Usa una frase chiara:  
-- “adatta come foto profilo perché …”  
+Valuta oggettivamente se questa foto è adatta come foto profilo.
+Usa una frase chiara:
+- “adatta come foto profilo perché …”
 - “non consigliata come foto profilo perché …”
 
 7) SUGGERIMENTI CONCRETI
@@ -469,14 +468,14 @@ Dai solo consigli tecnici e semplici, senza giudizi personali:
 Non dare giudizi estetici o emotivi. Limita la descrizione a elementi visivi e tecnici.
 
 Alla fine, riassumi in tre righe:
-1) Direzione volto (fronte / tre quarti / profilo)  
-2) Centratura (centrato / leggermente a sinistra / alto / basso ecc.)  
+1) Direzione volto (fronte / tre quarti / profilo)
+2) Centratura (centrato / leggermente a sinistra / alto / basso ecc.)
 3) Adatta o no come foto profilo (con 1 motivo tecnico)
 ` + qualityBlock;
 
                 case 'outdoor':
                     return `
-Descrivi lo scenario esterno presente nella foto. 
+Descrivi lo scenario esterno presente nella foto.
 Concentrati su:
 - tipo di luogo (strada, parco, mare, montagna, piazza, giardino),
 - cosa si vede al centro dell’immagine,
@@ -491,7 +490,7 @@ Usa una descrizione ordinata e chiara per aiutare una persona non vedente a imma
 
                 case 'indoor':
                     return `
-Descrivi l’ambiente interno visibile nella foto. 
+Descrivi l’ambiente interno visibile nella foto.
 Concentrati su:
 - che tipo di stanza è (ad esempio cucina, salotto, bagno, camera, negozio, ufficio),
 - cosa c’è al centro dell’immagine,
@@ -505,7 +504,7 @@ Non inventare dettagli, descrivi solo ciò che è visibile.
 
                 case 'object':
                     return `
-Descrivi l’oggetto principale dell’immagine. 
+Descrivi l’oggetto principale dell’immagine.
 Concentrati su:
 - che oggetto è, se è riconoscibile,
 - forma e dimensioni approssimative,
@@ -520,7 +519,7 @@ Se l’oggetto non è chiaro, spiega cosa ti fa dubitare, senza inventare.
 
                 case 'text':
                     return `
-Leggi soltanto il testo presente nell’immagine. 
+Leggi soltanto il testo presente nell’immagine.
 Riporta il testo nell’ordine più naturale possibile, come se lo stessi leggendo a voce alta, riga per riga.
 Non aggiungere interpretazioni o descrizioni della scena visiva, leggi solo ciò che è scritto.
 
@@ -544,7 +543,7 @@ Organizza la risposta in tre parti:
 
                 case 'food':
                     return `
-Descrivi il piatto o il cibo presente nella foto. 
+Descrivi il piatto o il cibo presente nella foto.
 Concentrati su:
 - tipo di piatto (ad esempio pasta, carne, insalata, dolce),
 - ingredienti visibili,
@@ -558,7 +557,7 @@ Non inventare ingredienti non visibili. Descrivi solo ciò che si vede.
 
                 case 'safety':
                     return `
-Analizza l’immagine come se dovessi aiutare una persona non vedente a orientarsi in sicurezza. 
+Analizza l’immagine come se dovessi aiutare una persona non vedente a orientarsi in sicurezza.
 Concentrati SOLO su:
 - ostacoli davanti alla persona (sedie, tavoli, oggetti a terra),
 - gradini, dislivelli o buche visibili,
@@ -568,7 +567,7 @@ Concentrati SOLO su:
 - veicoli vicini o potenzialmente in movimento,
 - persone molto vicine che potrebbero ostacolare il passaggio.
 
-Ignora dettagli estetici non legati alla sicurezza. 
+Ignora dettagli estetici non legati alla sicurezza.
 Se non sei sicuro di un potenziale ostacolo, dillo chiaramente.
 ` + `
 Poi valuta anche la qualità tecnica dello scatto:
@@ -589,21 +588,23 @@ Organizza la risposta in tre parti:
 Descrivi questa immagine in modo chiaro per una persona non vedente.
 ` + qualityBlock;
             }
-        }// --- GUIDA CENTRAGGIO ---
+        }
+
+        // --- GUIDA CENTRAGGIO ---
         function toggleGuidance() {
             const btn = document.getElementById('btn-guide');
-            if(mode === 'guiding') {
-                mode = 'idle'; 
-                btn.classList.remove('guiding'); 
+            if (mode === 'guiding') {
+                mode = 'idle';
+                btn.classList.remove('guiding');
                 btn.innerText = "GUIDA CENTRAGGIO";
-                ctx.clearRect(0,0,canvas.width,canvas.height); 
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
                 announce("Guida spenta.");
             } else {
-                mode = 'guiding'; 
-                centeredCount = 0; 
+                mode = 'guiding';
+                centeredCount = 0;
                 lastGuideMessage = "";
                 lastGuideMessageTime = 0;
-                btn.classList.add('guiding'); 
+                btn.classList.add('guiding');
                 btn.innerText = "GUIDA ATTIVA";
                 announce("Guida centraggio attiva. Cerco un oggetto da centrare.");
             }
@@ -622,7 +623,7 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
 
             const detections = (result && result.detections) ? result.detections : [];
 
-            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (detections.length === 0) {
                 if (Date.now() - lastSpeak > 1800) {
@@ -658,14 +659,14 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
                 })[0].d;
 
             const box = target.boundingBox;
-            
-            const cx = box.originX + box.width/2;
-            const cy = box.originY + box.height/2;
-            const sx = canvas.width/2, sy = canvas.height/2;
-            const tolX = canvas.width * 0.15; 
-            const tolY = canvas.height * 0.20; 
 
-            ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 6; 
+            const cx = box.originX + box.width / 2;
+            const cy = box.originY + box.height / 2;
+            const sx = canvas.width / 2, sy = canvas.height / 2;
+            const tolX = canvas.width * 0.15;
+            const tolY = canvas.height * 0.20;
+
+            ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 6;
             ctx.strokeRect(box.originX, box.originY, box.width, box.height);
 
             let label = null;
@@ -724,138 +725,96 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
         function toggleLight() {
             lightActive = !lightActive;
             const btn = document.getElementById('btn-light');
-            
-            if(lightActive) {
-                if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                lightOsc = audioCtx.createOscillator(); 
+
+            if (lightActive) {
+                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                lightOsc = audioCtx.createOscillator();
                 lightGain = audioCtx.createGain();
-                lightOsc.connect(lightGain); 
+                lightOsc.connect(lightGain);
                 lightGain.connect(audioCtx.destination);
-                lightGain.gain.value = 0.05; 
+                lightGain.gain.value = 0.05;
                 lightOsc.start();
-                
-                btn.classList.add('active-tool'); btn.innerText = "LUCE: ON"; 
+
+                btn.classList.add('active-tool'); btn.innerText = "LUCE: ON";
                 announce("Suono luce attivo.");
             } else {
-                if(lightOsc) { lightOsc.stop(); lightOsc.disconnect(); }
-                btn.classList.remove('active-tool'); btn.innerText = "SONDA LUCE"; 
+                if (lightOsc) { lightOsc.stop(); lightOsc.disconnect(); }
+                btn.classList.remove('active-tool'); btn.innerText = "SONDA LUCE";
                 announce("Suono luce spento.");
             }
         }
-        
+
         function processLight() {
-            if(!tempCtx) return;
-            const size = 20; 
+            if (!tempCtx) return;
+            const size = 20;
             const cx = Math.floor(canvas.width / 2);
             const cy = Math.floor(canvas.height / 2);
-            
+
             const x = Math.max(0, cx - size / 2);
             const y = Math.max(0, cy - size / 2);
-            
+
             const p = tempCtx.getImageData(x, y, size, size).data;
-            
-            let sum=0; 
-            for(let i=0; i<p.length; i+=4) sum += (p[i]+p[i+1]+p[i+2])/3;
-            const level = sum/(p.length/4); 
-            
-            if(lightOsc) lightOsc.frequency.setValueAtTime(100+(level*4), audioCtx.currentTime);
+
+            let sum = 0;
+            for (let i = 0; i < p.length; i += 4) sum += (p[i] + p[i + 1] + p[i + 2]) / 3;
+            const level = sum / (p.length / 4);
+
+            if (lightOsc) lightOsc.frequency.setValueAtTime(100 + (level * 4), audioCtx.currentTime);
         }
 
         function toggleColor() {
             colorActive = !colorActive;
             const btn = document.getElementById('btn-color');
-            if(colorActive) { 
-                btn.classList.add('active-tool'); btn.innerText = "COLORE: ON"; 
-                announce("Lettura colore attiva."); 
-            } else { 
-                btn.classList.remove('active-tool'); btn.innerText = "SONDA COLORE"; 
-                announce("Lettura colore spenta."); 
+            if (colorActive) {
+                btn.classList.add('active-tool'); btn.innerText = "COLORE: ON";
+                announce("Lettura colore attiva.");
+            } else {
+                btn.classList.remove('active-tool'); btn.innerText = "SONDA COLORE";
+                announce("Lettura colore spenta.");
             }
         }
-        
-        function processColor() {
-            if(Date.now()-lastSpeak<2000) return; 
-            if(!tempCtx) return;
 
-            const boxSize = 20; 
+        function processColor() {
+            if (Date.now() - lastSpeak < 2000) return;
+            if (!tempCtx) return;
+
+            const boxSize = 20;
             const cx = Math.floor(canvas.width / 2);
             const cy = Math.floor(canvas.height / 2);
-            
+
             const x = Math.max(0, cx - boxSize / 2);
             const y = Math.max(0, cy - boxSize / 2);
-            
+
             const data = tempCtx.getImageData(x, y, boxSize, boxSize).data;
-            let r=0, g=0, b=0;
-            const pixelCount = (boxSize*boxSize);
-            
-            for(let i=0; i<data.length; i+=4) {
-                r += data[i]; g += data[i+1]; b += data[i+2];
-            }
-            
-            r = Math.round(r/pixelCount);
-            g = Math.round(g/pixelCount);
-            b = Math.round(b/pixelCount);
+            let r = 0, g = 0, b = 0;
+            const pixelCount = (boxSize * boxSize);
 
-            announce(getColorName(r,g,b)); 
-            lastSpeak=Date.now();
+            for (let i = 0; i < data.length; i += 4) {
+                r += data[i]; g += data[i + 1]; b += data[i + 2];
+            }
+
+            r = Math.round(r / pixelCount);
+            g = Math.round(g / pixelCount);
+            b = Math.round(b / pixelCount);
+
+            announce(getColorName(r, g, b));
+            lastSpeak = Date.now();
         }
 
-        function toggleLevel() {
-            levelActive = !levelActive;
-            const btn = document.getElementById('btn-level');
-            if(levelActive) {
-                btn.classList.add('active-tool'); btn.innerText = "LIVELLA: ON"; 
-                announce("Livella attiva.");
-                if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    DeviceOrientationEvent.requestPermission()
-                        .then(r=>{if(r==='granted') window.addEventListener('deviceorientation', handleLevel)})
-                        .catch(()=>announce("Permesso sensori negato."));
-                } else {
-                    window.addEventListener('deviceorientation', handleLevel);
-                }
-            } else {
-                btn.classList.remove('active-tool'); btn.innerText = "LIVELLA"; 
-                announce("Livella spenta.");
-                window.removeEventListener('deviceorientation', handleLevel);
-            }
-        }
-        
         function handleLevel(e) {
-            if(Date.now()-lastSpeak<1500) return;
-            const tilt = e.gamma || 0; 
-            
-            if(tilt > 10) { announce("Pende a destra"); vibrate(50); lastSpeak=Date.now(); }
-            else if(tilt < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
-        }
+            if (Date.now() - lastSpeak < 1500) return;
+            const tilt = e.gamma || 0;
 
-        function toggleTorch() {
-            if(!videoTrack) { announce("Fotocamera non pronta."); return; }
-            const targetState = !torchActive;
-            const btn = document.getElementById('btn-torch');
-
-            videoTrack.applyConstraints({advanced:[{torch: targetState}]})
-            .then(() => {
-                torchActive = targetState; 
-                if(torchActive) {
-                     btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Torcia accesa.");
-                } else {
-                     btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Torcia spenta.");
-                }
-            })
-            .catch(err => {
-                console.warn("Errore torcia:", err);
-                announce("Torcia non disponibile su questo dispositivo o in questa modalità.");
-                torchActive = false;
-                btn.classList.remove('active-tool'); btn.innerText = "TORCIA";
-            });
+            if (tilt > 10) { announce("Pende a destra"); vibrate(50); lastSpeak = Date.now(); }
+            else if (tilt < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak = Date.now(); }
         }
 
         function toggleDiscrete() {
             discreteMode = !discreteMode;
             const btn = document.getElementById('btn-discrete');
-            if(discreteMode) { 
+            if (discreteMode) {
                 btn.classList.add('active-discrete'); btn.innerText = "MODO DISCRETO: ON";
-                vibrate([100,50,100]); 
+                vibrate([100, 50, 100]);
             } else {
                 btn.classList.remove('active-discrete'); btn.innerText = "MODO DISCRETO";
                 announce("Modo discreto spento.");
@@ -867,27 +826,27 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
             if (tempCtx) {
                 tempCtx.drawImage(video, 0, 0);
             }
-            return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1]; 
+            return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         }
 
         async function callGemini(prompt, b64) {
-            if(!GEMINI_KEY) { 
-                announce("Chiave API mancante."); 
-                openSettings(); 
-                return null; 
+            if (!GEMINI_KEY) {
+                announce("Chiave API mancante.");
+                openSettings();
+                return null;
             }
             let res;
             try {
                 res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        contents: [{ 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
                             parts: [
-                                { text: prompt }, 
+                                { text: prompt },
                                 { inline_data: { mime_type: "image/jpeg", data: b64 } }
-                            ] 
-                        }] 
+                            ]
+                        }]
                     })
                 });
             } catch (e) {
@@ -905,7 +864,7 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
                 return null;
             }
 
-            if(!res.ok) {
+            if (!res.ok) {
                 console.error("Errore HTTP Gemini:", res.status, d);
                 const msg = d.error && d.error.message ? d.error.message : "Errore sconosciuto";
                 announce("Errore API: " + msg);
@@ -913,13 +872,13 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
                 return null;
             }
 
-            if(d.error) {
+            if (d.error) {
                 console.error("Errore API Gemini:", d.error);
                 announce("Errore API: " + d.error.message);
                 alert("ERRORE API: " + d.error.message);
                 return null;
             }
-            
+
             const candidates = d.candidates || [];
             const first = candidates[0];
             const parts = first?.content?.parts || [];
@@ -929,13 +888,13 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
 
             const text = textParts.join("\n\n").trim();
 
-            if(!text) {
+            if (!text) {
                 console.warn("Nessun testo leggibile da Gemini:", d);
                 announce("Non ho ricevuto una risposta comprensibile dall'intelligenza artificiale. Puoi riprovare o scattare una nuova foto.");
                 return null;
             }
 
-            if(!discreteMode) {
+            if (!discreteMode) {
                 announce(text);
             } else {
                 alert("RISPOSTA AI:\n" + text);
@@ -944,13 +903,13 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
             return text;
         }
 
-        function playShutter() { 
-            if(!discreteMode && audioCtx){ 
-                const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); 
-                g.gain.value=0.1; o.frequency.value=600; 
-                o.connect(g); g.connect(audioCtx.destination); 
-                o.start(); o.stop(audioCtx.currentTime+0.1); 
-            } 
+        function playShutter() {
+            if (!discreteMode && audioCtx) {
+                const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+                g.gain.value = 0.1; o.frequency.value = 600;
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(); o.stop(audioCtx.currentTime + 0.1);
+            }
         }
 
         // --- USA FOTO / MODIFICA E ANALIZZA / ELIMINA ---
@@ -1074,7 +1033,7 @@ Descrivi poi:
 - se il testo copre parti molto importanti dell’immagine, come volti, oggetto principale o zona centrale;
 - se il testo è leggibile: contrasto tra colore del testo e sfondo, dimensione del carattere, eventuali parti tagliate.
 
-Poi valuta l’effetto del testo sovrapposto pensando ai diversi social e alle possibili zone di rischio dove l’app può tagliare o coprire l’immagine. 
+Poi valuta l’effetto del testo sovrapposto pensando ai diversi social e alle possibili zone di rischio dove l’app può tagliare o coprire l’immagine.
 Non servono numeri precisi, ma un controllo pratico:
 
 - POST FEED (Instagram, Facebook), spesso croppato in quadrato:
@@ -1203,20 +1162,20 @@ Organizza la risposta in tre parti:
             });
         }
 
-        const colors={
-            '0,0,0':'Nero','255,255,255':'Bianco','200,200,200':'Grigio Chiaro','80,80,80':'Grigio Scuro',
-            '255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo',
-            '0,255,255':'Azzurro','255,0,255':'Fucsia','165,42,42':'Marrone','255,165,0':'Arancione',
-            '128,0,128':'Viola','245,245,220':'Beige','255,192,203':'Rosa'
+        const colors = {
+            '0,0,0': 'Nero', '255,255,255': 'Bianco', '200,200,200': 'Grigio Chiaro', '80,80,80': 'Grigio Scuro',
+            '255,0,0': 'Rosso', '0,255,0': 'Verde', '0,0,255': 'Blu', '255,255,0': 'Giallo',
+            '0,255,255': 'Azzurro', '255,0,255': 'Fucsia', '165,42,42': 'Marrone', '255,165,0': 'Arancione',
+            '128,0,128': 'Viola', '245,245,220': 'Beige', '255,192,203': 'Rosa'
         };
-        
-        function getColorName(r,g,b){ 
-            let min=Infinity,res="Indefinito"; 
-            for(let k in colors){ 
-                const[cr,cg,cb]=k.split(',').map(Number); 
-                const d=Math.sqrt((r-cr)**2*0.3 + (g-cg)**2*0.59 + (b-cb)**2*0.11); 
-                if(d<min){min=d;res=colors[k];}
-            } 
+
+        function getColorName(r, g, b) {
+            let min = Infinity, res = "Indefinito";
+            for (let k in colors) {
+                const [cr, cg, cb] = k.split(',').map(Number);
+                const d = Math.sqrt((r - cr) ** 2 * 0.3 + (g - cg) ** 2 * 0.59 + (b - cb) ** 2 * 0.11);
+                if (d < min) { min = d; res = colors[k]; }
+            }
             return res;
         }
 
@@ -1237,7 +1196,7 @@ Organizza la risposta in tre parti:
             return labelMap[label] || "un oggetto";
         }
 
-        window.openSettings = () => { 
+        window.openSettings = () => {
             document.getElementById('key-screen').classList.remove('hidden');
             const input = document.getElementById('key-input');
             input.value = GEMINI_KEY || "";
@@ -1247,18 +1206,17 @@ Organizza la risposta in tre parti:
             document.getElementById('key-screen').classList.add('hidden');
             announce("Chiudo impostazioni.");
         };
-        window.saveKey = () => { 
+        window.saveKey = () => {
             const val = document.getElementById('key-input').value.trim();
-            if(val.length > 10) {
-                GEMINI_KEY=val; 
-                localStorage.setItem('gemini_key',GEMINI_KEY); 
-                closeSettings(); 
-                announce("Chiave salvata."); 
+            if (val.length > 10) {
+                GEMINI_KEY = val;
+                localStorage.setItem('gemini_key', GEMINI_KEY);
+                closeSettings();
+                announce("Chiave salvata.");
             } else {
                 announce("Chiave non valida.");
             }
         };
-
     </script>
 
     <!-- SCRIPT DI ROBUSTEZZA: STARTAPP, LOOP, TORCIA, LIVELLA -->
@@ -1270,13 +1228,13 @@ Organizza la risposta in tre parti:
             try {
                 let stream;
                 try {
-                    stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: 'environment', 
-                            width: { ideal: 1280 }, 
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
                             height: { ideal: 720 },
-                            focusMode: 'continuous' 
-                        } 
+                            focusMode: 'continuous'
+                        }
                     });
                 } catch (err) {
                     stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -1292,11 +1250,11 @@ Organizza la risposta in tre parti:
             try {
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-                
+
                 return await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: { 
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", 
-                        delegate: "GPU" 
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+                        delegate: "GPU"
                     },
                     scoreThreshold: 0.1,
                     maxResults: 5,
@@ -1313,7 +1271,7 @@ Organizza la risposta in tre parti:
             startBtn.style.display = 'none';
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('load-msg').classList.remove('hidden');
-            
+
             announce("Avvio sistema Pro 3. Attendi.");
 
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1330,7 +1288,6 @@ Organizza la risposta in tre parti:
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
 
-            // Tentiamo di far partire esplicitamente il video (Safari / iOS)
             try {
                 await video.play();
             } catch (e) {
@@ -1347,26 +1304,25 @@ Organizza la risposta in tre parti:
 
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('controls').classList.remove('hidden');
-                
-                canvas.width = video.videoWidth; 
+
+                canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                tempCanvas.width = video.videoWidth; 
+                tempCanvas.width = video.videoWidth;
                 tempCanvas.height = video.videoHeight;
                 tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
                 isRunning = true;
                 announce("Sistema Pro 3 attivo.");
-                
-                if(!GEMINI_KEY) {
+
+                if (!GEMINI_KEY) {
                     setTimeout(() => {
                         announce("Attenzione. Chiave API mancante. Puoi comunque scattare e usare le foto.");
                     }, 1000);
                 }
-                
-                loop(); 
+
+                loop();
             }
 
-            // Se il video è già pronto, non aspettiamo l'evento
             if (video.readyState >= 2) {
                 onVideoReady();
             } else {
@@ -1375,68 +1331,68 @@ Organizza la risposta in tre parti:
         }
 
         function loop() {
-            if(!isRunning) return;
+            if (!isRunning) return;
             const now = performance.now();
 
-            if(lightActive || colorActive) {
-                if(tempCtx && video.readyState >= 2) {
+            if (lightActive || colorActive) {
+                if (tempCtx && video.readyState >= 2) {
                     tempCtx.drawImage(video, 0, 0);
                 }
             }
 
-            if(lightActive) {
+            if (lightActive) {
                 processLight();
             }
 
-            if(colorActive && now - lastColorTime > 300) {
+            if (colorActive && now - lastColorTime > 300) {
                 processColor();
                 lastColorTime = now;
             }
 
-            if(mode === 'guiding' && now - lastGuideTime > 250) {
+            if (mode === 'guiding' && now - lastGuideTime > 250) {
                 processGuidance();
                 lastGuideTime = now;
             }
-            
+
             requestAnimationFrame(loop);
         }
 
         function toggleTorch() {
             const btn = document.getElementById('btn-torch');
 
-            if(!videoTrack) { 
-                announce("Fotocamera non pronta."); 
-                return; 
+            if (!videoTrack) {
+                announce("Fotocamera non pronta.");
+                return;
             }
 
             const capabilities = videoTrack.getCapabilities && videoTrack.getCapabilities();
             if (!capabilities || !capabilities.torch) {
                 announce("Torcia non supportata da questa fotocamera.");
                 torchActive = false;
-                btn.classList.remove('active-tool'); 
+                btn.classList.remove('active-tool');
                 btn.innerText = "TORCIA";
                 return;
             }
 
             const targetState = !torchActive;
 
-            videoTrack.applyConstraints({advanced:[{torch: targetState}]})
+            videoTrack.applyConstraints({ advanced: [{ torch: targetState }] })
                 .then(() => {
                     torchActive = targetState;
-                    if(torchActive) {
-                        btn.classList.add('active-tool'); 
-                        btn.innerText = "TORCIA: ON"; 
+                    if (torchActive) {
+                        btn.classList.add('active-tool');
+                        btn.innerText = "TORCIA: ON";
                         announce("Torcia accesa.");
                     } else {
-                        btn.classList.remove('active-tool'); 
-                        btn.innerText = "TORCIA"; 
+                        btn.classList.remove('active-tool');
+                        btn.innerText = "TORCIA";
                         announce("Torcia spenta.");
                     }
                 })
                 .catch(err => {
                     console.warn("Errore torcia:", err);
                     torchActive = false;
-                    btn.classList.remove('active-tool'); 
+                    btn.classList.remove('active-tool');
                     btn.innerText = "TORCIA";
                     announce("Torcia non disponibile su questo dispositivo o in questa modalità.");
                 });
@@ -1445,23 +1401,23 @@ Organizza la risposta in tre parti:
         function toggleLevel() {
             const btn = document.getElementById('btn-level');
 
-            if(levelActive) {
+            if (levelActive) {
                 levelActive = false;
-                btn.classList.remove('active-tool'); 
-                btn.innerText = "LIVELLA"; 
+                btn.classList.remove('active-tool');
+                btn.innerText = "LIVELLA";
                 announce("Livella spenta.");
                 window.removeEventListener('deviceorientation', handleLevel);
                 return;
             }
 
-            if(typeof DeviceOrientationEvent === 'undefined') {
+            if (typeof DeviceOrientationEvent === 'undefined') {
                 announce("Sensori di orientamento non disponibili su questo dispositivo.");
                 return;
             }
 
             levelActive = true;
-            btn.classList.add('active-tool'); 
-            btn.innerText = "LIVELLA: ON"; 
+            btn.classList.add('active-tool');
+            btn.innerText = "LIVELLA: ON";
             announce("Livella attiva.");
 
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -1471,14 +1427,14 @@ Organizza la risposta in tre parti:
                             window.addEventListener('deviceorientation', handleLevel);
                         } else {
                             levelActive = false;
-                            btn.classList.remove('active-tool'); 
+                            btn.classList.remove('active-tool');
                             btn.innerText = "LIVELLA";
                             announce("Permesso sensori negato. Livella disattivata.");
                         }
                     })
                     .catch(() => {
                         levelActive = false;
-                        btn.classList.remove('active-tool'); 
+                        btn.classList.remove('active-tool');
                         btn.innerText = "LIVELLA";
                         announce("Errore accesso ai sensori di orientamento.");
                     });
