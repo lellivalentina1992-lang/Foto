@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Scanner AI Pro</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Elementi accessibili ma invisibili */
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+
+        #video-container {
+            position: relative;
+            flex-grow: 1;
+            width: 100%;
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(1); }
+        video.selfie { transform: scaleX(-1); }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* Timer Rec */
+        #rec-timer {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            background: red; color: white; padding: 5px 15px; border-radius: 20px;
+            font-weight: bold; font-size: 1.2rem; display: none; z-index: 55;
+        }
+
+        /* Pulsanti Fluttuanti */
+        .top-btn {
+            position: absolute; top: 15px; z-index: 50;
+            background: rgba(0,0,0,0.6); color: #FFD700; border: 2px solid #FFD700;
+            font-size: 1.2rem; border-radius: 50%; width: 50px; height: 50px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        #btn-config { right: 15px; }
+        #btn-help { right: 75px; border-color: #00FF00; color: #00FF00; font-weight: bold; font-size: 1.5rem; }
+        #btn-torch { left: 15px; border-color: #FFF; color: #FFF; }
+        #btn-cam-switch { left: 80px; border-color: #00FFFF; color: #00FFFF; font-size: 1.5rem; }
+
+        /* Zoom Laterali */
+        .zoom-btn {
+            position: absolute; top: 50%; transform: translateY(-50%); z-index: 40;
+            width: 60px; height: 120px; background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #FFF; color: #FFF; font-size: 2rem; border-radius: 15px;
+            display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px);
+        }
+        #btn-zoom-in { right: 10px; background: rgba(0, 255, 0, 0.2); }
+        #btn-zoom-out { left: 10px; background: rgba(255, 0, 0, 0.2); }
+
+        /* UI Principale */
+        #ui-layer {
+            position: absolute; bottom: 0; width: 100%; height: 50vh;
+            background: rgba(0, 0, 0, 0.94);
+            display: grid;
+            grid-template-rows: auto 1fr 1fr 1fr 0.8fr 1.2fr; 
+            grid-template-columns: 1fr 1fr;
+            gap: 6px; padding: 10px; box-sizing: border-box;
+            border-top: 3px solid #333;
+        }
+
+        #status-message {
+            grid-column: 1 / -1; font-size: 1.2rem; text-align: center; padding: 8px;
+            color: #FFD700; font-weight: bold; background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        button {
+            background-color: #222; color: #FFF; border: 2px solid #555;
+            font-size: 1rem; font-weight: bold; border-radius: 12px;
+            cursor: pointer; touch-action: manipulation;
+        }
+        button:active { background-color: #FFD700; color: #000; border-color: #FFF; }
+
+        #btn-radar { grid-column: 1 / -1; background-color: #FFA500; color: #000; border: none; text-transform: uppercase; font-size: 1.1rem; }
+        
+        #btn-mode { 
+            grid-column: 1 / -1; 
+            background-color: #333; color: #FFF; border: 1px solid #999; 
+            font-size: 1rem; text-transform: uppercase; 
+        }
+        
+        #btn-snap {
+            grid-column: 1 / -1;
+            background-color: #EEE; color: #000; font-size: 1.3rem; text-transform: uppercase; border: none;
+        }
+        .rec-active { background-color: #FF0000 !important; color: #FFF !important; animation: pulse 1.5s infinite; border: 4px solid white !important; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        
+        .gemini-btn { border: none; color: #FFF; }
+        #btn-verify { background-color: #0056b3; border: 2px solid #4da6ff; }
+        #btn-tools { background-color: #4CAF50; color: #FFF; border: none; }
+
+        /* Overlay */
+        .overlay-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .hidden { display: none !important; }
+        
+        #tools-menu { background: rgba(0,0,0,0.95); z-index: 60; overflow-y: auto; display: block; }
+        .tools-content { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .tool-btn { width: 90%; margin: 6px 0; padding: 18px; font-size: 1.1rem; border: 2px solid #FFF; border-radius: 15px; text-align: left; }
+        
+        #start-btn { padding: 30px; font-size: 1.5rem; background: #FFD700; border-radius: 20px; border:none; width: 80%; }
+        #key-input { width: 90%; padding: 15px; font-size: 1.2rem; margin: 20px 0; background: #333; color: #fff; border: 2px solid #FFD700; }
+        
+        /* Loader con Progresso */
+        .loader { border: 6px solid #333; border-top: 6px solid #FFD700; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        #progress-text { font-size: 1.5rem; font-weight: bold; color: #FFF; margin-top: 10px; }
+        #error-text { color: red; margin-top: 20px; font-weight: bold; display: none; text-align: center; width: 80%; font-size: 1.2rem; padding: 10px; background: rgba(0,0,0,0.8); }
+    </style>
+</head>
+<body>
+
+    <!-- ELEMENTO PER COMUNICAZIONE DIRETTA CON SCREEN READER -->
+    <div id="sr-announcer" class="sr-only" aria-live="assertive" role="status"></div>
+
+    <script>
+        window.announce = function(text) {
+            const el = document.getElementById('sr-announcer');
+            el.textContent = ""; 
+            setTimeout(() => { el.textContent = text; }, 50);
+        };
+
+        // Guida continua: usa la sintesi se non in modalità discreta
+        window.speakGuide = function(text) {
+            if (window.discreteMode && window.isRunning) return;
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'it-IT';
+            window.speechSynthesis.speak(u);
+        };
+
+        // --- GESTORE DOWNLOAD SICURO ---
+        window.bootstrapApp = async function() {
+            if(window.audioCtx && window.audioCtx.state === 'suspended') window.audioCtx.resume();
+            
+            const startBtn = document.getElementById('start-btn');
+            const retryBtn = document.getElementById('retry-btn');
+            const loader = document.getElementById('loading-spinner');
+            const loadText = document.getElementById('loading-text');
+            const progressText = document.getElementById('progress-text');
+            const errorText = document.getElementById('error-text');
+
+            if (window.location.protocol === 'file:') {
+                const warning = "Attenzione: apri questo file tramite un server web o usa l'anteprima, altrimenti la fotocamera non partirà.";
+                alert(warning);
+                window.announce(warning);
+            }
+
+            startBtn.classList.add('hidden');
+            retryBtn.style.display = 'none';
+            errorText.style.display = 'none';
+            loader.classList.remove('hidden');
+            loadText.classList.remove('hidden');
+
+            window.announce("Inizio scaricamento intelligenza artificiale. Attendi.");
+
+            try {
+                // 1. CARICAMENTO LIBRERIA
+                const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
+                
+                // 2. SCARICAMENTO MODELLO
+                const modelUrl = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite";
+                const response = await fetch(modelUrl);
+                if (!response.ok) throw new Error("Errore rete: " + response.status);
+                
+                const contentLength = response.headers.get('content-length');
+                const total = parseInt(contentLength, 10);
+                let loaded = 0;
+                const reader = response.body.getReader();
+                const chunks = [];
+
+                while(true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    if (total) {
+                        const percent = Math.round((loaded / total) * 100);
+                        progressText.innerText = percent + "%";
+                    }
+                }
+                
+                const blob = new Blob(chunks);
+                const modelBlobUrl = URL.createObjectURL(blob);
+
+                window.announce("Download completato. Avvio fotocamera.");
+
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+                
+                window.objectDetector = await ObjectDetector.createFromOptions(vision, {
+                    baseOptions: { modelAssetPath: modelBlobUrl, delegate: "GPU" },
+                    scoreThreshold: 0.20,
+                    runningMode: "VIDEO"
+                });
+
+                window.startCamera();
+
+            } catch (error) {
+                console.error("Errore:", error);
+                loader.classList.add('hidden');
+                loadText.classList.add('hidden');
+                errorText.innerText = "Errore: " + error.message;
+                errorText.style.display = 'block';
+                retryBtn.style.display = 'block';
+                window.announce("Errore critico. Riprova.");
+            }
+        };
+    </script>
+
+    <div id="video-container">
+        <video id="webcam" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+        <div id="rec-timer">REC 00:00</div>
+        
+        <button id="btn-zoom-out" class="zoom-btn" onclick="changeZoom(-1)" aria-label="Zoom Meno">-</button>
+        <button id="btn-zoom-in" class="zoom-btn" onclick="changeZoom(1)" aria-label="Zoom Più">+</button>
+
+        <button id="btn-torch" onclick="toggleTorch()" class="top-btn" aria-label="Torcia">🔦</button>
+        <button id="btn-cam-switch" onclick="switchCamera()" class="top-btn" aria-label="Cambia Camera">🔄</button>
+        
+        <button id="btn-help" onclick="playTutorial()" class="top-btn" aria-label="Aiuto">?</button>
+        <button id="btn-config" onclick="openKeySettings()" class="top-btn" aria-label="Impostazioni">⚙️</button>
+    </div>
+
+    <div id="ui-layer">
+        <div id="status-message" aria-live="polite">In attesa...</div>
+        
+        <button id="btn-radar" aria-pressed="true" onclick="toggleRadarMode()">RADAR ATTIVO</button>
+
+        <button onclick="cyclePreview()">Scegli Oggetto</button>
+        <button onclick="toggleSelection()">Blocca Oggetto</button>
+
+        <button id="btn-verify" class="gemini-btn" onclick="askGemini('verify')">GIUDICE FOTO</button>
+        <button id="btn-tools" class="gemini-btn" onclick="openToolsMenu()">STRUMENTI</button>
+
+        <button id="btn-mode" onclick="toggleAppMode()">MODALITÀ: FOTO 📷</button>
+        <button id="btn-snap" onclick="handleAction()">SCATTA FOTO</button>
+    </div>
+
+    <div id="tools-menu" class="overlay-screen hidden">
+        <div class="tools-content">
+            <h2 style="color: #FFD700; margin-bottom: 15px;">Strumenti Visivi</h2>
+            
+            <button id="btn-discrete" class="tool-btn" aria-pressed="false" style="background: #607D8B;" onclick="toggleDiscreteMode()">MODALITÀ DISCRETA (OFF)</button>
+            <button id="btn-level" class="tool-btn" aria-pressed="false" style="background: #9C27B0;" onclick="toggleLevel()">LIVELLA (OFF)</button>
+            <button id="btn-light-probe" class="tool-btn" aria-pressed="false" style="background: #FFEB3B; color: #000;" onclick="toggleLightProbe()">SONDA LUCE (OFF)</button>
+            <button id="btn-color-probe" class="tool-btn" aria-pressed="false" style="background: #E91E63;" onclick="toggleColorProbe()">SONDA COLORE (OFF)</button>
+            <hr style="width: 80%; border-color: #555; margin: 10px 0;">
+            <button class="tool-btn" style="background: #2196F3;" onclick="askGemini('text')">LEGGI TESTO (AI)</button>
+            <button class="tool-btn" style="background: #FF9800;" onclick="askGemini('face')">ANALISI VOLTO (AI)</button>
+            <button onclick="closeToolsMenu()" style="margin-top: 15px; padding: 20px; width: 90%; background: #333;">CHIUDI MENU</button>
+        </div>
+    </div>
+
+    <div id="start-overlay" class="overlay-screen">
+        <div id="loading-spinner" class="loader hidden"></div>
+        <div id="loading-text" style="color: #FFD700; margin-bottom: 20px;" aria-live="assertive">Caricamento Sistema...</div>
+        <div id="progress-text" aria-live="polite">0%</div>
+        <div id="error-text" aria-live="assertive"></div>
+        <button id="start-btn" onclick="bootstrapApp()">AVVIA SISTEMA</button>
+        <button id="retry-btn" onclick="bootstrapApp()" style="display:none; margin-top:20px; padding:15px; background:red; color:white; border-radius:10px; border:none; font-size:1.2rem;">RIPROVA</button>
+    </div>
+
+    <div id="key-overlay" class="overlay-screen hidden">
+        <h2 style="color: #FFD700;">Chiave Gemini API</h2>
+        <input type="text" id="key-input" placeholder="Incolla chiave qui...">
+        <div style="display: flex; gap: 10px; width: 90%;">
+            <button onclick="saveKey()" style="flex: 1; padding: 15px; background: #FFD700;">Salva</button>
+            <button onclick="closeKeySettings()" style="flex: 1; padding: 15px; background: #555; color: #fff;">Chiudi</button>
+        </div>
+    </div>
+
+<script>
+    // --- LOGICA PRINCIPALE ---
+    
+    let objectDetector = null;
+    let video = document.getElementById("webcam");
+    let canvas = document.getElementById("overlay");
+    let ctx = canvas.getContext("2d");
+    let lastVideoTime = -1;
+    let isRunning = false;
+    let videoTrack = null; 
+
+    // Stati Globali
+    window.discreteMode = false;
+    window.isRunning = false;
+
+    // Camera & Zoom
+    let currentFacingMode = 'environment';
+    let currentZoom = 1;
+    let zoomCaps = { min: 1, max: 3, step: 0.1 };
+    let supportsZoom = false;
+
+    // App State
+    let appMode = 'photo'; 
+    let isRecording = false;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let recStartTime = 0;
+    let recInterval = null;
+
+    // Sensori
+    let radarMode = true; 
+    let torchState = false;
+    let lightProbeActive = false; 
+    let colorProbeActive = false; 
+    let levelActive = false; 
+    let discreteMode = false;
+    let selectedTargets = new Set();
+    let previewTarget = null;
+    let detectedObjects = [];
+
+    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let lightOscillator = null;
+    let lightGain = null;
+
+    // Variabili per throttling (evitare troppe parole)
+    let lastSpokenTime = 0;
+    let lastDirection = "";
+    let GEMINI_API_KEY = localStorage.getItem('gemini_key') || "";
+
+    const colorNames = { '0,0,0': 'Nero', '255,255,255': 'Bianco', '255,0,0': 'Rosso', '0,255,0': 'Verde', '0,0,255': 'Blu', '255,255,0': 'Giallo', '255,0,255': 'Viola', '0,255,255': 'Azzurro', '128,128,128': 'Grigio', '165,42,42': 'Marrone', '255,165,0': 'Arancione' };
+    const translations = { 'person': 'Persona', 'bicycle': 'Bicicletta', 'car': 'Auto', 'bench': 'Panchina', 'dog': 'Cane', 'cat': 'Gatto', 'backpack': 'Zaino', 'umbrella': 'Ombrello', 'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bottle': 'Bottiglia', 'cup': 'Tazza', 'chair': 'Sedia', 'couch': 'Divano', 'potted plant': 'Pianta', 'bed': 'Letto', 'dining table': 'Tavolo', 'toilet': 'Water', 'tv': 'TV', 'laptop': 'Laptop', 'mouse': 'Mouse', 'keyboard': 'Tastiera', 'cell phone': 'Telefono', 'book': 'Libro', 'clock': 'Orologio', 'vase': 'Vaso' };
+
+    window.startCamera = async function() {
+        if (video.srcObject) {
+            const tracks = video.srcObject.getTracks();
+            tracks.forEach(t => t.stop());
+        }
+
+        const retryBtn = document.getElementById('retry-btn');
+        const errText = document.getElementById('error-text');
+        
+        // TENTATIVO 1: STANDARD (Video + Audio)
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: currentFacingMode, 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }
+                },
+                audio: false // Partiamo senza audio per evitare crash, audio solo se richiesto o in rec
+            });
+            handleStreamSuccess(stream);
+        } catch (err) { 
+            console.warn("Errore camera standard:", err);
+            
+            // TENTATIVO 2: MINIMO
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                window.announce("Modalità compatibilità attiva.");
+                handleStreamSuccess(stream);
+            } catch (err3) {
+                console.error("Fallimento totale:", err3);
+                let msg = "Errore Fotocamera.";
+                
+                if (err3.name === 'NotReadableError' || err3.name === 'TrackStartError') {
+                    msg = "La fotocamera è usata da un'altra app. Chiudi le altre schede.";
+                } else if (err3.name === 'NotAllowedError' || err3.name === 'PermissionDeniedError') {
+                    msg = "Permesso negato. Sblocca la fotocamera dalle impostazioni del browser.";
+                }
+
+                errText.innerText = msg;
+                errText.style.display = 'block';
+                retryBtn.style.display = 'block';
+                document.getElementById('loading-spinner').classList.add('hidden');
+                document.getElementById('loading-text').classList.add('hidden');
+                
+                window.announce(msg);
+            }
+        }
+    }
+
+    function handleStreamSuccess(stream) {
+        video.srcObject = stream;
+        video.play().catch(e => console.log("Play error:", e));
+
+        videoTrack = stream.getVideoTracks()[0]; 
+        
+        if (currentFacingMode === 'user') video.classList.add('selfie');
+        else video.classList.remove('selfie');
+
+        const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        if ('zoom' in caps) {
+            supportsZoom = true; zoomCaps = caps.zoom; currentZoom = zoomCaps.min;
+            window.announce(currentFacingMode === 'user' ? "Modalità Selfie." : "Camera posteriore.");
+        } else {
+            supportsZoom = false;
+            window.announce(currentFacingMode === 'user' ? "Modalità Selfie." : "Camera posteriore.");
+        }
+
+        document.getElementById('btn-zoom-in').style.display = supportsZoom ? 'flex' : 'none';
+        document.getElementById('btn-zoom-out').style.display = supportsZoom ? 'flex' : 'none';
+        document.getElementById('btn-torch').style.display = ('torch' in caps) ? 'flex' : 'none';
+
+        const btnRadar = document.getElementById('btn-radar');
+        btnRadar.style.backgroundColor = "#FF0000";
+        btnRadar.innerText = "RADAR ATTIVO";
+        btnRadar.setAttribute('aria-pressed', 'true');
+
+        video.addEventListener("loadeddata", () => {
+            // Check Video Nero
+            checkVideoFeed();
+
+            document.getElementById('start-overlay').classList.add('hidden');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            isRunning = true;
+            window.isRunning = true;
+            window.speakGuide("Fotocamera attiva. Radar in funzione.");
+            predictWebcam();
+            processProbes(); 
+        });
+    }
+
+    // --- CHECK VIDEO NERO ---
+    function checkVideoFeed() {
+        const checkCanvas = document.createElement('canvas');
+        checkCanvas.width = 10; checkCanvas.height = 10;
+        const checkCtx = checkCanvas.getContext('2d');
+        checkCtx.drawImage(video, 0, 0, 10, 10);
+        const data = checkCtx.getImageData(0, 0, 10, 10).data;
+        
+        let allBlack = true;
+        for(let i=0; i<data.length; i+=4) {
+            if(data[i] > 10 || data[i+1] > 10 || data[i+2] > 10) { 
+                allBlack = false;
+                break;
+            }
+        }
+        
+        if(allBlack) {
+            window.speakGuide("Attenzione: Vedo tutto nero. Controlla che la fotocamera non sia coperta o il permesso non sia bloccato.");
+        }
+    }
+
+    // --- INTERAZIONI UTENTE ---
+
+    window.toggleDiscreteMode = function() {
+        discreteMode = !discreteMode;
+        window.discreteMode = discreteMode;
+        const btn = document.getElementById('btn-discrete');
+        if (discreteMode) {
+            btn.innerText = "🔕 MODALITÀ DISCRETA (ON)"; btn.style.border = "4px solid #FF0000"; btn.setAttribute('aria-pressed', 'true');
+            window.announce("Discreta attiva.");
+        } else {
+            btn.innerText = "🔕 MODALITÀ DISCRETA (OFF)"; btn.style.border = "2px solid #FFF"; btn.setAttribute('aria-pressed', 'false');
+            window.announce("Discreta spenta.");
+        }
+    }
+
+    window.toggleAppMode = function() {
+        if (isRecording) return; 
+        if (appMode === 'photo') {
+            appMode = 'video';
+            document.getElementById('btn-mode').innerText = "MODALITÀ: VIDEO 🎥";
+            document.getElementById('btn-snap').innerText = "AVVIA REGISTRAZIONE";
+            document.getElementById('btn-snap').style.backgroundColor = "#FFCCCC";
+            window.announce("Modalità Video.");
+        } else {
+            appMode = 'photo';
+            document.getElementById('btn-mode').innerText = "MODALITÀ: FOTO 📷";
+            document.getElementById('btn-snap').innerText = "SCATTA FOTO";
+            document.getElementById('btn-snap').style.backgroundColor = "#EEE";
+            window.announce("Modalità Foto.");
+        }
+    }
+
+    window.handleAction = function() {
+        if (appMode === 'photo') {
+            takePhoto();
+        } else {
+            if (!isRecording) startRecording();
+            else stopRecording();
+        }
+    }
+
+    function startRecording() {
+        recordedChunks = [];
+        try {
+            const stream = video.srcObject;
+            let mimeType = 'video/webm;codecs=vp9';
+            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+            
+            // Verifica se lo stream ha tracce audio
+            if (stream.getAudioTracks().length === 0) {
+                window.speakGuide("Attenzione: registro video senza audio.");
+            }
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
+            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
+            mediaRecorder.onstop = saveVideo;
+
+            mediaRecorder.start();
+            isRecording = true;
+            
+            const btn = document.getElementById('btn-snap');
+            btn.innerText = "STOP REGISTRAZIONE";
+            btn.classList.add('rec-active');
+            document.getElementById('rec-timer').style.display = 'block';
+            
+            recStartTime = Date.now();
+            updateTimer();
+            recInterval = setInterval(updateTimer, 1000);
+
+            // Qui usiamo speakGuide per essere sicuri che si senta l'avvio
+            window.speakGuide("Registrazione avviata.");
+            playBeep(); 
+
+        } catch (e) { console.error(e); window.announce("Errore video. Forse audio mancante."); }
+    }
+
+    function updateTimer() {
+        const diff = Math.floor((Date.now() - recStartTime) / 1000);
+        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        document.getElementById('rec-timer').innerText = `REC ${mins}:${secs}`;
+        if (diff > 0 && diff % 30 === 0) {
+            window.speakGuide("Rec " + mins + " min.");
+        }
+    }
+
+    function stopRecording() {
+        if (!mediaRecorder) return;
+        mediaRecorder.stop();
+        isRecording = false;
+        clearInterval(recInterval);
+        document.getElementById('rec-timer').style.display = 'none';
+        const btn = document.getElementById('btn-snap');
+        btn.innerText = "AVVIA REGISTRAZIONE";
+        btn.classList.remove('rec-active');
+        window.speakGuide("Video terminato.");
+        playBeep();
+    }
+
+    function saveVideo() {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'video_scan_' + Date.now() + '.webm';
+        a.click();
+    }
+
+    // --- LOOP GUIDA ---
+    async function predictWebcam() {
+        if (!isRunning || !objectDetector) return;
+        let startTimeMs = performance.now();
+        if (video.currentTime !== lastVideoTime) {
+            lastVideoTime = video.currentTime;
+            const detections = window.objectDetector.detectForVideo(video, startTimeMs);
+            detectedObjects = detections.detections.filter(d => {
+                if (radarMode) return true; 
+                return d.categories[0].score > 0.50; 
+            });
+            drawAndGuide(detectedObjects);
+        }
+        window.requestAnimationFrame(predictWebcam);
+    }
+
+    function drawAndGuide(detections) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let target = null;
+
+        if (radarMode && detections.length > 0) {
+            detections.sort((a, b) => (b.boundingBox.width * b.boundingBox.height) - (a.boundingBox.width * a.boundingBox.height));
+            target = detections[0];
+            detections.forEach(d => drawBox(d, d === target ? '#00FF00' : 'rgba(255,255,255,0.2)'));
+        } else {
+            let potential = [];
+            if (selectedTargets.size > 0) potential = detections.filter(d => selectedTargets.has(d.categories[0].categoryName));
+            else if (previewTarget) potential = detections.filter(d => d.categories[0].categoryName === previewTarget);
+            detections.forEach(d => {
+                let color = 'rgba(255,255,255,0.1)';
+                if (selectedTargets.has(d.categories[0].categoryName)) color = '#00FF00';
+                else if (d.categories[0].categoryName === previewTarget) color = '#FFFF00';
+                drawBox(d, color);
+            });
+            if (potential.length > 0) {
+                potential.sort((a, b) => (b.boundingBox.width * b.boundingBox.height) - (a.boundingBox.width * a.boundingBox.height));
+                target = potential[0];
+            }
+        }
+
+        if (target) {
+            const bbox = target.boundingBox;
+            const centerX = bbox.originX + (bbox.width / 2);
+            const screenCenter = canvas.width / 2;
+            const tolerance = canvas.width * 0.15;
+            let msg = "";
+            if (centerX < screenCenter - tolerance) msg = "Sinistra";
+            else if (centerX > screenCenter + tolerance) msg = "Destra";
+            else msg = "CENTRO";
+
+            const statusMsg = document.getElementById('status-message');
+            
+            if (msg === "CENTRO") {
+                statusMsg.style.color = "#00FF00"; statusMsg.innerText = "CENTRATO!";
+                if (lastDirection !== "CENTRO") { 
+                    if (discreteMode) { if(navigator.vibrate) navigator.vibrate(300); } 
+                    else { playBeep(); if(navigator.vibrate) navigator.vibrate([50, 50]); }
+                    lastDirection = "CENTRO"; 
+                    window.announce("Centrato.");
+                }
+            } else {
+                statusMsg.style.color = "#FFF"; statusMsg.innerText = msg;
+                // Rallenta la frequenza per lo Screen Reader (3.5 secondi)
+                if (msg !== lastDirection || Date.now() - lastSpokenTime > 3500) { 
+                    if (discreteMode) {
+                        if (msg === "Sinistra") { if(navigator.vibrate) navigator.vibrate(50); } 
+                        if (msg === "Destra") { if(navigator.vibrate) navigator.vibrate([50, 50]); } 
+                    } else { 
+                        window.announce(msg); 
+                    }
+                    lastDirection = msg; 
+                    lastSpokenTime = Date.now(); 
+                }
+            }
+        }
+    }
+
+    function drawBox(detection, color) {
+        const { originX, originY, width, height } = detection.boundingBox;
+        ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.strokeRect(originX, originY, width, height);
+    }
+
+    window.toggleRadarMode = function() {
+        radarMode = !radarMode;
+        const btn = document.getElementById('btn-radar');
+        if (radarMode) {
+            selectedTargets.clear(); previewTarget = null;
+            btn.style.backgroundColor = "#FF0000"; btn.innerText = "RADAR ATTIVO"; btn.setAttribute('aria-pressed', 'true');
+            window.announce("Radar Attivo.");
+        } else {
+            btn.style.backgroundColor = "#FFA500"; btn.innerText = "ATTIVA RADAR"; btn.setAttribute('aria-pressed', 'false');
+            window.announce("Radar spento.");
+        }
+    };
+
+    window.cyclePreview = function() {
+        if (radarMode) { window.announce("Disattiva radar."); return; }
+        const names = [...new Set(detectedObjects.map(d => d.categories[0].categoryName))];
+        if (names.length === 0) { window.announce("Nessun oggetto."); return; }
+        if (!previewTarget || !names.includes(previewTarget)) previewTarget = names[0];
+        else { const i = names.indexOf(previewTarget); previewTarget = names[(i+1)%names.length]; }
+        const it = translations[previewTarget] || previewTarget;
+        window.announce("Opzione: " + it);
+        document.getElementById('status-message').innerText = "Opz: " + it;
+    };
+
+    window.toggleSelection = function() {
+        if (radarMode) return;
+        if (!previewTarget) { window.announce("Scegli prima un oggetto."); return; }
+        const it = translations[previewTarget] || previewTarget;
+        if (selectedTargets.has(previewTarget)) { selectedTargets.delete(previewTarget); window.announce("Sbloccato " + it); }
+        else { selectedTargets.add(previewTarget); window.announce("Bloccato " + it); }
+    };
+
+    window.takePhoto = function() {
+        window.speakGuide("Salvo."); // Uso speakGuide per feedback immediato
+        const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext('2d').drawImage(video, 0, 0);
+        c.toBlob(async (blob) => {
+            const f = new File([blob], "foto.jpg", { type: "image/jpeg" });
+            if (navigator.canShare && navigator.canShare({files:[f]})) navigator.share({files:[f], title:'Foto', text:'AI Scan'});
+            else { const l = document.createElement('a'); l.download='foto.jpg'; l.href=URL.createObjectURL(blob); l.click(); }
+        }, 'image/jpeg');
+    };
+
+    window.askGemini = async function(mode) {
+        if (!GEMINI_API_KEY) { window.announce("Manca chiave API."); return; }
+        playBeep();
+        document.getElementById('tools-menu').classList.add('hidden');
+        let prompt = "";
+        if (mode === 'verify') prompt = "Analizza foto. Soggetto centrato? A fuoco? Luce ok? Dammi istruzioni correttive se serve.";
+        else if (mode === 'text') prompt = "Leggi tutto il testo.";
+        else if (mode === 'face') prompt = "Analisi volti: età, espressione.";
+        const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext('2d').drawImage(video, 0, 0);
+        const base64 = c.toDataURL('image/jpeg', 0.8).split(',')[1];
+        try {
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: base64}}] }] })
+            });
+            const d = await res.json();
+            window.speakGuide(d.candidates[0].content.parts[0].text);
+        } catch(e) { window.announce("Errore connessione."); }
+    };
+
+    window.toggleTorch = function() {
+        if (!videoTrack) return; torchState = !torchState;
+        videoTrack.applyConstraints({ advanced: [{ torch: torchState }] }).then(()=>window.announce(torchState?"Luce on":"Luce off"));
+    };
+    
+    window.changeZoom = function(d) {
+        if (!supportsZoom) return;
+        let s = (zoomCaps.max-zoomCaps.min)/10;
+        let n = currentZoom + (d*s);
+        if(n>=zoomCaps.min && n<=zoomCaps.max) {
+            currentZoom = n;
+            videoTrack.applyConstraints({advanced:[{zoom:n}]}).then(()=>window.announce("Zoom "+n.toFixed(1)));
+        }
+    };
+    
+    window.switchCamera = function() {
+        currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+        window.announce("Cambio camera..."); startCamera();
+    };
+    
+    window.openKeySettings = () => { document.getElementById('key-overlay').classList.remove('hidden'); window.announce("Impostazioni"); };
+    window.closeKeySettings = () => { document.getElementById('key-overlay').classList.add('hidden'); window.announce("Chiuso"); };
+    window.saveKey = () => {
+        GEMINI_API_KEY = document.getElementById('key-input').value.trim();
+        localStorage.setItem('gemini_key', GEMINI_API_KEY);
+        closeKeySettings(); window.announce("Salvato.");
+    };
+    
+    window.openToolsMenu = () => { document.getElementById('tools-menu').classList.remove('hidden'); window.announce("Strumenti."); }
+    window.closeToolsMenu = () => { document.getElementById('tools-menu').classList.add('hidden'); window.announce("Chiuso."); }
+    
+    window.playTutorial = () => window.speakGuide("Tutorial: Usa Radar Arancio per tutto. Tasto Blu per verifica con Gemini. Tasto Modo per Video. Stop video scarica il file.");
+
+    function processProbes() {
+        if (!isRunning) { requestAnimationFrame(processProbes); return; }
+        if ((lightProbeActive || colorProbeActive) && video.readyState === 4) {
+            const c = document.createElement('canvas'); c.width=1; c.height=1;
+            c.getContext('2d').drawImage(video,0,0,1,1);
+            const p = c.getContext('2d').getImageData(0,0,1,1).data;
+            if(lightProbeActive && lightOscillator) {
+                lightOscillator.frequency.setValueAtTime(200+((p[0]+p[1]+p[2])/3)*8, audioCtx.currentTime);
+            }
+            if(colorProbeActive && Date.now()-lastSpokenTime>1500) {
+                window.speakGuide(getColorName(p[0],p[1],p[2])); lastSpokenTime=Date.now();
+            }
+        }
+        setTimeout(() => requestAnimationFrame(processProbes), 100);
+    }
+    
+    function getColorName(r, g, b) {
+        let min = Infinity; let col = "Sconosciuto";
+        for (let k in colorNames) {
+            const [cr, cg, cb] = k.split(',').map(Number);
+            const d = Math.sqrt((r-cr)**2 + (g-cg)**2 + (b-cb)**2);
+            if (d < min) { min = d; col = colorNames[k]; }
+        }
+        return col;
+    }
+    
+    window.toggleLightProbe = () => {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        lightProbeActive = !lightProbeActive;
+        const btn = document.getElementById('btn-light-probe');
+        if(lightProbeActive) { 
+            btn.innerText="☀️ SONDA LUCE (ON)"; btn.style.border="4px solid yellow"; btn.setAttribute('aria-pressed', 'true');
+            lightOscillator = audioCtx.createOscillator(); lightGain = audioCtx.createGain();
+            lightOscillator.type='sine'; lightGain.gain.value=0.1;
+            lightOscillator.connect(lightGain); lightGain.connect(audioCtx.destination);
+            lightOscillator.start(); window.announce("Luce attiva");
+        } else { 
+            btn.innerText="☀️ SONDA LUCE (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false');
+            if(lightOscillator) lightOscillator.stop(); window.announce("Luce spenta");
+        }
+    };
+    
+    window.toggleColorProbe = () => {
+        colorProbeActive = !colorProbeActive;
+        const btn = document.getElementById('btn-color-probe');
+        if(colorProbeActive) { btn.innerText="🎨 COLORE (ON)"; btn.style.border="4px solid magenta"; btn.setAttribute('aria-pressed', 'true'); window.announce("Colore attivo"); }
+        else { btn.innerText="🎨 COLORE (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false'); window.announce("Colore spento"); }
+    };
+    
+    window.toggleLevel = () => {
+        levelActive = !levelActive;
+        const btn = document.getElementById('btn-level');
+        if(levelActive) {
+            btn.innerText="📐 LIVELLA (ON)"; btn.style.border="4px solid lime"; btn.setAttribute('aria-pressed', 'true'); window.announce("Livella attiva");
+            if(typeof DeviceOrientationEvent.requestPermission==='function') DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted')window.addEventListener('deviceorientation', handleOrientation)});
+            else window.addEventListener('deviceorientation', handleOrientation);
+        } else {
+            btn.innerText="📐 LIVELLA (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false'); window.announce("Livella spenta");
+            window.removeEventListener('deviceorientation', handleOrientation);
+        }
+    };
+    
+    let lastLevelSpeak=0;
+    function handleOrientation(e) {
+        if(!levelActive || Date.now()-lastLevelSpeak<1500) return;
+        if(e.gamma>5) { window.speakGuide("Pendi destra"); lastLevelSpeak=Date.now(); }
+        else if(e.gamma<-5) { window.speakGuide("Pendi sinistra"); lastLevelSpeak=Date.now(); }
+    }
+
+    function playBeep() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        o.frequency.value = 880; g.gain.value = 0.1; o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.1);
+    }
+</script>
+</body>
+</html>
