@@ -296,121 +296,66 @@
                     intro = "Analisi in modalità scena generale. Attendi descrizione dettagliata e qualità della foto.";
                     break;
                 case 'selfie':
-                    intro = "Analisi in modalità selfie o volto. Attendi valutazione del viso e qualità foto.";
-                    break;
-                case 'outdoor':
-                    intro = "Analisi in modalità ambiente esterno o paesaggio. Attendi descrizione e qualità foto.";
-                    break;
-                case 'indoor':
-                    intro = "Analisi in modalità ambiente interno o stanza. Attendi descrizione e qualità foto.";
-                    break;
-                case 'object':
-                    intro = "Analisi in modalità oggetto. Attendi descrizione dell’oggetto e qualità foto.";
-                    break;
-                case 'text':
-                    intro = "Analisi in modalità testo o documento. Attendi lettura del testo e qualità della foto.";
-                    break;
-                case 'food':
-                    intro = "Analisi in modalità cibo o piatto. Attendi descrizione del piatto e qualità foto.";
-                    break;
-                case 'safety':
-                    intro = "Analisi in modalità sicurezza e ostacoli. Attendi analisi e qualità foto.";
-                    break;
-                default:
-                    intro = "Analisi della foto. Attendi.";
-            }
-
-            announce(intro);
-
-            const prompt = buildPromptForContext(context);
-            const text = await callGemini(prompt, b64);
-
-            if (!text) {
-                announce("Analisi non riuscita. Controlla la connessione o la chiave API e riprova.");
-                return;
-            }
-
-            announce("Analisi completata. Puoi usare la foto, modificarla e farla analizzare di nuovo, oppure eliminarla.");
-        }
-
-        function buildPromptForContext(context) {
-            const qualityBlock = `
-Infine, valuta la qualità tecnica della foto e se è adatta ai vari usi sui social.
-
-Basati solo su criteri oggettivi:
-- nitidezza (foto nitida oppure sfocata),
-- centratura del soggetto principale,
-- luminosità (troppo scura, troppo chiara, luce equilibrata),
-- colori (naturali oppure strani o slavati),
-- eventuali ostacoli davanti all’obiettivo o elementi che coprono il soggetto.
-
-Se noti problemi concreti (ad esempio: soggetto tagliato, troppo lontano, troppo vicino, luce insufficiente, foto mossa, dito davanti alla lente, zona importante fuori inquadratura):
-- indica chiaramente qual è il problema principale;
-- proponi da 1 a 3 consigli molto concreti e semplici per migliorare un prossimo scatto, ad esempio: “avvicina un po’ il telefono”, “sposta la fotocamera leggermente verso sinistra”, “scegli un punto più illuminato”, “tieni il telefono più fermo”, “alza leggermente l’inquadratura”.
-
-Poi valuta separatamente la foto pensando alle inquadrature tipiche e alle zone a rischio taglio sui social. 
-Non serve essere perfetto sui numeri, basta un controllo pratico e chiaro:
-
-- POST FEED (Instagram, Facebook), spesso croppato in quadrato o quasi quadrato:
-  - immagina un quadrato centrale che comprenda circa il 70% dell’immagine;
-  - verifica se volto, oggetto principale o testo cadono dentro a questa zona centrale;
-  - segnala se qualcosa di importante è troppo vicino ai bordi sinistro o destro o viene tagliato in alto/in basso nel quadrato.
-
-- STORIE / REELS / STATI (Instagram Stories, Facebook Stories, WhatsApp, TikTok a schermo intero verticale):
-  - immagina un formato verticale 9:16, centrato sull’immagine;
-  - considera che in alto e in basso ci sono spesso barre, nomi e pulsanti;
-  - controlla che il contenuto importante sia nella parte centrale verticale, non attaccato al bordo superiore o inferiore;
-  - segnala se elementi importanti cadono proprio in zone che di solito sono coperte da scritte o pulsanti dell’app.
-
-- FOTO PROFILO (cerchio piccolo per social o app di messaggistica):
-  - immagina un cerchio al centro della foto;
-  - controlla se il viso o il soggetto principale cadono bene dentro il cerchio senza essere tagliati;
-  - segnala se la testa è troppo vicina al bordo superiore, se il viso è tagliato o troppo di lato.
-
-- COPERTINA / THUMBNAIL, ad esempio copertina di video o anteprima stile TikTok/Reel:
-  - immagina un riquadro centrale orizzontale che occupa la parte centrale dell’immagine;
-  - verifica se il soggetto principale e il testo sono ben visibili in questo riquadro centrale;
-  - segnala se elementi importanti sono troppo vicini ai bordi, dove potrebbero essere coperti da scritte o pulsanti dell’app.
-
-Per ciascuna di queste categorie, esprimi una valutazione sintetica, ad esempio:
-- “Post feed: adatta / non consigliata, perché …”
-- “Storie / stati: adatta / non consigliata, perché …”
-- “Foto profilo: adatta / non consigliata, perché …”
-- “Copertina / thumbnail: adatta / non consigliata, perché …”
-
-Quando rispondi, usa sempre questa struttura con tre parti:
-
-1) Descrizione:
-- descrivi solo ciò che vedi chiaramente, con frasi brevi e dirette;
-- indica la posizione degli elementi rispetto al centro dell’immagine (sinistra, destra, in alto, in basso, vicino, lontano);
-- se qualcosa non è chiaro, usa espressioni come “sembra” oppure “non è chiaro se…”.
-
-2) Qualità tecnica e uso sui social:
-- in poche frasi valuta nitidezza, centratura, luminosità e colori;
-- includi la valutazione separata per: post feed, storie/stati, foto profilo, copertina/thumbnail, con motivazione breve.
-
-3) Suggerimenti pratici (solo se necessari):
-- se hai individuato problemi concreti, dai suggerimenti semplici e azionabili;
-- se non hai individuato problemi rilevanti, scrivi che non sono necessari cambiamenti importanti.
-
-Evita giudizi personali o psicologici sulle persone (non dire se sono belle o brutte, tristi o felici), limita la descrizione a espressioni del volto, postura, vestiti e contesto visibile.
-`;
-
-            switch (context) {
-                case 'scene':
                     return `
-Descrivi questa immagine come se la stessi spiegando a una persona non vedente. 
-Concentrati su:
-- cosa c’è in primo piano,
-- cosa c’è al centro dell’immagine,
-- cosa c’è sullo sfondo,
-- posizione degli elementi (sinistra, destra, alto, basso, vicino, lontano),
-- presenza di persone, animali, oggetti, segnali, testo o elementi rilevanti,
-- colori principali e contrasti,
-- eventuali interazioni tra gli oggetti o le persone.
+Analizza la foto come selfie o ritratto, con un obiettivo: valutare se il volto è adatto come foto profilo o immagine personale per social, app di messaggistica o documenti informali.
 
-Usa frasi semplici e dirette. Non inventare dettagli se non sei sicuro.
+1) RICONOSCIMENTO VOLTO
+- Di’ se è presente 1 volto principale.  
+- Ignora volti secondari o molto piccoli.
+- Indica chiaramente la DIREZIONE DEL VOLTO usando una delle tre categorie:
+  • “fronte” → il volto guarda direttamente l'obiettivo;  
+  • “tre quarti” → metà del volto è più visibile dell’altra, il naso punta leggermente di lato;  
+  • “profilo” → si vede un solo lato del volto, con naso e bocca di lato.
+
+2) POSIZIONE DEL VOLTO
+Descrivi la posizione del volto rispetto al centro dell’immagine:
+- a sinistra, destra, alto, basso, oppure ben centrato.
+- Indica se lo sguardo è verso la fotocamera oppure leggermente altrove.
+
+3) MARGINI E TAGLI
+Controlla con precisione:
+- se la testa è tagliata in alto o in basso,
+- se c’è sufficiente “spazio sopra la testa” (importante per foto profilo),
+- se mento, fronte o orecchie sono tagliati,
+- se qualche oggetto copre il volto.
+
+4) DISTANZA DALLA CAMERA
+Classifica la distanza in tre categorie:
+- “troppo vicina” (parte del viso deformata, dettagli troppo ingranditi),
+- “ok / naturale” (visione equilibrata),
+- “troppo lontana” (volto piccolo, difficile da usare come profilo).
+
+5) LUCE E QUALITÀ
+Valuta:
+- se la luce illumina il volto in modo uniforme,
+- se ci sono ombre forti, zone scurissime o luce bruciata,
+- se i colori sono naturali o alterati,
+- nitidezza (nitida / leggermente sfocata / molto sfocata),
+- eventuale rumore o movimento.
+
+6) ADATTA COME FOTO PROFILO?
+Valuta oggettivamente se questa foto è adatta come foto profilo.  
+Usa una frase chiara:  
+- “adatta come foto profilo perché …”  
+- “non consigliata come foto profilo perché …”
+
+7) SUGGERIMENTI CONCRETI
+Dai solo consigli tecnici e semplici, senza giudizi personali:
+- avvicina / allontana la fotocamera,
+- centra meglio il volto,
+- lascia più spazio sopra la testa,
+- evita controluce o luce troppo forte,
+- inclina leggermente il telefono per bilanciare l’inquadratura,
+- guarda direttamente la fotocamera.
+
+Non dare giudizi estetici o emotivi. Limita la descrizione a elementi visivi e tecnici.
+
+Alla fine, riassumi in tre righe:
+1) Direzione volto (fronte / tre quarti / profilo)  
+2) Centratura (centrato / leggermente a sinistra / alto / basso ecc.)  
+3) Adatta o no come foto profilo (con 1 motivo tecnico)
 ` + qualityBlock;
+
 
                 case 'selfie':
                     return `
