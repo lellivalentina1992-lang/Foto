@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI Pro - Max Quality</title>
+    <title>Visione AI - Universale</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -134,7 +134,7 @@
             if(navigator.vibrate) navigator.vibrate(pattern);
         }
 
-        // --- 1. AVVIO DEL SISTEMA ---
+        // --- 1. AVVIO DEL SISTEMA (LOGICA IBRIDA) ---
         async function startApp() {
             const startBtn = document.querySelector('#start-screen button');
             startBtn.style.display = 'none';
@@ -146,6 +146,7 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             try {
+                // Carica AI per centraggio
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
@@ -155,13 +156,23 @@
                     runningMode: "VIDEO"
                 });
 
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
-                });
+                // --- GESTIONE CAMERA IBRIDA (ANDROID/IOS + WINDOWS) ---
+                let stream;
+                try {
+                    // TENTATIVO 1: Chiedi fotocamera posteriore (per Smartphone)
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                    });
+                } catch (err) {
+                    console.warn("Nessuna camera posteriore trovata, passo a generica.");
+                    // TENTATIVO 2: Se fallisce (es. Windows), chiedi una camera qualsiasi
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    } catch (err2) {
+                        alert("ERRORE FOTOCAMERA: Verifica che il sito sia HTTPS o Localhost e di aver dato i permessi.");
+                        throw err2;
+                    }
+                }
                 
                 video.srcObject = stream;
                 videoTrack = stream.getVideoTracks()[0];
@@ -190,10 +201,10 @@
             requestAnimationFrame(loop);
         }
 
-        // --- 2. DESCRIZIONE SCENA (AI PRO) ---
+        // --- 2. DESCRIZIONE SCENA (GEMINI PRO) ---
         async function quickDescribe() {
             if(mode === 'guiding') toggleGuidance(); 
-            announce("Scatto e analizzo con alta precisione.");
+            announce("Scatto e analizzo.");
             playShutter();
             const b64 = captureFrame();
             const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
@@ -399,12 +410,12 @@
             return c.toDataURL('image/jpeg', 0.7).split(',')[1]; 
         }
 
-        // --- CHIAMATA AI CON MODELLO PRO (gemini-1.5-pro-latest) ---
+        // --- CHIAMATA AI GEMINI PRO (STABILE) ---
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
             try {
-                // MODIFICA EFFETTUATA: 'gemini-1.5-pro-latest' per massima qualità
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${GEMINI_KEY}`, {
+                // Modello Gemini 1.5 Pro (Massima precisione)
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
                 });
