@@ -27,7 +27,7 @@
             height: 60vh; width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr 1fr 0.3fr; 
+            grid-template-rows: 1fr 1fr 1fr auto auto; 
             gap: 8px; padding: 8px; box-sizing: border-box;
             background: #000; border-top: 4px solid #333;
         }
@@ -48,10 +48,13 @@
         .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; }
         .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; }
 
-        /* Riga impostazioni inferiore */
+        /* Barra inferiore impostazioni */
         .bottom-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
         .small-btn { flex: 1; font-size: 0.9rem; background: #111; border: 1px solid #444; color: #CCC; }
         .active-discrete { border-color: #FF0000; color: #FF0000; }
+
+        /* Barra azioni foto (usa / elimina) */
+        .shot-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
 
         /* Overlay Caricamento e Settings */
         .overlay {
@@ -64,6 +67,15 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
         input { background: #333; color: #FFF; border: 1px solid #777; }
+
+        /* Link download fallback */
+        #download-link {
+            grid-column: 1 / -1;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #D4AF37;
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -76,7 +88,9 @@
     </div>
 
     <div id="controls" class="hidden">
-        <button id="btn-desc" onclick="quickDescribe()">DESCRIVI SCENA</button>
+        <button id="btn-desc" onclick="quickDescribe()" aria-label="Scatta foto, descrivi la scena e poi scegli se usare o eliminare la foto">
+            DESCRIVI SCENA
+        </button>
         <button id="btn-guide" onclick="toggleGuidance()">GUIDA CENTRAGGIO</button>
         
         <button id="btn-light" onclick="toggleLight()">SONDA LUCE</button>
@@ -85,10 +99,21 @@
         <button id="btn-level" onclick="toggleLevel()">LIVELLA</button>
         <button id="btn-torch" onclick="toggleTorch()">TORCIA</button>
 
+        <!-- Barra azioni dopo lo scatto -->
+        <div id="shot-actions" class="shot-bar hidden">
+            <button class="small-btn" id="btn-use" onclick="usePhoto()">USA FOTO</button>
+            <button class="small-btn" id="btn-delete" onclick="deletePhoto()">ELIMINA</button>
+        </div>
+
         <div class="bottom-bar">
             <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()">MODO DISCRETO</button>
             <button class="small-btn" onclick="openSettings()">IMPOSTAZIONI API</button>
         </div>
+
+        <!-- Link fallback per download foto -->
+        <a id="download-link" href="#" class="hidden">
+            Scarica la foto scattata
+        </a>
     </div>
 
     <div id="start-screen" class="overlay">
@@ -135,6 +160,10 @@
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
 
+        // Stato ultima foto scattata
+        let lastShotB64 = null;
+        let lastShotUrl = null;
+
         // --- ACCESSIBILITÀ & OUTPUT ---
         function announce(text) {
             if(discreteMode) return;
@@ -164,8 +193,12 @@
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
                 objectDetector = await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", delegate: "GPU" },
-                    scoreThreshold: 0.35, 
+                    baseOptions: { 
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", 
+                        delegate: "GPU" 
+                    },
+                    scoreThreshold: 0.1,   // più sensibile
+                    maxResults: 5,
                     runningMode: "VIDEO"
                 });
 
@@ -225,22 +258,40 @@
             requestAnimationFrame(loop);
         }
 
-        // --- 2. INTEGRAZIONE GEMINI PRO (DESCRIZIONE DETTAGLIATA) ---
+        // --- 2. SCATTO + DESCRIZIONE GEMINI + SCELTA USA/ELIMINA ---
         async function quickDescribe() {
-            if(mode === 'guiding') toggleGuidance(); 
+            if (mode === 'guiding') toggleGuidance(); 
             
-            announce("Scatto Pro 3. Attendi analisi dettagliata.");
+            announce("Scatto. Attendi descrizione della scena.");
             playShutter();
             
+            // Scatto dal video
             const b64 = captureFrame();
-            
-            // PROMPT AGGIORNATO PER PRECISIONE
+            lastShotB64 = b64;
+
+            // reset eventuale URL precedente
+            if (lastShotUrl) {
+                URL.revokeObjectURL(lastShotUrl);
+                lastShotUrl = null;
+            }
+            // nascondo link download vecchio
+            const dlLink = document.getElementById('download-link');
+            dlLink.classList.add('hidden');
+            dlLink.removeAttribute('href');
+            dlLink.removeAttribute('download');
+
+            // Prompt per Gemini
             const prompt = "Descrivi in dettaglio e con alta precisione questa immagine per una persona non vedente. Identifica oggetti, testi (leggili tutti), colori e posizioni relative. Non essere troppo sintetico se ci sono dettagli importanti.";
             
             await callGemini(prompt, b64);
+
+            // Dopo la descrizione mostro le azioni sulla foto
+            const actions = document.getElementById('shot-actions');
+            actions.classList.remove('hidden');
+            announce("Descrizione completata. Puoi usare la foto oppure eliminarla.");
         }
 
-        // --- 3. GUIDA AL CENTRAGGIO ---
+        // --- 3. GUIDA AL CENTRAGGIO (potenziata) ---
         function toggleGuidance() {
             const btn = document.getElementById('btn-guide');
             if(mode === 'guiding') {
@@ -254,21 +305,54 @@
                 centeredCount = 0; 
                 btn.classList.add('guiding'); 
                 btn.innerText = "CERCO SOGGETTO...";
-                announce("Cerco soggetto.");
+                announce("Guida centraggio attiva. Cerco un oggetto da centrare.");
             }
         }
 
         function processGuidance() {
-            // GUARDIA: Controlla se il rilevatore è pronto
             if (!objectDetector) return;
 
-            const detections = objectDetector.detectForVideo(video, performance.now()).detections;
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            
-            if(detections.length === 0) return;
+            const result = objectDetector.detectForVideo(video, performance.now());
+            const detections = (result && result.detections) ? result.detections : [];
 
-            // Prendi l'oggetto più grande
-            const target = detections.sort((a,b)=>(b.boundingBox.width*b.boundingBox.height)-(a.boundingBox.width*a.boundingBox.height))[0];
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+
+            // Nessun oggetto rilevato proprio
+            if (detections.length === 0) {
+                if (Date.now() - lastSpeak > 1800) {
+                    announce("Non vedo nessun oggetto distinto. Prova ad avvicinare o cambiare leggermente angolazione.");
+                    lastSpeak = Date.now();
+                }
+                centeredCount = 0;
+                return;
+            }
+
+            // Due livelli: detection forti, poi deboli
+            let scored = detections.map(d => {
+                const cat = (d.categories && d.categories[0]) ? d.categories[0] : null;
+                const score = cat ? cat.score : 0;
+                return { d, score };
+            });
+
+            let strong = scored.filter(x => x.score >= 0.5);
+            if (strong.length === 0) {
+                strong = scored.filter(x => x.score >= 0.2);
+            }
+
+            if (strong.length === 0) {
+                // Modello molto incerto, meglio tacere
+                centeredCount = 0;
+                return;
+            }
+
+            // prendo l'oggetto più grande tra quelli filtrati
+            const target = strong
+                .sort((a, b) => {
+                    const boxA = a.d.boundingBox;
+                    const boxB = b.d.boundingBox;
+                    return (boxB.width * boxB.height) - (boxA.width * boxA.height);
+                })[0].d;
+
             const box = target.boundingBox;
             
             const cx = box.originX + box.width/2;
@@ -280,39 +364,61 @@
             ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 6; 
             ctx.strokeRect(box.originX, box.originY, box.width, box.height);
 
+            // etichetta -> italiano, con fallback “un oggetto”
+            let label = null;
+            if (target.categories && target.categories.length > 0) {
+                label = target.categories[0].categoryName;
+            }
+            const oggetto = labelToItalian(label);
+
             let msg = "";
-            
-            if(cx < sx - tolX) msg = "Sposta a sinistra";
-            else if(cx > sx + tolX) msg = "Sposta a destra";
-            else if(cy < sy - tolY) msg = "Alza fotocamera";
-            else if(cy > sy + tolY) msg = "Abbassa fotocamera";
-            
-            if(msg) {
+
+            if (cx < sx - tolX) {
+                msg = oggetto + " un po' a sinistra. Sposta a sinistra.";
                 centeredCount = 0;
-                if(Date.now() - lastSpeak > 1200) { 
-                    announce(msg); 
-                    vibrate(30); 
-                    lastSpeak=Date.now(); 
-                }
+            } else if (cx > sx + tolX) {
+                msg = oggetto + " un po' a destra. Sposta a destra.";
+                centeredCount = 0;
+            } else if (cy < sy - tolY) {
+                msg = oggetto + " in alto. Alza la fotocamera.";
+                centeredCount = 0;
+            } else if (cy > sy + tolY) {
+                msg = oggetto + " in basso. Abbassa la fotocamera.";
+                centeredCount = 0;
             } else {
+                msg = oggetto + " centrato.";
                 centeredCount++;
-                if(centeredCount === 2) { 
-                    announce("Centrato."); 
-                    vibrate([50,50,50]); 
+            }
+
+            if (Date.now() - lastSpeak > 1200) {
+                announce(msg);
+                vibrate(30);
+                lastSpeak = Date.now();
+            }
+
+            // Se rimane centrato per un po', puoi auto-scatto + descrizione
+            if (centeredCount > SNAP_THRESHOLD) {
+                mode = 'idle'; 
+                document.getElementById('btn-guide').classList.remove('guiding');
+                document.getElementById('btn-guide').innerText = "GUIDA CENTRAGGIO";
+                announce("Oggetto centrato da tempo. Scatto e analizzo.");
+                playShutter();
+
+                const b64 = captureFrame();
+                lastShotB64 = b64;
+
+                if (lastShotUrl) {
+                    URL.revokeObjectURL(lastShotUrl);
+                    lastShotUrl = null;
                 }
-                
-                if(centeredCount > SNAP_THRESHOLD) {
-                    mode = 'idle'; 
-                    document.getElementById('btn-guide').classList.remove('guiding');
-                    document.getElementById('btn-guide').innerText = "ANALISI PRO...";
-                    announce("Oggetto centrato. Scatto e analizzo."); 
-                    playShutter();
-                    const b64 = captureFrame();
-                    
-                    callGemini("Descrivi molto dettagliatamente l'oggetto che ho appena inquadrato e centrato.", b64).then(()=>{
-                        document.getElementById('btn-guide').innerText = "GUIDA CENTRAGGIO";
-                    });
-                }
+
+                callGemini("Descrivi molto dettagliatamente l'oggetto che ho appena inquadrato e centrato.", b64).then(()=>{
+                    const actions = document.getElementById('shot-actions');
+                    actions.classList.remove('hidden');
+                    announce("Descrizione completata. Puoi usare la foto oppure eliminarla.");
+                });
+
+                centeredCount = 0;
             }
         }
 
@@ -345,7 +451,6 @@
             const cx = Math.floor(canvas.width / 2);
             const cy = Math.floor(canvas.height / 2);
             
-            // CLAMPING: Assicura che le coordinate non siano negative
             const x = Math.max(0, cx - size / 2);
             const y = Math.max(0, cy - size / 2);
             
@@ -378,7 +483,6 @@
             const cx = Math.floor(canvas.width / 2);
             const cy = Math.floor(canvas.height / 2);
             
-            // CLAMPING: Assicura che le coordinate non siano negative
             const x = Math.max(0, cx - boxSize / 2);
             const y = Math.max(0, cy - boxSize / 2);
             
@@ -431,7 +535,6 @@
             const targetState = !torchActive;
             const btn = document.getElementById('btn-torch');
 
-            // Avviso: torch non è sempre supportato o richiede HTTPS
             videoTrack.applyConstraints({advanced:[{torch: targetState}]})
             .then(() => {
                 torchActive = targetState; 
@@ -469,7 +572,6 @@
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Chiave API mancante."); openSettings(); return; }
             try {
-                // Chiamata a Gemini 3 Pro Preview
                 const res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
@@ -484,7 +586,6 @@
                 
                 const d = await res.json();
                 
-                // GESTIONE ERRORI TRASPARENTE: Mostra l'errore reale
                 if(d.error) {
                     console.error("Errore API Gemini:", d.error);
                     announce("Errore API: " + d.error.message);
@@ -514,6 +615,71 @@
             } 
         }
         
+        // --- 5. USA FOTO / ELIMINA FOTO ---
+
+        async function usePhoto() {
+            if (!lastShotB64) {
+                announce("Nessuna foto disponibile da usare.");
+                return;
+            }
+
+            let shared = false;
+
+            try {
+                if (navigator.share) {
+                    const blob = await (await fetch(`data:image/jpeg;base64,${lastShotB64}`)).blob();
+                    const file = new File([blob], "foto-visione-ai.jpg", { type: "image/jpeg" });
+
+                    const canShareFiles = !navigator.canShare || navigator.canShare({ files: [file] });
+
+                    if (canShareFiles) {
+                        await navigator.share({
+                            title: "Scatto Visione AI",
+                            text: "Foto scattata da Visione AI.",
+                            files: [file]
+                        });
+                        shared = true;
+                        announce("Finestra di condivisione aperta. Scegli l'app con cui vuoi inviare la foto.");
+                    }
+                }
+            } catch (e) {
+                console.warn("Condivisione non riuscita o annullata:", e);
+            }
+
+            if (!shared) {
+                try {
+                    const blob = await (await fetch(`data:image/jpeg;base64,${lastShotB64}`)).blob();
+                    lastShotUrl = URL.createObjectURL(blob);
+                    const link = document.getElementById('download-link');
+                    link.href = lastShotUrl;
+                    link.download = "scatto-visione-ai.jpg";
+                    link.classList.remove('hidden');
+                    announce("Questo dispositivo non supporta la condivisione diretta della foto. Usa il link 'Scarica la foto scattata' per salvarla e condividerla dall'app Foto.");
+                } catch (e) {
+                    console.error(e);
+                    announce("Errore nel preparare la foto per la condivisione.");
+                }
+            }
+        }
+
+        function deletePhoto() {
+            lastShotB64 = null;
+            if (lastShotUrl) {
+                URL.revokeObjectURL(lastShotUrl);
+                lastShotUrl = null;
+            }
+
+            const actions = document.getElementById('shot-actions');
+            actions.classList.add('hidden');
+
+            const dlLink = document.getElementById('download-link');
+            dlLink.classList.add('hidden');
+            dlLink.removeAttribute('href');
+            dlLink.removeAttribute('download');
+
+            announce("Foto eliminata. Sei tornata alla schermata principale. Puoi scattare una nuova foto quando vuoi.");
+        }
+
         // Palette Colori per Non Vedenti (nomi stabili)
         const colors={
             '0,0,0':'Nero','255,255,255':'Bianco','200,200,200':'Grigio Chiaro','80,80,80':'Grigio Scuro',
@@ -530,6 +696,25 @@
                 if(d<min){min=d;res=colors[k];}
             } 
             return res;
+        }
+
+        // Mappe etichette rilevatore -> italiano
+        const labelMap = {
+            person: "una persona",
+            face: "un volto",
+            bottle: "una bottiglia",
+            cup: "una tazza",
+            book: "un libro",
+            cellphone: "un telefono",
+            laptop: "un portatile",
+            chair: "una sedia",
+            tv: "un televisore"
+            // puoi aggiungere altre etichette se ne trovi nei test
+        };
+
+        function labelToItalian(label) {
+            if (!label) return "un oggetto";
+            return labelMap[label] || "un oggetto";
         }
 
         // Settings Manager
