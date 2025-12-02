@@ -27,7 +27,7 @@
             height: 60vh; width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto 1fr 1fr 1fr 1fr auto auto auto; 
+            grid-template-rows: auto auto 1fr 1fr 1fr 1fr auto auto auto; 
             gap: 8px; padding: 8px; box-sizing: border-box;
             background: #000; border-top: 4px solid #333;
         }
@@ -41,7 +41,7 @@
         }
         button:active { background: #555; transform: scale(0.98); }
 
-        /* Barra superiore */
+        /* Barre superiori */
         .top-bar { 
             grid-column: 1 / -1; 
             display: flex; 
@@ -98,17 +98,35 @@
 
     <div id="controls" class="hidden">
 
-        <!-- RIGA 0: GUIDA + SCATTA -->
+        <!-- RIGA 0: guida + scatta -->
         <div class="top-bar">
-            <button class="small-btn" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva o disattiva guida di centraggio oggetto">
+            <button class="small-btn" id="btn-guide" onclick="toggleGuidance()"
+                    aria-label="Attiva o disattiva guida di centraggio oggetto">
                 GUIDA CENTRAGGIO
             </button>
-            <button class="small-btn" id="btn-shot" onclick="takeShot()" aria-label="Scatta una foto senza analizzarla, poi scegli come farla descrivere">
+            <button class="small-btn" id="btn-shot" onclick="takeShot()"
+                    aria-label="Scatta una foto senza analizzarla, poi scegli come farla descrivere">
                 SCATTA
             </button>
         </div>
 
-        <!-- RIGA 1: scena generale + selfie -->
+        <!-- RIGA 1: strumenti sensoriali -->
+        <div class="top-bar">
+            <button class="small-btn" id="btn-light" onclick="toggleLight()" aria-label="SONDA LUCE">
+                SONDA LUCE
+            </button>
+            <button class="small-btn" id="btn-color" onclick="toggleColor()" aria-label="SONDA COLORE">
+                SONDA COLORE
+            </button>
+            <button class="small-btn" id="btn-level" onclick="toggleLevel()" aria-label="LIVELLA">
+                LIVELLA
+            </button>
+            <button class="small-btn" id="btn-torch" onclick="toggleTorch()" aria-label="TORCIA">
+                TORCIA
+            </button>
+        </div>
+
+        <!-- RIGA 2: scena generale + selfie -->
         <button id="btn-scene" 
                 onclick="describeWithMode('scene')" 
                 aria-label="Analizza la foto scattata come scena generale con descrizione dettagliata e qualità della foto">
@@ -120,7 +138,7 @@
             SELFIE / VOLTO
         </button>
         
-        <!-- RIGA 2: esterno + interno -->
+        <!-- RIGA 3: esterno + interno -->
         <button id="btn-outdoor" 
                 onclick="describeWithMode('outdoor')" 
                 aria-label="Analizza la foto scattata come ambiente esterno o paesaggio, con descrizione e qualità foto">
@@ -132,7 +150,7 @@
             INTERNO / STANZA
         </button>
 
-        <!-- RIGA 3: oggetto + testo -->
+        <!-- RIGA 4: oggetto + testo -->
         <button id="btn-object" 
                 onclick="describeWithMode('object')" 
                 aria-label="Analizza la foto scattata per descrivere un oggetto in dettaglio, con qualità foto">
@@ -144,15 +162,15 @@
             TESTO / DOCUMENTO
         </button>
 
-        <!-- RIGA 4: cibo + sicurezza -->
+        <!-- RIGA 5: cibo + sicurezza -->
         <button id="btn-food" 
                 onclick="describeWithMode('food')" 
                 aria-label="Analizza la foto scattata per descrivere un piatto o del cibo, con qualità foto">
             CIBO / PIATTO
         </button>
         <button id="btn-safety" 
-            onclick="describeWithMode('safety')" 
-            aria-label="Analizza la foto scattata per ostacoli e sicurezza">
+                onclick="describeWithMode('safety')" 
+                aria-label="Analizza la foto scattata per ostacoli e sicurezza">
             SICUREZZA / OSTACOLI
         </button>
 
@@ -163,14 +181,8 @@
             <button class="small-btn" id="btn-delete" onclick="deletePhoto()">ELIMINA</button>
         </div>
 
+        <!-- Barra inferiore: modo discreto + impostazioni -->
         <div class="bottom-bar">
-            <button class="small-btn" id="btn-light" onclick="toggleLight()">SONDA LUCE</button>
-            <button class="small-btn" id="btn-color" onclick="toggleColor()">SONDA COLORE</button>
-        </div>
-
-        <div class="bottom-bar">
-            <button class="small-btn" id="btn-level" onclick="toggleLevel()">LIVELLA</button>
-            <button class="small-btn" id="btn-torch" onclick="toggleTorch()">TORCIA</button>
             <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()">MODO DISCRETO</button>
             <button class="small-btn" onclick="openSettings()">IMPOSTAZIONI API</button>
         </div>
@@ -397,7 +409,8 @@
 
         function buildPromptForContext(context) {
             const qualityBlock = `
-Infine, valuta in modo sintetico la qualità tecnica della foto e se è pronta per essere condivisa sui social (Instagram, Facebook, WhatsApp). 
+Infine, valuta la qualità tecnica della foto e se è adatta ai vari usi sui social.
+
 Basati solo su criteri oggettivi:
 - nitidezza (foto nitida oppure sfocata),
 - centratura del soggetto principale,
@@ -409,7 +422,35 @@ Se noti problemi concreti (ad esempio: soggetto tagliato, troppo lontano, troppo
 - indica chiaramente qual è il problema principale;
 - proponi da 1 a 3 consigli molto concreti e semplici per migliorare un prossimo scatto, ad esempio: “avvicina un po’ il telefono”, “sposta la fotocamera leggermente verso sinistra”, “scegli un punto più illuminato”, “tieni il telefono più fermo”, “alza leggermente l’inquadratura”.
 
-Se la foto è già chiaramente adatta e non vedi problemi rilevanti, dillo esplicitamente e non inventare correzioni.
+Poi valuta separatamente la foto pensando alle inquadrature tipiche e alle zone a rischio taglio sui social. 
+Non serve essere perfetto sui numeri, basta un controllo pratico e chiaro:
+
+- POST FEED (Instagram, Facebook), spesso croppato in quadrato o quasi quadrato:
+  - immagina un quadrato centrale che comprenda circa il 70% dell’immagine;
+  - verifica se volto, oggetto principale o testo cadono dentro a questa zona centrale;
+  - segnala se qualcosa di importante è troppo vicino ai bordi sinistro o destro o viene tagliato in alto/in basso nel quadrato.
+
+- STORIE / REELS / STATI (Instagram Stories, Facebook Stories, WhatsApp, TikTok a schermo intero verticale):
+  - immagina un formato verticale 9:16, centrato sull’immagine;
+  - considera che in alto e in basso ci sono spesso barre, nomi e pulsanti;
+  - controlla che il contenuto importante sia nella parte centrale verticale, non attaccato al bordo superiore o inferiore;
+  - segnala se elementi importanti cadono proprio in zone che di solito sono coperte da scritte o pulsanti.
+
+- FOTO PROFILO (cerchio piccolo per social o app di messaggistica):
+  - immagina un cerchio al centro della foto;
+  - controlla se il viso o il soggetto principale cadono bene dentro il cerchio senza essere tagliati;
+  - segnala se la testa è troppo vicina al bordo superiore, se il viso è tagliato o troppo di lato.
+
+- COPERTINA / THUMBNAIL, ad esempio copertina di video o anteprima stile TikTok/Reel:
+  - immagina un riquadro centrale orizzontale che occupa la parte centrale dell’immagine;
+  - verifica se il soggetto principale e il testo sono ben visibili in questo riquadro centrale;
+  - segnala se elementi importanti sono troppo vicini ai bordi, dove potrebbero essere coperti da scritte o pulsanti dell’app.
+
+Per ciascuna di queste categorie, esprimi una valutazione sintetica, ad esempio:
+- “Post feed: adatta / non consigliata, perché …”
+- “Storie / stati: adatta / non consigliata, perché …”
+- “Foto profilo: adatta / non consigliata, perché …”
+- “Copertina / thumbnail: adatta / non consigliata, perché …”
 
 Quando rispondi, usa sempre questa struttura con tre parti:
 
@@ -418,9 +459,9 @@ Quando rispondi, usa sempre questa struttura con tre parti:
 - indica la posizione degli elementi rispetto al centro dell’immagine (sinistra, destra, in alto, in basso, vicino, lontano);
 - se qualcosa non è chiaro, usa espressioni come “sembra” oppure “non è chiaro se…”.
 
-2) Qualità tecnica:
+2) Qualità tecnica e uso sui social:
 - in poche frasi valuta nitidezza, centratura, luminosità e colori;
-- specifica se la foto è “adatta ai social” oppure “non consigliata per i social” e perché.
+- includi la valutazione separata per: post feed, storie/stati, foto profilo, copertina/thumbnail, con motivazione breve.
 
 3) Suggerimenti pratici (solo se necessari):
 - se hai individuato problemi concreti, dai suggerimenti semplici e azionabili;
@@ -568,7 +609,7 @@ Organizza la risposta in tre parti:
 1) Analisi sicurezza (ostacoli e percorso);
 2) Qualità tecnica per la valutazione della sicurezza;
 3) Suggerimenti pratici (solo se necessari).
-`;
+` + qualityBlock;
 
                 default:
                     return `
@@ -1043,20 +1084,44 @@ Descrivi poi:
 - se il testo copre parti molto importanti dell’immagine, come volti, oggetto principale o zona centrale;
 - se il testo è leggibile: contrasto tra colore del testo e sfondo, dimensione del carattere, eventuali parti tagliate.
 
-Poi valuta se questa versione della foto, con il testo sopra, è adatta per essere condivisa sui social (storia o post):
-- se l’immagine rimane ancora comprensibile,
-- se il soggetto principale è ancora chiaramente riconoscibile,
-- se la composizione generale rimane gradevole oppure se il testo è troppo invadente.
+Poi valuta l’effetto del testo sovrapposto pensando ai diversi social e alle possibili zone di rischio dove l’app può tagliare o coprire l’immagine. 
+Non servono numeri precisi, ma un controllo pratico:
 
-Se noti problemi concreti (ad esempio: il testo copre il volto, copre l’oggetto principale, copre piccoli dettagli importanti, è troppo grande, è poco leggibile):
+- POST FEED (Instagram, Facebook), spesso croppato in quadrato:
+  - immagina un quadrato centrale (circa 70% dell’immagine);
+  - spiega se, dentro questo quadrato, si vedono ancora bene il soggetto e il testo;
+  - segnala se il testo cade troppo vicino ai bordi e rischia di essere tagliato.
+
+- STORIE / REELS / STATI (Instagram Stories, Facebook Stories, WhatsApp, TikTok verticale):
+  - immagina la foto come sfondo a schermo intero verticale;
+  - considera che in alto e in basso ci sono spesso nomi, pulsanti e barre dell’app;
+  - indica se il testo sta in una zona centrale sicura oppure se è troppo vicino al bordo superiore o inferiore, dove può essere coperto dall’interfaccia;
+  - spiega se il soggetto principale rimane comunque leggibile e riconoscibile.
+
+- FOTO PROFILO (cerchio piccolo):
+  - immagina un cerchio al centro dell’immagine;
+  - indica se con quel cerchio il volto o il soggetto principale rimangono chiari oppure se verrebbero tagliati dal testo o dal riquadro scuro.
+
+- COPERTINA / THUMBNAIL (ad esempio anteprima di video tipo TikTok o Reels):
+  - immagina un riquadro centrale che verrebbe usato come miniatura;
+  - indica se soggetto principale e testo sono ancora leggibili e centrati in questa zona;
+  - segnala se qualcosa di importante finisce troppo vicino ai bordi, dove spesso compaiono scritte e pulsanti dell’app.
+
+Infine, per ciascuna di queste categorie, dai una valutazione molto sintetica, ad esempio:
+- “Post feed: adatta / non consigliata, perché …”
+- “Storie / stati: adatta / non consigliata, perché …”
+- “Foto profilo: adatta / non consigliata, perché …”
+- “Copertina / thumbnail: adatta / non consigliata, perché …”
+
+Se noti problemi concreti (ad esempio: il testo copre il volto, copre l’oggetto principale, copre piccoli dettagli importanti, è troppo grande, è poco leggibile, è in una zona facilmente tagliata o coperta dall’interfaccia dell’app):
 - indica chiaramente qual è o quali sono i problemi principali;
-- suggerisci da 1 a 3 azioni semplici per migliorare, ad esempio: “metti il testo più in alto”, “riduci la quantità di testo”, “usa meno righe”, “abbassa un po’ la fascia di testo”, “sposta il testo lontano dal volto o dall’oggetto principale”.
+- suggerisci da 1 a 3 azioni semplici per migliorare, ad esempio: “metti il testo più in alto”, “usa meno righe”, “sposta il testo più verso il centro”, “riduci l’altezza del riquadro di testo”, “sposta il testo lontano dal volto o dall’oggetto principale”.
 
 Se la foto con il testo è già ben bilanciata e non vedi problemi rilevanti, dillo esplicitamente e non inventare correzioni.
 
 Organizza la risposta in tre parti:
 1) Elementi coperti dal testo (anche piccoli), posizione e importanza;
-2) Impatto sulla foto e sulla leggibilità del testo;
+2) Impatto sulla foto e uso sui social (feed, storie/stati, foto profilo, copertina/thumbnail);
 3) Suggerimenti pratici (solo se necessari).
 `;
         }
