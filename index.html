@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI - Universale</title>
+    <title>Visione AI - Pro 002 (Alta Precisione)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -11,7 +11,7 @@
             height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* Accessibilità */
+        /* Accessibilità: SR Only */
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
         /* Area Fotocamera */
@@ -28,40 +28,42 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: 1fr 1fr 1fr 0.3fr; 
-            gap: 10px; padding: 10px; box-sizing: border-box;
+            gap: 8px; padding: 8px; box-sizing: border-box;
             background: #000; border-top: 4px solid #333;
         }
 
         button {
             border: 2px solid #555; border-radius: 12px;
-            font-size: 1.2rem; font-weight: bold; text-transform: uppercase;
+            font-size: 1.1rem; font-weight: bold; text-transform: uppercase;
             color: #FFF; background: #222; cursor: pointer;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center;
+            text-align: center; touch-action: manipulation;
         }
         button:active { background: #555; transform: scale(0.98); }
 
-        /* Colori Pulsanti */
-        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; }
+        /* Colori e Stati Pulsanti */
+        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.3rem; } /* Giallo tattile */
         #btn-guide { background-color: #004080; border-color: #FFF; }
         
         .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; }
         .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; }
 
-        /* Riga impostazioni */
+        /* Riga impostazioni inferiore */
         .bottom-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
-        .small-btn { flex: 1; font-size: 1rem; background: #111; border: 1px solid #444; color: #CCC; }
+        .small-btn { flex: 1; font-size: 0.9rem; background: #111; border: 1px solid #444; color: #CCC; }
         .active-discrete { border-color: #FF0000; color: #FF0000; }
 
-        /* Overlay */
+        /* Overlay Caricamento e Settings */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: flex; flex-direction: column;
             justify-content: center; align-items: center;
         }
         .hidden { display: none !important; }
-        .loader { border: 6px solid #333; border-top: 6px solid #FFF; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .loader { border: 6px solid #333; border-top: 6px solid #D4AF37; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        input { background: #333; color: #FFF; border: 1px solid #777; }
     </style>
 </head>
 <body>
@@ -90,39 +92,48 @@
     </div>
 
     <div id="start-screen" class="overlay">
-        <h1 style="color: #FFF; margin-bottom: 20px;">Visione AI</h1>
+        <h1 style="color: #FFF; margin-bottom: 20px;">Visione AI Pro</h1>
         <div id="loader" class="loader hidden"></div>
-        <div id="load-msg" class="hidden" style="color:#FFF;">Caricamento in corso...</div>
+        <div id="load-msg" class="hidden" style="color:#FFF; font-size: 1.2rem;">Avvio sensori...</div>
         <button onclick="startApp()" style="padding: 30px; font-size: 1.5rem; background: #D4AF37; color: #000; border-radius: 12px; width: 90%; border:none; font-weight: bold;">AVVIA SISTEMA</button>
     </div>
 
     <div id="key-screen" class="overlay hidden">
         <h2 style="color: #FFF;">Chiave Gemini API</h2>
-        <input type="text" id="key-input" placeholder="Incolla chiave qui..." style="width: 80%; padding: 15px; font-size: 1.2rem; margin-bottom: 20px;">
-        <button onclick="saveKey()" style="padding: 15px; background: #FFF; color:#000; width: 50%; font-weight:bold;">SALVA</button>
-        <button onclick="closeSettings()" style="margin-top:10px; background:#333; color:#FFF; width:50%;">CHIUDI</button>
+        <p style="color: #AAA; padding: 0 20px; text-align: center;">Inserisci la tua API Key (Versione Pro consigliata)</p>
+        <input type="text" id="key-input" placeholder="Incolla chiave qui..." style="width: 80%; padding: 15px; font-size: 1.2rem; margin-bottom: 20px; border-radius: 8px;">
+        <button onclick="saveKey()" style="padding: 15px; background: #FFF; color:#000; width: 50%; font-weight:bold; border-radius: 8px; margin-bottom: 10px;">SALVA</button>
+        <button onclick="closeSettings()" style="padding: 15px; background:#333; color:#FFF; width:50%; border-radius: 8px;">CHIUDI</button>
     </div>
 
     <script>
         // --- CONFIGURAZIONE ---
         let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
+        // MODIFICATO: Usa la versione PRO 002 per massima precisione
+        const MODEL_NAME = "gemini-1.5-pro-002"; 
+        
         let audioCtx, lightOsc, lightGain;
         let objectDetector = null;
         let isRunning = false;
         let videoTrack = null;
         
-        // Stati
+        // Canvas off-screen ottimizzato
+        const tempCanvas = document.createElement('canvas');
+        let tempCtx = null;
+
+        // Stati applicazione
         let mode = 'idle'; 
         let lightActive = false, colorActive = false, levelActive = false, torchActive = false;
         let discreteMode = false;
         let lastSpeak = 0;
         let centeredCount = 0;
-        const SNAP_THRESHOLD = 15; 
+        const SNAP_THRESHOLD = 20; 
 
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
 
+        // --- ACCESSIBILITÀ & OUTPUT ---
         function announce(text) {
             if(discreteMode) return;
             const el = document.getElementById('sr-announcer');
@@ -134,44 +145,41 @@
             if(navigator.vibrate) navigator.vibrate(pattern);
         }
 
-        // --- 1. AVVIO DEL SISTEMA (LOGICA IBRIDA) ---
+        // --- 1. AVVIO DEL SISTEMA ---
         async function startApp() {
             const startBtn = document.querySelector('#start-screen button');
             startBtn.style.display = 'none';
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('load-msg').classList.remove('hidden');
             
-            announce("Avvio sistema. Attendi.");
+            announce("Avvio sistema Pro. Attendi.");
             
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             try {
-                // Carica AI per centraggio
+                // MediaPipe (Visione locale veloce per guida)
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
                 objectDetector = await ObjectDetector.createFromOptions(vision, {
                     baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", delegate: "GPU" },
-                    scoreThreshold: 0.3, 
+                    scoreThreshold: 0.35, 
                     runningMode: "VIDEO"
                 });
 
-                // --- GESTIONE CAMERA IBRIDA (ANDROID/IOS + WINDOWS) ---
+                // Gestione Fotocamera
                 let stream;
                 try {
-                    // TENTATIVO 1: Chiedi fotocamera posteriore (per Smartphone)
                     stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                        video: { 
+                            facingMode: 'environment', 
+                            width: { ideal: 1280 }, 
+                            height: { ideal: 720 },
+                            focusMode: 'continuous' 
+                        } 
                     });
                 } catch (err) {
-                    console.warn("Nessuna camera posteriore trovata, passo a generica.");
-                    // TENTATIVO 2: Se fallisce (es. Windows), chiedi una camera qualsiasi
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    } catch (err2) {
-                        alert("ERRORE FOTOCAMERA: Verifica che il sito sia HTTPS o Localhost e di aver dato i permessi.");
-                        throw err2;
-                    }
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 }
                 
                 video.srcObject = stream;
@@ -180,34 +188,52 @@
                 video.addEventListener('loadeddata', () => {
                     document.getElementById('start-screen').classList.add('hidden');
                     document.getElementById('controls').classList.remove('hidden');
-                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                    isRunning = true;
-                    announce("Pronto. Pulsanti attivi.");
                     
-                    if(!GEMINI_KEY) openSettings();
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                    tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
+                    tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+
+                    isRunning = true;
+                    announce("Sistema Pro attivo.");
+                    
+                    if(!GEMINI_KEY) setTimeout(() => {
+                        announce("Attenzione. Chiave A P I mancante.");
+                        openSettings();
+                    }, 1000);
+                    
                     loop(); 
                 });
             } catch(e) { 
                 alert("Errore avvio: " + e.message); 
-                announce("Errore critico fotocamera.");
+                announce("Errore critico avvio fotocamera.");
             }
         }
 
         function loop() {
             if(!isRunning) return;
+            
+            if(lightActive || colorActive) {
+                if(tempCtx) tempCtx.drawImage(video, 0, 0);
+            }
+
             if(lightActive) processLight();
             if(colorActive) processColor();
             if(mode === 'guiding') processGuidance();
+            
             requestAnimationFrame(loop);
         }
 
-        // --- 2. DESCRIZIONE SCENA (GEMINI PRO) ---
+        // --- 2. INTEGRAZIONE GEMINI PRO (DESCRIZIONE DETTAGLIATA) ---
         async function quickDescribe() {
             if(mode === 'guiding') toggleGuidance(); 
-            announce("Scatto e analizzo.");
+            
+            announce("Scatto Pro. Attendi analisi dettagliata.");
             playShutter();
+            
             const b64 = captureFrame();
-            const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
+            
+            // PROMPT AGGIORNATO PER PRECISIONE
+            const prompt = "Descrivi in dettaglio e con alta precisione questa immagine per una persona non vedente. Identifica oggetti, testi (leggili tutti), colori e posizioni relative. Non essere troppo sintetico se ci sono dettagli importanti.";
             
             await callGemini(prompt, b64);
         }
@@ -242,28 +268,30 @@
             const cx = box.originX + box.width/2;
             const cy = box.originY + box.height/2;
             const sx = canvas.width/2, sy = canvas.height/2;
-            const tol = canvas.width * 0.15; 
+            const tolX = canvas.width * 0.15; 
+            const tolY = canvas.height * 0.20; 
 
-            ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 5; 
+            ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 6; 
             ctx.strokeRect(box.originX, box.originY, box.width, box.height);
 
             let msg = "";
-            if(cx < sx - tol) msg = "Sposta a DESTRA";
-            else if(cx > sx + tol) msg = "Sposta a SINISTRA";
-            else if(cy < sy - tol) msg = "ALZA il telefono";
-            else if(cy > sy + tol) msg = "ABBASSA il telefono";
+            
+            if(cx < sx - tolX) msg = "Sposta a sinistra";
+            else if(cx > sx + tolX) msg = "Sposta a destra";
+            else if(cy < sy - tolY) msg = "Alza fotocamera";
+            else if(cy > sy + tolY) msg = "Abbassa fotocamera";
             
             if(msg) {
                 centeredCount = 0;
                 if(Date.now() - lastSpeak > 1200) { 
                     announce(msg); 
-                    vibrate(50); 
+                    vibrate(30); 
                     lastSpeak=Date.now(); 
                 }
             } else {
                 centeredCount++;
-                if(centeredCount === 1) { 
-                    announce("Centrato. Tieni fermo."); 
+                if(centeredCount === 2) { 
+                    announce("Centrato."); 
                     vibrate([50,50,50]); 
                 }
                 
@@ -271,43 +299,50 @@
                     mode = 'idle'; 
                     document.getElementById('btn-guide').classList.remove('guiding');
                     document.getElementById('btn-guide').innerText = "ANALISI PRO...";
-                    announce("Scatto automatico. Analisi approfondita."); 
+                    announce("Oggetto centrato. Scatto e analizzo."); 
                     playShutter();
                     const b64 = captureFrame();
-                    callGemini("Descrivi in dettaglio l'oggetto che ho appena inquadrato.", b64).then(()=>{
+                    
+                    callGemini("Descrivi molto dettagliatamente l'oggetto che ho appena inquadrato e centrato.", b64).then(()=>{
                         document.getElementById('btn-guide').innerText = "GUIDA CENTRAGGIO";
                     });
                 }
             }
         }
 
-        // --- 4. STRUMENTI AGGIUNTIVI ---
+        // --- 4. STRUMENTI SENSORIALI ---
         function toggleLight() {
             lightActive = !lightActive;
             const btn = document.getElementById('btn-light');
+            
             if(lightActive) {
                 if(audioCtx.state === 'suspended') audioCtx.resume();
                 lightOsc = audioCtx.createOscillator(); 
                 lightGain = audioCtx.createGain();
                 lightOsc.connect(lightGain); 
                 lightGain.connect(audioCtx.destination);
-                lightGain.gain.value = 0.1; 
+                lightGain.gain.value = 0.05; 
                 lightOsc.start();
+                
                 btn.classList.add('active-tool'); btn.innerText = "LUCE: ON"; 
                 announce("Suono luce attivo.");
             } else {
-                if(lightOsc) lightOsc.stop();
+                if(lightOsc) { lightOsc.stop(); lightOsc.disconnect(); }
                 btn.classList.remove('active-tool'); btn.innerText = "SONDA LUCE"; 
                 announce("Suono luce spento.");
             }
         }
         
         function processLight() {
-            const size=10, cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
-            const p = createTempContext().getImageData(cx-size/2, cy-size/2, size, size).data;
+            if(!tempCtx) return;
+            const size=20; 
+            const cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
+            const p = tempCtx.getImageData(cx-size/2, cy-size/2, size, size).data;
+            
             let sum=0; 
             for(let i=0; i<p.length; i+=4) sum += (p[i]+p[i+1]+p[i+2])/3;
-            const level = sum/(p.length/4);
+            const level = sum/(p.length/4); 
+            
             if(lightOsc) lightOsc.frequency.setValueAtTime(100+(level*4), audioCtx.currentTime);
         }
 
@@ -316,18 +351,35 @@
             const btn = document.getElementById('btn-color');
             if(colorActive) { 
                 btn.classList.add('active-tool'); btn.innerText = "COLORE: ON"; 
-                announce("Lettura colori attiva."); 
+                announce("Lettura colore attiva."); 
             } else { 
                 btn.classList.remove('active-tool'); btn.innerText = "SONDA COLORE"; 
-                announce("Lettura colori spenta."); 
+                announce("Lettura colore spenta."); 
             }
         }
         
         function processColor() {
-            if(Date.now()-lastSpeak<2000) return;
-            const cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
-            const p = createTempContext().getImageData(cx,cy,1,1).data;
-            announce(getColorName(p[0],p[1],p[2])); 
+            if(Date.now()-lastSpeak<2000) return; 
+            if(!tempCtx) return;
+
+            // Media su 20x20 pixel per evitare errori su singoli pixel
+            const boxSize = 20; 
+            const cx=Math.floor(canvas.width/2 - boxSize/2);
+            const cy=Math.floor(canvas.height/2 - boxSize/2);
+            
+            const data = tempCtx.getImageData(cx,cy,boxSize,boxSize).data;
+            let r=0, g=0, b=0;
+            const pixelCount = (boxSize*boxSize);
+            
+            for(let i=0; i<data.length; i+=4) {
+                r += data[i]; g += data[i+1]; b += data[i+2];
+            }
+            
+            r = Math.round(r/pixelCount);
+            g = Math.round(g/pixelCount);
+            b = Math.round(b/pixelCount);
+
+            announce(getColorName(r,g,b)); 
             lastSpeak=Date.now();
         }
 
@@ -337,8 +389,10 @@
             if(levelActive) {
                 btn.classList.add('active-tool'); btn.innerText = "LIVELLA: ON"; 
                 announce("Livella attiva.");
-                if(typeof DeviceOrientationEvent.requestPermission==='function') {
-                    DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted') window.addEventListener('deviceorientation', handleLevel)});
+                if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(r=>{if(r==='granted') window.addEventListener('deviceorientation', handleLevel)})
+                        .catch(()=>announce("Permesso sensori negato."));
                 } else {
                     window.addEventListener('deviceorientation', handleLevel);
                 }
@@ -351,8 +405,10 @@
         
         function handleLevel(e) {
             if(Date.now()-lastSpeak<1500) return;
-            if(e.gamma > 10) { announce("Pende a destra"); vibrate(50); lastSpeak=Date.now(); }
-            else if(e.gamma < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
+            const tilt = e.gamma || 0; 
+            
+            if(tilt > 10) { announce("Pende a destra"); vibrate(50); lastSpeak=Date.now(); }
+            else if(tilt < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
         }
 
         function toggleTorch() {
@@ -362,30 +418,15 @@
 
             videoTrack.applyConstraints({advanced:[{torch: targetState}]})
             .then(() => {
-                const settings = videoTrack.getSettings();
-                if ('torch' in settings) {
-                    const actualState = settings.torch;
-                    if (actualState === targetState) {
-                        torchActive = actualState;
-                        if(torchActive) {
-                            btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Luce accesa.");
-                        } else {
-                            btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Luce spenta.");
-                        }
-                    } else {
-                        announce("La torcia non risponde.");
-                    }
+                torchActive = targetState; 
+                if(torchActive) {
+                     btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Torcia accesa.");
                 } else {
-                    torchActive = targetState;
-                    if(torchActive) {
-                        btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Luce attivata.");
-                    } else {
-                        btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Luce disattivata.");
-                    }
+                     btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Torcia spenta.");
                 }
             })
             .catch(err => {
-                announce("Impossibile attivare torcia.");
+                announce("Torcia non disponibile.");
                 torchActive = false;
                 btn.classList.remove('active-tool'); btn.innerText = "TORCIA";
             });
@@ -399,23 +440,22 @@
                 vibrate([100,50,100]); 
             } else {
                 btn.classList.remove('active-discrete'); btn.innerText = "MODO DISCRETO";
-                announce("Modo discreto spento. Voce attiva.");
+                announce("Modo discreto spento.");
             }
         }
 
-        // --- FUNZIONI SUPPORTO ---
+        // --- UTILITIES ---
         function captureFrame() {
-            const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
-            c.getContext('2d').drawImage(video, 0, 0);
-            return c.toDataURL('image/jpeg', 0.7).split(',')[1]; 
+            tempCtx.drawImage(video, 0, 0);
+            // Qualità aumentata a 0.8 per il modello PRO
+            return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1]; 
         }
 
-        // --- CHIAMATA AI GEMINI PRO (STABILE) ---
         async function callGemini(prompt, b64) {
-            if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
+            if(!GEMINI_KEY) { announce("Chiave API mancante."); openSettings(); return; }
             try {
-                // Modello Gemini 1.5 Pro (Massima precisione)
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_KEY}`, {
+                // Chiamata specifica al modello PRO
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
                 });
@@ -432,43 +472,56 @@
 
             } catch(e) { 
                 console.error(e);
-                alert("ERRORE: " + e.message);
-                announce("Si è verificato un errore nell'analisi."); 
+                announce("Si è verificato un errore. Riprova."); 
             }
         }
 
-        function createTempContext() { 
-            const c=document.createElement('canvas'); c.width=canvas.width; c.height=canvas.height; 
-            c.getContext('2d').drawImage(video,0,0); return c.getContext('2d'); 
-        }
-        
         function playShutter() { 
             if(!discreteMode && audioCtx){ 
                 const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); 
-                g.gain.value=0.1; o.connect(g); g.connect(audioCtx.destination); 
+                g.gain.value=0.1; o.frequency.value=600; 
+                o.connect(g); g.connect(audioCtx.destination); 
                 o.start(); o.stop(audioCtx.currentTime+0.1); 
             } 
         }
         
-        const colors={'0,0,0':'Nero','255,255,255':'Bianco','255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo','128,128,128':'Grigio','165,42,42':'Marrone','255,165,0':'Arancione','128,0,128':'Viola'};
+        // Palette Colori per Non Vedenti (nomi stabili)
+        const colors={
+            '0,0,0':'Nero','255,255,255':'Bianco','200,200,200':'Grigio Chiaro','80,80,80':'Grigio Scuro',
+            '255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo',
+            '0,255,255':'Azzurro','255,0,255':'Fucsia','165,42,42':'Marrone','255,165,0':'Arancione',
+            '128,0,128':'Viola','245,245,220':'Beige','255,192,203':'Rosa'
+        };
+        
         function getColorName(r,g,b){ 
-            let min=Infinity,res="Sconosciuto"; 
+            let min=Infinity,res="Indefinito"; 
             for(let k in colors){ 
                 const[cr,cg,cb]=k.split(',').map(Number); 
-                const d=Math.sqrt((r-cr)**2+(g-cg)**2+(b-cb)**2); 
+                const d=Math.sqrt((r-cr)**2*0.3 + (g-cg)**2*0.59 + (b-cb)**2*0.11); 
                 if(d<min){min=d;res=colors[k];}
             } 
             return res;
         }
 
-        // Settings
-        window.openSettings = () => document.getElementById('key-screen').classList.remove('hidden');
-        window.closeSettings = () => document.getElementById('key-screen').classList.add('hidden');
+        // Settings Manager
+        window.openSettings = () => { 
+            document.getElementById('key-screen').classList.remove('hidden');
+            announce("Impostazioni aperte.");
+        };
+        window.closeSettings = () => {
+            document.getElementById('key-screen').classList.add('hidden');
+            announce("Chiudo impostazioni.");
+        };
         window.saveKey = () => { 
-            GEMINI_KEY=document.getElementById('key-input').value.trim(); 
-            localStorage.setItem('gemini_key',GEMINI_KEY); 
-            closeSettings(); 
-            announce("Chiave salvata."); 
+            const val = document.getElementById('key-input').value.trim();
+            if(val.length > 10) {
+                GEMINI_KEY=val; 
+                localStorage.setItem('gemini_key',GEMINI_KEY); 
+                closeSettings(); 
+                announce("Chiave salvata."); 
+            } else {
+                announce("Chiave non valida.");
+            }
         };
 
     </script>
