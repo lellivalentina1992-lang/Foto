@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI Pro</title>
+    <title>Visione AI Pro - v2</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -112,18 +112,17 @@
         let videoTrack = null;
         
         // Stati dell'app
-        let mode = 'idle'; // 'idle' o 'guiding'
+        let mode = 'idle'; 
         let lightActive = false, colorActive = false, levelActive = false, torchActive = false;
         let discreteMode = false;
         let lastSpeak = 0;
         let centeredCount = 0;
-        const SNAP_THRESHOLD = 15; // Frame necessari per scatto automatico
+        const SNAP_THRESHOLD = 15; 
 
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
 
-        // Funzione parlante
         function announce(text) {
             if(discreteMode) return;
             const el = document.getElementById('sr-announcer');
@@ -144,7 +143,6 @@
             
             announce("Avvio sistema. Attendi.");
             
-            // Sblocca AudioContext con interazione utente
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             try {
@@ -158,7 +156,7 @@
                     runningMode: "VIDEO"
                 });
 
-                // Avvia Camera (Correzione per compatibilità Windows/Android)
+                // Avvia Camera (Configurazione Compatibile Windows/Android)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
@@ -178,7 +176,7 @@
                     announce("Pronto. Pulsanti attivi.");
                     
                     if(!GEMINI_KEY) openSettings();
-                    loop(); // Inizia ciclo continuo
+                    loop(); 
                 });
             } catch(e) { 
                 alert("Errore avvio: " + e.message); 
@@ -186,7 +184,7 @@
             }
         }
 
-        // Ciclo principale (60 volte al secondo)
+        // Ciclo principale
         function loop() {
             if(!isRunning) return;
             if(lightActive) processLight();
@@ -197,13 +195,13 @@
 
         // --- 2. DESCRIZIONE SCENA (AI) ---
         async function quickDescribe() {
-            if(mode === 'guiding') toggleGuidance(); // Spegni guida se attiva
+            if(mode === 'guiding') toggleGuidance(); 
             announce("Scatto e analizzo.");
             playShutter();
             const b64 = captureFrame();
-            // Prompt ottimizzato per Screen Reader
             const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
-            // Correzione: passiamo 'b64' invece di 'base64'
+            
+            // Chiamata con gestione errori avanzata
             await callGemini(prompt, b64);
         }
 
@@ -231,17 +229,14 @@
             
             if(detections.length === 0) return;
 
-            // Prendi l'oggetto più grande
             const target = detections.sort((a,b)=>(b.boundingBox.width*b.boundingBox.height)-(a.boundingBox.width*a.boundingBox.height))[0];
             const box = target.boundingBox;
             
-            // Coordinate
             const cx = box.originX + box.width/2;
             const cy = box.originY + box.height/2;
             const sx = canvas.width/2, sy = canvas.height/2;
-            const tol = canvas.width * 0.15; // Tolleranza 15%
+            const tol = canvas.width * 0.15; 
 
-            // Feedback Visivo (Quadrato verde)
             ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 5; 
             ctx.strokeRect(box.originX, box.originY, box.width, box.height);
 
@@ -253,21 +248,18 @@
             
             if(msg) {
                 centeredCount = 0;
-                // Parla ogni 1.2 secondi per non sovrapporsi
                 if(Date.now() - lastSpeak > 1200) { 
                     announce(msg); 
                     vibrate(50); 
                     lastSpeak=Date.now(); 
                 }
             } else {
-                // Centrato
                 centeredCount++;
                 if(centeredCount === 1) { 
                     announce("Centrato. Tieni fermo."); 
                     vibrate([50,50,50]); 
                 }
                 
-                // Se rimane centrato per ~0.5 secondi
                 if(centeredCount > SNAP_THRESHOLD) {
                     mode = 'idle'; 
                     document.getElementById('btn-guide').classList.remove('guiding');
@@ -305,12 +297,10 @@
         
         function processLight() {
             const size=10, cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
-            // Legge luminosità media al centro
             const p = createTempContext().getImageData(cx-size/2, cy-size/2, size, size).data;
             let sum=0; 
             for(let i=0; i<p.length; i+=4) sum += (p[i]+p[i+1]+p[i+2])/3;
             const level = sum/(p.length/4);
-            // Modula frequenza: Buio(0)=100Hz, Luce(255)=1100Hz
             if(lightOsc) lightOsc.frequency.setValueAtTime(100+(level*4), audioCtx.currentTime);
         }
 
@@ -342,7 +332,6 @@
             if(levelActive) {
                 btn.classList.add('active-tool'); btn.innerText = "LIVELLA: ON"; 
                 announce("Livella attiva.");
-                // Richiesta permessi iOS
                 if(typeof DeviceOrientationEvent.requestPermission==='function') {
                     DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted') window.addEventListener('deviceorientation', handleLevel)});
                 } else {
@@ -361,19 +350,16 @@
             else if(e.gamma < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
         }
 
-        // --- 7. TORCIA (CON CONTROLLO REALE) ---
+        // --- 7. TORCIA ---
         function toggleTorch() {
             if(!videoTrack) { announce("Fotocamera non pronta."); return; }
             
-            const targetState = !torchActive; // Lo stato che vorremmo
+            const targetState = !torchActive;
             const btn = document.getElementById('btn-torch');
 
             videoTrack.applyConstraints({advanced:[{torch: targetState}]})
             .then(() => {
-                // CONTROLLO DI REALTA': Chiediamo alla videocamera come sta
                 const settings = videoTrack.getSettings();
-                
-                // Se il browser supporta la lettura dello stato
                 if ('torch' in settings) {
                     const actualState = settings.torch;
                     if (actualState === targetState) {
@@ -387,7 +373,6 @@
                         announce("La torcia non risponde.");
                     }
                 } else {
-                    // Fallback per dispositivi che non riportano lo stato (es. alcuni Android vecchi)
                     torchActive = targetState;
                     if(torchActive) {
                         btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Luce attivata.");
@@ -420,26 +405,40 @@
         function captureFrame() {
             const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
             c.getContext('2d').drawImage(video, 0, 0);
-            return c.toDataURL('image/jpeg', 0.7).split(',')[1]; // Compressione 0.7
+            return c.toDataURL('image/jpeg', 0.7).split(',')[1]; 
         }
 
+        // CHIAMATA API CON DEBUG DI ERRORI
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
             try {
-                // CORREZIONE APPLICATA QUI SOTTO (b64 invece di base64)
+                // Notare uso di 'b64' corretto qui
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
                 });
+                
                 const d = await res.json();
-                if(d.error) throw new Error(d.error.message);
+                
+                // Se Google restituisce un errore, lo mostriamo chiaramente
+                if(d.error) {
+                    throw new Error("GOOGLE ERROR: " + d.error.message);
+                }
+
+                if(!d.candidates || !d.candidates[0].content) {
+                    throw new Error("Nessuna risposta generata. Forse immagine bloccata.");
+                }
+
                 const text = d.candidates[0].content.parts[0].text;
                 
                 if(!discreteMode) announce(text);
                 else alert("RISPOSTA AI:\n" + text); 
+
             } catch(e) { 
                 console.error(e);
-                announce("Errore connessione intelligenza artificiale."); 
+                // Legge l'errore specifico a voce o schermo
+                alert("ERRORE: " + e.message);
+                announce("Si è verificato un errore nell'analisi."); 
             }
         }
 
@@ -456,7 +455,6 @@
             } 
         }
         
-        // Dizionario Colori Semplice
         const colors={'0,0,0':'Nero','255,255,255':'Bianco','255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo','128,128,128':'Grigio','165,42,42':'Marrone','255,165,0':'Arancione','128,0,128':'Viola'};
         function getColorName(r,g,b){ 
             let min=Infinity,res="Sconosciuto"; 
