@@ -242,85 +242,6 @@
             if(navigator.vibrate) navigator.vibrate(pattern);
         }
 
-        // --- AVVIO SISTEMA (verrà sovrascritto dallo script di robustezza) ---
-        async function startApp() {
-            const startBtn = document.querySelector('#start-screen button');
-            startBtn.style.display = 'none';
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('load-msg').classList.remove('hidden');
-            
-            announce("Avvio sistema Pro 3. Attendi.");
-            
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-            try {
-                const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
-                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-                
-                objectDetector = await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: { 
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", 
-                        delegate: "GPU" 
-                    },
-                    scoreThreshold: 0.1,
-                    maxResults: 5,
-                    runningMode: "VIDEO"
-                });
-
-                let stream;
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: 'environment', 
-                            width: { ideal: 1280 }, 
-                            height: { ideal: 720 },
-                            focusMode: 'continuous' 
-                        } 
-                    });
-                } catch (err) {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                }
-                
-                video.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
-
-                video.addEventListener('loadeddata', () => {
-                    document.getElementById('start-screen').classList.add('hidden');
-                    document.getElementById('controls').classList.remove('hidden');
-                    
-                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                    tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
-                    tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
-
-                    isRunning = true;
-                    announce("Sistema Pro 3 attivo.");
-                    
-                    if(!GEMINI_KEY) setTimeout(() => {
-                        announce("Attenzione. Chiave API mancante. Puoi comunque scattare e usare le foto.");
-                    }, 1000);
-                    
-                    loop(); 
-                });
-            } catch(e) { 
-                alert("Errore avvio: " + e.message); 
-                announce("Errore critico avvio fotocamera.");
-            }
-        }
-
-        function loop() {
-            if(!isRunning) return;
-            
-            if(lightActive || colorActive) {
-                if(tempCtx) tempCtx.drawImage(video, 0, 0);
-            }
-
-            if(lightActive) processLight();
-            if(colorActive) processColor();
-            if(mode === 'guiding') processGuidance();
-            
-            requestAnimationFrame(loop);
-        }
-
         // --- SCATTO GENERALE RIUTILIZZABILE ---
         async function captureNewShot(forContext) {
             if (mode === 'guiding') toggleGuidance();
@@ -1295,7 +1216,7 @@ Organizza la risposta in tre parti:
 
     </script>
 
-    <!-- SCRIPT DI ROBUSTEZZA: SOVRASCRIVE STARTAPP, LOOP, TORCIA, LIVELLA -->
+    <!-- SCRIPT DI ROBUSTEZZA: STARTAPP, LOOP, TORCIA, LIVELLA -->
     <script>
         let lastGuideTime = 0;
         let lastColorTime = 0;
@@ -1364,12 +1285,21 @@ Organizza la risposta in tre parti:
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
 
+            // Tentiamo di far partire esplicitamente il video (Safari / iOS)
+            try {
+                await video.play();
+            } catch (e) {
+                console.warn("Errore video.play():", e);
+            }
+
             objectDetector = await initObjectDetectorSafe();
             if (!objectDetector) {
                 announce("Rilevamento oggetti non disponibile. Guida centraggio e posizionamento automatico del testo saranno limitati.");
             }
 
-            video.addEventListener('loadeddata', () => {
+            function onVideoReady() {
+                video.removeEventListener('loadeddata', onVideoReady);
+
                 document.getElementById('start-screen').classList.add('hidden');
                 document.getElementById('controls').classList.remove('hidden');
                 
@@ -1389,7 +1319,14 @@ Organizza la risposta in tre parti:
                 }
                 
                 loop(); 
-            });
+            }
+
+            // Se il video è già pronto, non aspettiamo l'evento
+            if (video.readyState >= 2) {
+                onVideoReady();
+            } else {
+                video.addEventListener('loadeddata', onVideoReady);
+            }
         }
 
         function loop() {
