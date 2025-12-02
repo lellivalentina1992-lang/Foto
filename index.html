@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI - PRO 3 (Finale)</title>
+    <title>Visione AI - PRO 3 (Multi-modo)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -27,33 +27,35 @@
             height: 60vh; width: 100%;
             display: grid;
             grid-template-columns: 1fr 1fr;
-            grid-template-rows: 1fr 1fr 1fr auto auto; 
+            grid-template-rows: 1fr 1fr 1fr 1fr auto auto auto; 
             gap: 8px; padding: 8px; box-sizing: border-box;
             background: #000; border-top: 4px solid #333;
         }
 
         button {
             border: 2px solid #555; border-radius: 12px;
-            font-size: 1.1rem; font-weight: bold; text-transform: uppercase;
+            font-size: 1.0rem; font-weight: bold; text-transform: uppercase;
             color: #FFF; background: #222; cursor: pointer;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             text-align: center; touch-action: manipulation;
         }
         button:active { background: #555; transform: scale(0.98); }
 
-        /* Colori e Stati Pulsanti */
-        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.3rem; }
-        #btn-guide { background-color: #004080; border-color: #FFF; }
-        
+        /* Colori e Stati Pulsanti principali */
+        #btn-scene { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.1rem; }
+        #btn-selfie { background-color: #004080; border-color: #FFF; }
+        #btn-outdoor { background-color: #3B6C2A; border-color: #FFF; }
+        #btn-indoor { background-color: #6A1B9A; border-color: #FFF; }
+
         .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; }
         .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; }
 
-        /* Barra inferiore impostazioni */
+        /* Barre inferiori */
         .bottom-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
         .small-btn { flex: 1; font-size: 0.9rem; background: #111; border: 1px solid #444; color: #CCC; }
         .active-discrete { border-color: #FF0000; color: #FF0000; }
 
-        /* Barra azioni foto (usa / elimina) */
+        /* Barra azioni foto (usa / modifica / elimina) */
         .shot-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
 
         /* Overlay Caricamento e Settings */
@@ -88,24 +90,70 @@
     </div>
 
     <div id="controls" class="hidden">
-        <button id="btn-desc" onclick="quickDescribe()" aria-label="Scatta foto, descrivi la scena e poi scegli se usare o eliminare la foto">
-            DESCRIVI SCENA
+        <!-- RIGA 1: scena generale + selfie -->
+        <button id="btn-scene" 
+                onclick="describeWithMode('scene')" 
+                aria-label="Scatta foto e descrivi scena generale in dettaglio, con qualità della foto">
+            SCENA GENERALE
         </button>
-        <button id="btn-guide" onclick="toggleGuidance()">GUIDA CENTRAGGIO</button>
+        <button id="btn-selfie" 
+                onclick="describeWithMode('selfie')" 
+                aria-label="Scatta selfie o foto di volto e controlla se è adatta come foto profilo">
+            SELFIE / VOLTO
+        </button>
         
-        <button id="btn-light" onclick="toggleLight()">SONDA LUCE</button>
-        <button id="btn-color" onclick="toggleColor()">SONDA COLORE</button>
+        <!-- RIGA 2: esterno + interno -->
+        <button id="btn-outdoor" 
+                onclick="describeWithMode('outdoor')" 
+                aria-label="Scatta e descrivi un ambiente esterno o paesaggio, con qualità foto">
+            ESTERNO / PAESAGGIO
+        </button>
+        <button id="btn-indoor" 
+                onclick="describeWithMode('indoor')" 
+                aria-label="Scatta e descrivi un ambiente interno, come stanza o negozio">
+            INTERNO / STANZA
+        </button>
 
-        <button id="btn-level" onclick="toggleLevel()">LIVELLA</button>
-        <button id="btn-torch" onclick="toggleTorch()">TORCIA</button>
+        <!-- RIGA 3: oggetto + testo -->
+        <button id="btn-object" 
+                onclick="describeWithMode('object')" 
+                aria-label="Scatta e descrivi un oggetto in dettaglio, con qualità foto">
+            OGGETTO
+        </button>
+        <button id="btn-text" 
+                onclick="describeWithMode('text')" 
+                aria-label="Scatta e leggi il testo o documento nell’immagine">
+            TESTO / DOCUMENTO
+        </button>
+
+        <!-- RIGA 4: cibo + sicurezza -->
+        <button id="btn-food" 
+                onclick="describeWithMode('food')" 
+                aria-label="Scatta e descrivi un piatto o del cibo, con qualità foto">
+            CIBO / PIATTO
+        </button>
+        <button id="btn-safety" 
+                onclick="describeWithMode('safety')" 
+                aria-label="Scatta e analizza la scena per ostacoli e sicurezza">
+            SICUREZZA / OSTACOLI
+        </button>
 
         <!-- Barra azioni dopo lo scatto -->
         <div id="shot-actions" class="shot-bar hidden">
             <button class="small-btn" id="btn-use" onclick="usePhoto()">USA FOTO</button>
+            <button class="small-btn" id="btn-edit" onclick="editAndReviewPhoto()">MODIFICA E ANALIZZA</button>
             <button class="small-btn" id="btn-delete" onclick="deletePhoto()">ELIMINA</button>
         </div>
 
         <div class="bottom-bar">
+            <button class="small-btn" id="btn-guide" onclick="toggleGuidance()">GUIDA CENTRAGGIO</button>
+            <button class="small-btn" id="btn-light" onclick="toggleLight()">SONDA LUCE</button>
+            <button class="small-btn" id="btn-color" onclick="toggleColor()">SONDA COLORE</button>
+        </div>
+
+        <div class="bottom-bar">
+            <button class="small-btn" id="btn-level" onclick="toggleLevel()">LIVELLA</button>
+            <button class="small-btn" id="btn-torch" onclick="toggleTorch()">TORCIA</button>
             <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()">MODO DISCRETO</button>
             <button class="small-btn" onclick="openSettings()">IMPOSTAZIONI API</button>
         </div>
@@ -170,7 +218,7 @@
             if(navigator.vibrate) navigator.vibrate(pattern);
         }
 
-        // --- 1. AVVIO DEL SISTEMA ---
+        // --- AVVIO SISTEMA ---
         async function startApp() {
             const startBtn = document.querySelector('#start-screen button');
             startBtn.style.display = 'none';
@@ -224,7 +272,7 @@
                     announce("Sistema Pro 3 attivo.");
                     
                     if(!GEMINI_KEY) setTimeout(() => {
-                        announce("Attenzione. Chiave A P I mancante.");
+                        announce("Attenzione. Chiave API mancante.");
                         openSettings();
                     }, 1000);
                     
@@ -250,11 +298,41 @@
             requestAnimationFrame(loop);
         }
 
-        // --- 2. SCATTO + DESCRIZIONE GEMINI + SCELTA USA/ELIMINA ---
-        async function quickDescribe() {
+        // --- DESCRIZIONI PER CONTESTO ---
+        async function describeWithMode(context) {
             if (mode === 'guiding') toggleGuidance(); 
-            
-            announce("Scatto. Attendi descrizione della scena.");
+
+            let intro;
+            switch (context) {
+                case 'scene':
+                    intro = "Scatto in modalità scena generale. Attendi descrizione dettagliata e qualità della foto.";
+                    break;
+                case 'selfie':
+                    intro = "Scatto in modalità selfie o volto. Attendi controllo del viso e qualità foto.";
+                    break;
+                case 'outdoor':
+                    intro = "Scatto in modalità ambiente esterno o paesaggio. Attendi descrizione e qualità foto.";
+                    break;
+                case 'indoor':
+                    intro = "Scatto in modalità ambiente interno o stanza. Attendi descrizione e qualità foto.";
+                    break;
+                case 'object':
+                    intro = "Scatto in modalità oggetto. Attendi descrizione dell’oggetto e qualità foto.";
+                    break;
+                case 'text':
+                    intro = "Scatto in modalità testo o documento. Attendi lettura del testo e qualità della foto.";
+                    break;
+                case 'food':
+                    intro = "Scatto in modalità cibo o piatto. Attendi descrizione del piatto e qualità foto.";
+                    break;
+                case 'safety':
+                    intro = "Scatto in modalità sicurezza e ostacoli. Attendi analisi e qualità foto.";
+                    break;
+                default:
+                    intro = "Scatto. Attendi analisi.";
+            }
+
+            announce(intro);
             playShutter();
             
             const b64 = captureFrame();
@@ -270,16 +348,197 @@
             dlLink.removeAttribute('href');
             dlLink.removeAttribute('download');
 
-            const prompt = "Descrivi in dettaglio e con alta precisione questa immagine per una persona non vedente. Identifica oggetti, testi (leggili tutti), colori e posizioni relative. Non essere troppo sintetico se ci sono dettagli importanti.";
-            
+            const prompt = buildPromptForContext(context);
             await callGemini(prompt, b64);
 
             const actions = document.getElementById('shot-actions');
             actions.classList.remove('hidden');
-            announce("Descrizione completata. Puoi usare la foto oppure eliminarla.");
+            announce("Descrizione completata. Puoi usare la foto, modificarla e farla analizzare di nuovo, oppure eliminarla.");
         }
 
-        // --- 3. GUIDA AL CENTRAGGIO (solo guida, niente auto-scatto) ---
+        function buildPromptForContext(context) {
+            const qualityBlock = `
+Infine, valuta in modo sintetico la qualità tecnica della foto e se è pronta per essere condivisa sui social (Instagram, Facebook, WhatsApp). 
+Basati solo su criteri oggettivi:
+- nitidezza (foto nitida oppure sfocata),
+- centratura del soggetto principale,
+- luminosità (troppo scura, troppo chiara, luce equilibrata),
+- colori (naturali oppure strani o slavati),
+- eventuali ostacoli davanti all’obiettivo o elementi che coprono il soggetto.
+
+Se noti problemi concreti (ad esempio: soggetto tagliato, troppo lontano, troppo vicino, luce insufficiente, foto mossa, dito davanti alla lente, zona importante fuori inquadratura):
+- indica chiaramente qual è il problema principale;
+- proponi da 1 a 3 consigli molto concreti e semplici per migliorare un prossimo scatto, ad esempio: “avvicina un po’ il telefono”, “sposta la fotocamera leggermente verso sinistra”, “scegli un punto più illuminato”, “tieni il telefono più fermo”, “alza leggermente l’inquadratura”.
+
+Se la foto è già chiaramente adatta e non vedi problemi rilevanti, dillo esplicitamente e non inventare correzioni.
+
+Quando rispondi, usa sempre questa struttura con tre parti:
+
+1) Descrizione:
+- descrivi solo ciò che vedi chiaramente, con frasi brevi e dirette;
+- indica la posizione degli elementi rispetto al centro dell’immagine (sinistra, destra, in alto, in basso, vicino, lontano);
+- se qualcosa non è chiaro, usa espressioni come “sembra” oppure “non è chiaro se…”.
+
+2) Qualità tecnica:
+- in poche frasi valuta nitidezza, centratura, luminosità e colori;
+- specifica se la foto è “adatta ai social” oppure “non consigliata per i social” e perché.
+
+3) Suggerimenti pratici (solo se necessari):
+- se hai individuato problemi concreti, dai suggerimenti semplici e azionabili;
+- se non hai individuato problemi rilevanti, scrivi che non sono necessari cambiamenti importanti.
+
+Evita giudizi personali o psicologici sulle persone (non dire se sono belle o brutte, tristi o felici), limita la descrizione a espressioni del volto, postura, vestiti e contesto visibile.
+`;
+
+            switch (context) {
+                case 'scene':
+                    return `
+Descrivi questa immagine come se la stessi spiegando a una persona non vedente. 
+Concentrati su:
+- cosa c’è in primo piano,
+- cosa c’è al centro dell’immagine,
+- cosa c’è sullo sfondo,
+- posizione degli elementi (sinistra, destra, alto, basso, vicino, lontano),
+- presenza di persone, animali, oggetti, segnali, testo o elementi rilevanti,
+- colori principali e contrasti,
+- eventuali interazioni tra gli oggetti o le persone.
+
+Usa frasi semplici e dirette. Non inventare dettagli se non sei sicuro.
+` + qualityBlock;
+
+                case 'selfie':
+                    return `
+Analizza la foto concentrandoti sulle persone e in particolare sul volto principale. 
+Dimmi:
+- se è presente un volto e dove si trova,
+- se il volto è centrato o tagliato,
+- se gli occhi sembrano aperti oppure chiusi,
+- se l’espressione è neutra, seria o sorridente,
+- se la luce valorizza il volto o crea ombre forti o zone troppo scure,
+- se l’immagine è adatta come selfie o foto profilo (ad esempio per social o app di messaggistica),
+- se ci sono altre persone attorno e quanto sono vicine.
+
+Non descrivere lo sfondo se non è importante per la qualità del ritratto. Non inventare dettagli non visibili.
+` + qualityBlock;
+
+                case 'outdoor':
+                    return `
+Descrivi lo scenario esterno presente nella foto. 
+Concentrati su:
+- tipo di luogo (strada, parco, mare, montagna, piazza, giardino),
+- cosa si vede al centro dell’immagine,
+- elementi naturali (alberi, erba, cielo, acqua, montagne),
+- edifici, marciapiedi, strade o strutture,
+- profondità e distanza degli elementi (vicino, lontano, sullo sfondo),
+- eventuali persone o animali presenti e cosa stanno facendo,
+- condizioni meteo (sole, nuvoloso, pioggia).
+
+Usa una descrizione ordinata e chiara per aiutare una persona non vedente a immaginare la scena.
+` + qualityBlock;
+
+                case 'indoor':
+                    return `
+Descrivi l’ambiente interno visibile nella foto. 
+Concentrati su:
+- che tipo di stanza è (ad esempio cucina, salotto, bagno, camera, negozio, ufficio),
+- cosa c’è al centro dell’immagine,
+- mobili e oggetti principali (tavoli, sedie, letti, scaffali, elettrodomestici),
+- disposizione spaziale (sinistra, destra, alto, basso, più vicino o più lontano),
+- eventuale disordine o ordine (oggetti sparsi, superfici libere, cose accatastate),
+- porte, finestre o passaggi che si vedono.
+
+Non inventare dettagli, descrivi solo ciò che è visibile.
+` + qualityBlock;
+
+                case 'object':
+                    return `
+Descrivi l’oggetto principale dell’immagine. 
+Concentrati su:
+- che oggetto è, se è riconoscibile,
+- forma e dimensioni approssimative,
+- materiali e colori principali,
+- condizioni (nuovo, usato, consumato, rotto, sporco, pulito),
+- dettagli rilevanti (etichette, loghi, pulsanti, scritte visibili),
+- posizione dell’oggetto rispetto al centro dell’immagine,
+- presenza di altri oggetti vicini che potrebbero creare confusione.
+
+Se l’oggetto non è chiaro, spiega cosa ti fa dubitare, senza inventare.
+` + qualityBlock;
+
+                case 'text':
+                    return `
+Leggi soltanto il testo presente nell’immagine. 
+Riporta il testo nell’ordine più naturale possibile, come se lo stessi leggendo a voce alta, riga per riga.
+Non aggiungere interpretazioni o descrizioni della scena visiva, leggi solo ciò che è scritto.
+
+Poi valuta se la foto è tecnicamente adatta a mostrare il testo (ad esempio per condividerla con qualcuno o sui social):
+- se il testo è sufficientemente leggibile,
+- se la foto è nitida o sfocata,
+- se l’inquadratura contiene tutto il testo importante oppure se parti vengono tagliate,
+- se ci sono ombre o riflessi che disturbano molto la lettura.
+
+Se noti problemi concreti (ad esempio testo sfocato, tagliato, troppo piccolo, in ombra):
+- indica chiaramente qual è il problema principale;
+- suggerisci da 1 a 3 azioni semplici per migliorare un prossimo scatto, ad esempio: “avvicina il telefono”, “centra meglio il foglio”, “evita il controluce”, “appoggia il foglio su una superficie uniforme”.
+
+Se la foto è già chiaramente adatta alla lettura del testo, dillo esplicitamente e non inventare difetti.
+
+Organizza la risposta in tre parti:
+1) Testo letto (solo il contenuto del testo);
+2) Qualità tecnica per la lettura del testo;
+3) Suggerimenti pratici (solo se necessari).
+`;
+
+                case 'food':
+                    return `
+Descrivi il piatto o il cibo presente nella foto. 
+Concentrati su:
+- tipo di piatto (ad esempio pasta, carne, insalata, dolce),
+- ingredienti visibili,
+- colori e consistenze (cremoso, croccante, liquido, denso),
+- disposizione sul piatto (ordinato, decorato, disordinato),
+- se il piatto appare pieno, parzialmente vuoto o quasi finito,
+- presenza di stoviglie, bicchieri, tovaglioli o altri elementi sul tavolo.
+
+Non inventare ingredienti non visibili. Descrivi solo ciò che si vede.
+` + qualityBlock;
+
+                case 'safety':
+                    return `
+Analizza l’immagine come se dovessi aiutare una persona non vedente a orientarsi in sicurezza. 
+Concentrati SOLO su:
+- ostacoli davanti alla persona (sedie, tavoli, oggetti a terra),
+- gradini, dislivelli o buche visibili,
+- bordi di marciapiedi o piattaforme,
+- porte aperte o chiuse,
+- oggetti sporgenti ad altezza gambe, busto o testa,
+- veicoli vicini o potenzialmente in movimento,
+- persone molto vicine che potrebbero ostacolare il passaggio.
+
+Ignora dettagli estetici non legati alla sicurezza. 
+Se non sei sicuro di un potenziale ostacolo, dillo chiaramente.
+` + `
+Poi valuta anche la qualità tecnica dello scatto:
+- se la zona importante per la sicurezza (pavimento, percorso, ostacoli) è nitida e visibile,
+- se la luce è sufficiente per capire gli ostacoli,
+- se l’inquadratura è centrata sulla zona dove si cammina.
+
+Se la foto non è adatta per valutare bene la sicurezza, spiega qual è il problema e suggerisci cosa fare per migliorare il prossimo scatto (ad esempio “abbassa un po’ la fotocamera verso il pavimento”, “fai un passo indietro”, “cerca una zona più illuminata”).
+
+Organizza la risposta in tre parti:
+1) Analisi sicurezza (ostacoli e percorso);
+2) Qualità tecnica per la valutazione della sicurezza;
+3) Suggerimenti pratici (solo se necessari).
+`;
+
+                default:
+                    return `
+Descrivi questa immagine in modo chiaro per una persona non vedente.
+` + qualityBlock;
+            }
+        }
+
+        // --- GUIDA CENTRAGGIO ---
         function toggleGuidance() {
             const btn = document.getElementById('btn-guide');
             if(mode === 'guiding') {
@@ -292,7 +551,7 @@
                 mode = 'guiding'; 
                 centeredCount = 0; 
                 btn.classList.add('guiding'); 
-                btn.innerText = "CERCO SOGGETTO...";
+                btn.innerText = "GUIDA ATTIVA";
                 announce("Guida centraggio attiva. Cerco un oggetto da centrare.");
             }
         }
@@ -300,7 +559,14 @@
         function processGuidance() {
             if (!objectDetector) return;
 
-            const result = objectDetector.detectForVideo(video, performance.now());
+            let result;
+            try {
+                result = objectDetector.detectForVideo(video, performance.now());
+            } catch (e) {
+                console.warn("Errore objectDetector in processGuidance:", e);
+                return;
+            }
+
             const detections = (result && result.detections) ? result.detections : [];
 
             ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -385,17 +651,17 @@
                 document.getElementById('btn-guide').innerText = "GUIDA CENTRAGGIO";
                 centeredCount = 0;
 
-                announce("Oggetto centrato. Puoi premere descrivi scena per scattare la foto e analizzarla.");
+                announce("Oggetto centrato. Puoi scegliere una modalità di descrizione per scattare e analizzare la foto.");
             }
         }
 
-        // --- 4. STRUMENTI SENSORIALI ---
+        // --- STRUMENTI SENSORIALI ---
         function toggleLight() {
             lightActive = !lightActive;
             const btn = document.getElementById('btn-light');
             
             if(lightActive) {
-                if(audioCtx.state === 'suspended') audioCtx.resume();
+                if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
                 lightOsc = audioCtx.createOscillator(); 
                 lightGain = audioCtx.createGain();
                 lightOsc.connect(lightGain); 
@@ -512,6 +778,7 @@
                 }
             })
             .catch(err => {
+                console.warn("Errore torcia:", err);
                 announce("Torcia non disponibile su questo dispositivo o in questa modalità.");
                 torchActive = false;
                 btn.classList.remove('active-tool'); btn.innerText = "TORCIA";
@@ -530,17 +797,25 @@
             }
         }
 
-        // --- UTILITIES ---
+        // --- UTILITIES GEMINI / FOTO ---
         function captureFrame() {
-            tempCtx.drawImage(video, 0, 0);
+            if (tempCtx) {
+                tempCtx.drawImage(video, 0, 0);
+            }
             return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1]; 
         }
 
         async function callGemini(prompt, b64) {
-            if(!GEMINI_KEY) { announce("Chiave API mancante."); openSettings(); return; }
+            if(!GEMINI_KEY) { 
+                announce("Chiave API mancante."); 
+                openSettings(); 
+                return; 
+            }
+            let res;
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
-                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ 
                         contents: [{ 
                             parts: [
@@ -550,26 +825,55 @@
                         }] 
                     })
                 });
-                
-                const d = await res.json();
-                
-                if(d.error) {
-                    console.error("Errore API Gemini:", d.error);
-                    announce("Errore API: " + d.error.message);
-                    alert("ERRORE API: " + d.error.message);
-                    return;
-                }
-                
-                if(!d.candidates || !d.candidates[0].content) throw new Error("Nessuna risposta dall'AI.");
+            } catch (e) {
+                console.error("Errore di rete chiamando Gemini:", e);
+                announce("Errore di rete durante la chiamata all'intelligenza artificiale. Controlla la connessione e riprova.");
+                return;
+            }
 
-                const text = d.candidates[0].content.parts[0].text;
-                
-                if(!discreteMode) announce(text);
-                else alert("RISPOSTA AI:\n" + text); 
+            let d;
+            try {
+                d = await res.json();
+            } catch (e) {
+                console.error("Errore parsing JSON Gemini:", e);
+                announce("Risposta non valida dal server AI.");
+                return;
+            }
 
-            } catch(e) { 
-                console.error(e);
-                announce("Si è verificato un errore generale nell'analisi. Riprova.");
+            if(!res.ok) {
+                console.error("Errore HTTP Gemini:", res.status, d);
+                const msg = d.error && d.error.message ? d.error.message : "Errore sconosciuto";
+                announce("Errore API: " + msg);
+                alert("ERRORE API (" + res.status + "): " + msg);
+                return;
+            }
+
+            if(d.error) {
+                console.error("Errore API Gemini:", d.error);
+                announce("Errore API: " + d.error.message);
+                alert("ERRORE API: " + d.error.message);
+                return;
+            }
+            
+            const candidates = d.candidates || [];
+            const first = candidates[0];
+            const parts = first?.content?.parts || [];
+            const textParts = parts
+                .map(p => typeof p.text === "string" ? p.text : "")
+                .filter(Boolean);
+
+            const text = textParts.join("\n\n").trim();
+
+            if(!text) {
+                console.warn("Nessun testo leggibile da Gemini:", d);
+                announce("Non ho ricevuto una risposta comprensibile dall'AI.");
+                return;
+            }
+
+            if(!discreteMode) {
+                announce(text);
+            } else {
+                alert("RISPOSTA AI:\n" + text);
             }
         }
 
@@ -581,8 +885,8 @@
                 o.start(); o.stop(audioCtx.currentTime+0.1); 
             } 
         }
-        
-        // --- 5. USA FOTO / ELIMINA FOTO ---
+
+        // --- USA FOTO / MODIFICA E ANALIZZA / ELIMINA ---
         async function usePhoto() {
             if (!lastShotB64) {
                 announce("Nessuna foto disponibile da usare.");
@@ -628,6 +932,40 @@
             }
         }
 
+        async function editAndReviewPhoto() {
+            if (!lastShotB64) {
+                announce("Nessuna foto disponibile da modificare.");
+                return;
+            }
+
+            const text = window.prompt("Testo da sovrapporre sulla foto, ad esempio una frase per la storia o il post:");
+            if (!text || !text.trim()) {
+                announce("Nessun testo inserito. Foto non modificata.");
+                return;
+            }
+
+            const position = chooseTextPositionAutomatically();
+            if (position === "alto") {
+                announce("Ho posizionato il testo nella parte alta della foto, per non coprire il soggetto principale.");
+            } else if (position === "centro") {
+                announce("Ho posizionato il testo al centro, su una zona che sembra meno importante della scena.");
+            } else {
+                announce("Ho posizionato il testo nella parte bassa della foto, per non coprire il soggetto principale.");
+            }
+
+            announce("Creo una versione della foto con la scritta sovrapposta. Attendi.");
+            try {
+                const editedB64 = await createEditedPhoto(text.trim(), position);
+                lastShotB64 = editedB64;
+                const overlayPrompt = buildOverlayReviewPrompt();
+                await callGemini(overlayPrompt, editedB64);
+                announce("Analisi della foto modificata completata. Puoi ora usare la foto oppure eliminarla.");
+            } catch (e) {
+                console.error(e);
+                announce("Errore nella modifica o analisi della foto. Riprova.");
+            }
+        }
+
         function deletePhoto() {
             lastShotB64 = null;
             if (lastShotUrl) {
@@ -644,6 +982,129 @@
             dlLink.removeAttribute('download');
 
             announce("Foto eliminata. Sei tornata alla schermata principale. Puoi scattare una nuova foto quando vuoi.");
+        }
+
+        // --- PROMPT PER ANALISI DEL TESTO SOVRAPPOSTO ---
+        function buildOverlayReviewPrompt() {
+            return `
+Osserva questa immagine con del testo sovrapposto, come se dovessi aiutare una persona non vedente a capire se la foto è pronta per essere pubblicata sui social.
+
+Concentrati in modo molto preciso su cosa il riquadro di testo COPRE, anche solo in parte:
+- elenca TUTTI gli elementi visivi che vengono coperti totalmente o parzialmente dal testo, anche se piccoli (ad esempio oggetti sul tavolo, dettagli sullo sfondo, parti di vestiti, mani, oggetti decorativi);
+- per ogni elemento coperto, specifica se è coperto poco, in parte oppure in modo significativo;
+- indica sempre la posizione di questi elementi (sinistra, destra, in alto, in basso, vicino, lontano).
+
+Descrivi poi:
+- dove si trova il riquadro di testo (in alto, al centro o in basso);
+- quanto è grande rispetto all’intera immagine (piccolo, medio, molto grande, copre quasi tutta la foto);
+- se il testo copre parti molto importanti dell’immagine, come volti, oggetto principale o zona centrale;
+- se il testo è leggibile: contrasto tra colore del testo e sfondo, dimensione del carattere, eventuali parti tagliate.
+
+Poi valuta se questa versione della foto, con il testo sopra, è adatta per essere condivisa sui social (storia o post):
+- se l’immagine rimane ancora comprensibile,
+- se il soggetto principale è ancora chiaramente riconoscibile,
+- se la composizione generale rimane gradevole oppure se il testo è troppo invadente.
+
+Se noti problemi concreti (ad esempio: il testo copre il volto, copre l’oggetto principale, copre piccoli dettagli importanti, è troppo grande, è poco leggibile):
+- indica chiaramente qual è o quali sono i problemi principali;
+- suggerisci da 1 a 3 azioni semplici per migliorare, ad esempio: “metti il testo più in alto”, “riduci la quantità di testo”, “usa meno righe”, “abbassa un po’ la fascia di testo”, “sposta il testo lontano dal volto o dall’oggetto principale”.
+
+Se la foto con il testo è già ben bilanciata e non vedi problemi rilevanti, dillo esplicitamente e non inventare correzioni.
+
+Organizza la risposta in tre parti:
+1) Elementi coperti dal testo (anche piccoli), posizione e importanza;
+2) Impatto sulla foto e sulla leggibilità del testo;
+3) Suggerimenti pratici (solo se necessari).
+`;
+        }
+
+        // --- SCELTA AUTOMATICA POSIZIONE TESTO ---
+        function chooseTextPositionAutomatically() {
+            if (!objectDetector || !video || video.readyState < 2) return "basso";
+
+            try {
+                const result = objectDetector.detectForVideo(video, performance.now());
+                const detections = (result && result.detections) ? result.detections : [];
+                if (!detections.length) {
+                    return "basso";
+                }
+
+                const target = detections
+                    .sort((a, b) => {
+                        const boxA = a.boundingBox;
+                        const boxB = b.boundingBox;
+                        return (boxB.width * boxB.height) - (boxA.width * boxA.height);
+                    })[0];
+
+                const box = target.boundingBox;
+                const cy = box.originY + box.height / 2;
+                const h = canvas.height || video.videoHeight || 1;
+                const rel = cy / h;
+
+                if (rel < 0.4) return "basso";
+                if (rel > 0.6) return "alto";
+                return "alto";
+            } catch (e) {
+                console.warn("Errore scelta posizione testo:", e);
+                return "basso";
+            }
+        }
+
+        // --- DISEGNA TESTO SULLA FOTO ---
+        function createEditedPhoto(text, position) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const c = document.createElement('canvas');
+                    c.width = img.width;
+                    c.height = img.height;
+                    const cctx = c.getContext('2d');
+                    cctx.drawImage(img, 0, 0);
+
+                    const fontSize = Math.round(c.height * 0.05);
+                    cctx.font = fontSize + "px system-ui, -apple-system, sans-serif";
+                    cctx.textBaseline = "middle";
+                    cctx.textAlign = "center";
+
+                    const lines = text.split(/\r?\n/);
+                    const lineHeight = fontSize * 1.3;
+
+                    let maxWidth = 0;
+                    lines.forEach(line => {
+                        const w = cctx.measureText(line).width;
+                        if (w > maxWidth) maxWidth = w;
+                    });
+
+                    const padding = fontSize * 0.6;
+                    const boxWidth = maxWidth + padding * 2;
+                    const boxHeight = lineHeight * lines.length + padding * 2;
+
+                    const centerX = c.width / 2;
+                    let boxY;
+
+                    if (position === "alto") {
+                        boxY = padding;
+                    } else if (position === "centro") {
+                        boxY = (c.height - boxHeight) / 2;
+                    } else {
+                        boxY = c.height - boxHeight - padding;
+                    }
+
+                    cctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                    cctx.fillRect(centerX - boxWidth / 2, boxY, boxWidth, boxHeight);
+
+                    cctx.fillStyle = "#FFFFFF";
+                    lines.forEach((line, i) => {
+                        const lineY = boxY + padding + i * lineHeight + lineHeight / 2;
+                        cctx.fillText(line, centerX, lineY);
+                    });
+
+                    const b64 = c.toDataURL("image/jpeg", 0.9).split(",")[1];
+                    resolve(b64);
+                };
+                img.onerror = reject;
+                img.src = `data:image/jpeg;base64,${lastShotB64}`;
+            });
         }
 
         // Palette Colori per Non Vedenti (nomi stabili)
@@ -685,6 +1146,8 @@
         // Settings Manager
         window.openSettings = () => { 
             document.getElementById('key-screen').classList.remove('hidden');
+            const input = document.getElementById('key-input');
+            input.value = GEMINI_KEY || "";
             announce("Impostazioni aperte.");
         };
         window.closeSettings = () => {
