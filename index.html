@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI - Pro (Stabile)</title>
+    <title>Visione AI - Pro (Visione)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -109,8 +109,8 @@
     <script>
         // --- CONFIGURAZIONE ---
         let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
-        // CORREZIONE: Uso l'alias stabile per la versione Pro
-        const MODEL_NAME = "gemini-1.5-pro"; 
+        // MODELLO ATTUALMENTE UTILIZZATO: Alias specifico per le operazioni di Visione (immagini)
+        const MODEL_NAME = "gemini-pro-vision"; 
         
         let audioCtx, lightOsc, lightGain;
         let objectDetector = null;
@@ -194,7 +194,7 @@
                     tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
 
                     isRunning = true;
-                    announce("Sistema Pro attivo.");
+                    announce("Sistema Pro Visione attivo.");
                     
                     if(!GEMINI_KEY) setTimeout(() => {
                         announce("Attenzione. Chiave A P I mancante.");
@@ -227,7 +227,7 @@
         async function quickDescribe() {
             if(mode === 'guiding') toggleGuidance(); 
             
-            announce("Scatto Pro. Attendi analisi dettagliata.");
+            announce("Scatto Pro Visione. Attendi analisi dettagliata.");
             playShutter();
             
             const b64 = captureFrame();
@@ -452,7 +452,7 @@
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Chiave API mancante."); openSettings(); return; }
             try {
-                // Chiamata all'alias stabile PRO
+                // Chiamata all'alias PRO Visione
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
@@ -460,11 +460,11 @@
                 
                 const d = await res.json();
                 
-                // Gestione specifica degli errori API (es. chiave non Pro)
+                // Gestione specifica degli errori API (es. chiave non Pro o quota zero)
                 if(d.error) {
                     if(d.error.message.includes('not found') || d.error.message.includes('Permission Denied')) {
-                        // Se l'errore è un problema di permesso (chiave non Pro), suggeriamo l'alias Flash
-                        announce("Errore: Il modello Pro non è accessibile. Verifica la fatturazione o la chiave API.");
+                        // Se l'errore è un problema di permesso/quota, avvisa l'utente
+                        announce("Errore: Il modello Visione Pro non è accessibile. Verifica le quote nella console Google Cloud.");
                         throw new Error("API Error: Model Pro is not accessible.");
                     }
                     throw new Error(d.error.message);
