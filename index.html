@@ -3,819 +3,472 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Scanner AI Screen Reader</title>
+    <title>Visione AI Pro</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            color: #fff;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            font-family: 'Arial', sans-serif; margin: 0; padding: 0;
+            background-color: #000; color: #fff;
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* Live Region Invisibile ma fondamentale per SR */
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
+        /* Accessibilità: testo per Screen Reader */
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
-        #video-container {
-            position: relative;
-            flex-grow: 1;
-            width: 100%;
-            background: #111;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        /* Area Fotocamera */
+        #cam-container {
+            position: relative; flex-grow: 1; width: 100%;
+            background: #111; display: flex; justify-content: center; align-items: center;
         }
-
-        video { width: 100%; height: 100%; object-fit: cover; display: block; transform: scaleX(1); }
-        video.selfie { transform: scaleX(-1); }
+        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
         canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
 
-        /* Timer Rec */
-        #rec-timer {
-            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
-            background: red; color: white; padding: 5px 15px; border-radius: 20px;
-            font-weight: bold; font-size: 1.2rem; display: none; z-index: 55;
-        }
-
-        /* Pulsanti Fluttuanti */
-        .top-btn {
-            position: absolute; top: 15px; z-index: 50;
-            background: rgba(0,0,0,0.6); color: #FFD700; border: 2px solid #FFD700;
-            font-size: 1.2rem; border-radius: 50%; width: 50px; height: 50px;
-            display: flex; justify-content: center; align-items: center; cursor: pointer;
-        }
-        #btn-config { right: 15px; }
-        #btn-help { right: 75px; border-color: #00FF00; color: #00FF00; font-weight: bold; font-size: 1.5rem; }
-        #btn-torch { left: 15px; border-color: #FFF; color: #FFF; }
-        #btn-cam-switch { left: 80px; border-color: #00FFFF; color: #00FFFF; font-size: 1.5rem; }
-
-        /* Zoom Laterali */
-        .zoom-btn {
-            position: absolute; top: 50%; transform: translateY(-50%); z-index: 40;
-            width: 60px; height: 120px; background: rgba(255, 255, 255, 0.2);
-            border: 2px solid #FFF; color: #FFF; font-size: 2rem; border-radius: 15px;
-            display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px);
-        }
-        #btn-zoom-in { right: 10px; background: rgba(0, 255, 0, 0.2); }
-        #btn-zoom-out { left: 10px; background: rgba(255, 0, 0, 0.2); }
-
-        /* UI Principale */
-        #ui-layer {
-            position: absolute; bottom: 0; width: 100%; height: 50vh;
-            background: rgba(0, 0, 0, 0.94);
+        /* Griglia Comandi */
+        #controls {
+            height: 60vh; width: 100%;
             display: grid;
-            grid-template-rows: auto 1fr 1fr 1fr 0.8fr 1.2fr; 
             grid-template-columns: 1fr 1fr;
-            gap: 6px; padding: 10px; box-sizing: border-box;
-            border-top: 3px solid #333;
-        }
-
-        #status-message {
-            grid-column: 1 / -1; font-size: 1.2rem; text-align: center; padding: 8px;
-            color: #FFD700; font-weight: bold; background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            grid-template-rows: 1fr 1fr 1fr 0.3fr; 
+            gap: 10px; padding: 10px; box-sizing: border-box;
+            background: #000; border-top: 4px solid #333;
         }
 
         button {
-            background-color: #222; color: #FFF; border: 2px solid #555;
-            font-size: 1rem; font-weight: bold; border-radius: 12px;
-            cursor: pointer; touch-action: manipulation;
+            border: 2px solid #555; border-radius: 12px;
+            font-size: 1.2rem; font-weight: bold; text-transform: uppercase;
+            color: #FFF; background: #222; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center;
         }
-        button:active { background-color: #FFD700; color: #000; border-color: #FFF; }
-        button:focus { outline: 4px solid #FFD700; } /* Focus visibile */
+        button:active { background: #555; transform: scale(0.98); }
 
-        #btn-radar { grid-column: 1 / -1; background-color: #FFA500; color: #000; border: none; text-transform: uppercase; font-size: 1.1rem; }
+        /* Colori Pulsanti per Alto Contrasto */
+        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; } /* Oro */
+        #btn-guide { background-color: #004080; border-color: #FFF; } /* Blu */
         
-        #btn-mode { 
-            grid-column: 1 / -1; 
-            background-color: #333; color: #FFF; border: 1px solid #999; 
-            font-size: 1rem; text-transform: uppercase; 
-        }
-        
-        #btn-snap {
-            grid-column: 1 / -1;
-            background-color: #EEE; color: #000; font-size: 1.3rem; text-transform: uppercase; border: none;
-        }
-        .rec-active { background-color: #FF0000 !important; color: #FFF !important; animation: pulse 1.5s infinite; border: 4px solid white !important; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        
-        .gemini-btn { border: none; color: #FFF; }
-        #btn-verify { background-color: #0056b3; border: 2px solid #4da6ff; }
-        #btn-tools { background-color: #4CAF50; color: #FFF; border: none; }
+        .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; } /* Verde scuro */
+        .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; } /* Rosso scuro */
 
-        /* Overlay */
-        .overlay-screen {
+        /* Riga impostazioni */
+        .bottom-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
+        .small-btn { flex: 1; font-size: 1rem; background: #111; border: 1px solid #444; color: #CCC; }
+        .active-discrete { border-color: #FF0000; color: #FF0000; }
+
+        /* Overlay Caricamento */
+        .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 100;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: #000; z-index: 100; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
         }
         .hidden { display: none !important; }
-        
-        #tools-menu { background: rgba(0,0,0,0.95); z-index: 60; overflow-y: auto; display: block; }
-        .tools-content { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .tool-btn { width: 90%; margin: 6px 0; padding: 18px; font-size: 1.1rem; border: 2px solid #FFF; border-radius: 15px; text-align: left; }
-        
-        #start-btn { padding: 30px; font-size: 1.5rem; background: #FFD700; border-radius: 20px; border:none; width: 80%; }
-        #key-input { width: 90%; padding: 15px; font-size: 1.2rem; margin: 20px 0; background: #333; color: #fff; border: 2px solid #FFD700; }
-        
-        /* Loader */
-        .loader { border: 6px solid #333; border-top: 6px solid #FFD700; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .loader { border: 6px solid #333; border-top: 6px solid #FFF; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        #progress-text { font-size: 1.5rem; font-weight: bold; color: #FFF; margin-top: 10px; }
-        #error-text { color: red; margin-top: 20px; font-weight: bold; display: none; text-align: center; width: 80%; font-size: 1.2rem; padding: 10px; background: rgba(0,0,0,0.8); }
-        
-        #force-cam-btn {
-            display: none; margin-top: 20px; padding: 20px; background: #FF0000; color: white;
-            border: 4px solid white; border-radius: 15px; font-size: 1.5rem; z-index: 200;
-        }
     </style>
 </head>
 <body>
 
-    <!-- QUESTA È LA VOCE DEL TUO SCREEN READER -->
-    <!-- Aggiornando il testo qui dentro, il tuo telefono lo leggerà automaticamente -->
     <div id="sr-announcer" class="sr-only" aria-live="assertive" role="status"></div>
 
+    <div id="cam-container">
+        <video id="webcam" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+    </div>
+
+    <div id="controls" class="hidden">
+        <button id="btn-desc" onclick="quickDescribe()">DESCRIVI SCENA</button>
+        <button id="btn-guide" onclick="toggleGuidance()">GUIDA CENTRAGGIO</button>
+        
+        <button id="btn-light" onclick="toggleLight()">SONDA LUCE</button>
+        <button id="btn-color" onclick="toggleColor()">SONDA COLORE</button>
+
+        <button id="btn-level" onclick="toggleLevel()">LIVELLA</button>
+        <button id="btn-torch" onclick="toggleTorch()">TORCIA</button>
+
+        <div class="bottom-bar">
+            <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()">MODO DISCRETO</button>
+            <button class="small-btn" onclick="openSettings()">IMPOSTAZIONI API</button>
+        </div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <h1 style="color: #FFF; margin-bottom: 20px;">Visione AI</h1>
+        <div id="loader" class="loader hidden"></div>
+        <div id="load-msg" class="hidden" style="color:#FFF;">Caricamento in corso...</div>
+        <button onclick="startApp()" style="padding: 30px; font-size: 1.5rem; background: #D4AF37; color: #000; border-radius: 12px; width: 90%; border:none; font-weight: bold;">AVVIA SISTEMA</button>
+    </div>
+
+    <div id="key-screen" class="overlay hidden">
+        <h2 style="color: #FFF;">Chiave Gemini API</h2>
+        <input type="text" id="key-input" placeholder="Incolla chiave qui..." style="width: 80%; padding: 15px; font-size: 1.2rem; margin-bottom: 20px;">
+        <button onclick="saveKey()" style="padding: 15px; background: #FFF; color:#000; width: 50%; font-weight:bold;">SALVA</button>
+        <button onclick="closeSettings()" style="margin-top:10px; background:#333; color:#FFF; width:50%;">CHIUDI</button>
+    </div>
+
     <script>
-        // Funzione UNICA per parlare con lo Screen Reader
-        // Sostituisce completamente la vecchia window.speak
-        window.announce = function(text) {
+        // --- CONFIGURAZIONE ---
+        let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
+        let audioCtx, lightOsc, lightGain;
+        let objectDetector = null;
+        let isRunning = false;
+        let videoTrack = null;
+        
+        // Stati dell'app
+        let mode = 'idle'; // 'idle' o 'guiding'
+        let lightActive = false, colorActive = false, levelActive = false, torchActive = false;
+        let discreteMode = false;
+        let lastSpeak = 0;
+        let centeredCount = 0;
+        const SNAP_THRESHOLD = 15; // Frame necessari per scatto automatico
+
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const ctx = canvas.getContext('2d');
+
+        // Funzione parlante
+        function announce(text) {
+            if(discreteMode) return;
             const el = document.getElementById('sr-announcer');
-            // Trucco per forzare la rilettura anche se il testo è uguale
             el.textContent = ""; 
-            setTimeout(() => { el.textContent = text; }, 100);
-        };
+            setTimeout(() => el.textContent = text, 50);
+        }
 
-        // --- GESTORE DOWNLOAD SICURO ---
-        window.bootstrapApp = async function() {
-            const startBtn = document.getElementById('start-btn');
-            const retryBtn = document.getElementById('retry-btn');
-            const loader = document.getElementById('loading-spinner');
-            const loadText = document.getElementById('loading-text');
-            const progressText = document.getElementById('progress-text');
-            const errorText = document.getElementById('error-text');
+        function vibrate(pattern) {
+            if(navigator.vibrate) navigator.vibrate(pattern);
+        }
 
-            if (window.location.protocol === 'file:') {
-                const warning = "Errore protocollo File. Usa un server.";
-                alert(warning);
-                window.announce(warning);
-            }
-
-            startBtn.classList.add('hidden');
-            retryBtn.style.display = 'none';
-            errorText.style.display = 'none';
-            loader.classList.remove('hidden');
-            loadText.classList.remove('hidden');
-
-            window.announce("Inizio scaricamento. Attendi.");
+        // --- 1. AVVIO DEL SISTEMA ---
+        async function startApp() {
+            const startBtn = document.querySelector('#start-screen button');
+            startBtn.style.display = 'none';
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('load-msg').classList.remove('hidden');
+            
+            announce("Avvio sistema. Attendi.");
+            
+            // Sblocca AudioContext con interazione utente
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             try {
-                // 1. LIBRERIA
+                // Carica librerie visione
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
-                
-                // 2. MODELLO
-                const modelUrl = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite";
-                const response = await fetch(modelUrl);
-                if (!response.ok) throw new Error("Errore rete.");
-                
-                const contentLength = response.headers.get('content-length');
-                const total = parseInt(contentLength, 10);
-                let loaded = 0;
-                const reader = response.body.getReader();
-                const chunks = [];
-
-                while(true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    if (total) {
-                        const percent = Math.round((loaded / total) * 100);
-                        progressText.innerText = percent + "%";
-                        // Non annunciamo ogni % allo screen reader per non intasarlo
-                        if (percent % 50 === 0) window.announce(percent + " per cento");
-                    }
-                }
-                
-                const blob = new Blob(chunks);
-                const modelBlobUrl = URL.createObjectURL(blob);
-
-                window.announce("Download completato. Avvio fotocamera.");
-
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
-                window.objectDetector = await ObjectDetector.createFromOptions(vision, {
-                    baseOptions: { modelAssetPath: modelBlobUrl, delegate: "GPU" },
-                    scoreThreshold: 0.20,
+                objectDetector = await ObjectDetector.createFromOptions(vision, {
+                    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite", delegate: "GPU" },
+                    scoreThreshold: 0.3, 
                     runningMode: "VIDEO"
                 });
 
-                window.startCamera();
+                // Avvia Camera
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
 
-            } catch (error) {
-                console.error("Errore:", error);
-                loader.classList.add('hidden');
-                loadText.classList.add('hidden');
-                errorText.innerText = "Errore: " + error.message;
-                errorText.style.display = 'block';
-                retryBtn.style.display = 'block';
-                window.announce("Errore critico.");
-            }
-        };
-    </script>
-
-    <div id="video-container">
-        <video id="webcam" playsinline muted autoplay></video>
-        <canvas id="overlay"></canvas>
-        <div id="rec-timer">REC 00:00</div>
-        
-        <button id="btn-zoom-out" class="zoom-btn" onclick="changeZoom(-1)" aria-label="Zoom Meno">-</button>
-        <button id="btn-zoom-in" class="zoom-btn" onclick="changeZoom(1)" aria-label="Zoom Più">+</button>
-
-        <button id="btn-torch" onclick="toggleTorch()" class="top-btn" aria-label="Torcia">🔦</button>
-        <button id="btn-cam-switch" onclick="switchCamera()" class="top-btn" aria-label="Cambia Camera">🔄</button>
-        
-        <button id="btn-help" onclick="playTutorial()" class="top-btn" aria-label="Aiuto">?</button>
-        <button id="btn-config" onclick="openKeySettings()" class="top-btn" aria-label="Impostazioni">⚙️</button>
-    </div>
-
-    <div id="ui-layer">
-        <div id="status-message" aria-live="polite">In attesa...</div>
-        
-        <!-- radarMode attivo di default -->
-        <button id="btn-radar" aria-pressed="true" onclick="toggleRadarMode()">RADAR ATTIVO</button>
-
-        <button onclick="cyclePreview()">Scegli Oggetto</button>
-        <button onclick="toggleSelection()">Blocca Oggetto</button>
-
-        <button id="btn-verify" class="gemini-btn" onclick="askGemini('verify')">GIUDICE FOTO</button>
-        <button id="btn-tools" class="gemini-btn" onclick="openToolsMenu()">STRUMENTI</button>
-
-        <button id="btn-mode" onclick="toggleAppMode()">MODALITÀ: FOTO 📷</button>
-        <button id="btn-snap" onclick="handleAction()">SCATTA FOTO</button>
-    </div>
-
-    <!-- Menu Strumenti -->
-    <div id="tools-menu" class="overlay-screen hidden">
-        <div class="tools-content">
-            <h2 style="color: #FFD700; margin-bottom: 15px;" tabindex="-1">Strumenti Visivi</h2>
-            <!-- Primo elemento focusabile -->
-            <button id="btn-discrete" class="tool-btn" aria-pressed="false" style="background: #607D8B;" onclick="toggleDiscreteMode()">MODALITÀ DISCRETA (OFF)</button>
-            <button id="btn-level" class="tool-btn" aria-pressed="false" style="background: #9C27B0;" onclick="toggleLevel()">LIVELLA (OFF)</button>
-            <button id="btn-light-probe" class="tool-btn" aria-pressed="false" style="background: #FFEB3B; color: #000;" onclick="toggleLightProbe()">SONDA LUCE (OFF)</button>
-            <button id="btn-color-probe" class="tool-btn" aria-pressed="false" style="background: #E91E63;" onclick="toggleColorProbe()">SONDA COLORE (OFF)</button>
-            <hr style="width: 80%; border-color: #555; margin: 10px 0;">
-            <button class="tool-btn" style="background: #2196F3;" onclick="askGemini('text')">LEGGI TESTO (AI)</button>
-            <button class="tool-btn" style="background: #FF9800;" onclick="askGemini('face')">ANALISI VOLTO (AI)</button>
-            <button onclick="closeToolsMenu()" style="margin-top: 15px; padding: 20px; width: 90%; background: #333;">CHIUDI MENU</button>
-        </div>
-    </div>
-
-    <div id="start-overlay" class="overlay-screen">
-        <div id="loading-spinner" class="loader hidden"></div>
-        <div id="loading-text" style="color: #FFD700; margin-bottom: 20px;" aria-live="polite">Caricamento...</div>
-        <div id="progress-text" aria-live="polite">0%</div>
-        <div id="error-text" aria-live="assertive"></div>
-        
-        <button id="start-btn" onclick="bootstrapApp()">AVVIA SISTEMA</button>
-        <button id="retry-btn" onclick="bootstrapApp()" style="display:none; margin-top:20px; padding:15px; background:red; color:white; border-radius:10px; border:none; font-size:1.2rem;">RIPROVA</button>
-        <button id="force-cam-btn" onclick="forceCameraStart()">SBLOCCA FOTOCAMERA</button>
-    </div>
-
-    <div id="key-overlay" class="overlay-screen hidden">
-        <h2 style="color: #FFD700;">Chiave Gemini API</h2>
-        <input type="text" id="key-input" placeholder="Incolla chiave qui...">
-        <div style="display: flex; gap: 10px; width: 90%;">
-            <button onclick="saveKey()" style="flex: 1; padding: 15px; background: #FFD700;">Salva</button>
-            <button onclick="closeKeySettings()" style="flex: 1; padding: 15px; background: #555; color: #fff;">Chiudi</button>
-        </div>
-    </div>
-
-<script>
-    // --- LOGICA PRINCIPALE ---
-    
-    let objectDetector = null;
-    let video = document.getElementById("webcam");
-    let canvas = document.getElementById("overlay");
-    let ctx = canvas.getContext("2d");
-    let lastVideoTime = -1;
-    let isRunning = false;
-    let videoTrack = null; 
-    let cameraWatchdog = null;
-
-    // Stati
-    let currentFacingMode = 'environment';
-    let currentZoom = 1;
-    let zoomCaps = { min: 1, max: 3, step: 0.1 };
-    let supportsZoom = false;
-
-    let appMode = 'photo'; 
-    let isRecording = false;
-    let mediaRecorder = null;
-    let recordedChunks = [];
-    let recStartTime = 0;
-    let recInterval = null;
-
-    let radarMode = true; 
-    let torchState = false;
-    let lightProbeActive = false; 
-    let colorProbeActive = false; 
-    let levelActive = false; 
-    let discreteMode = false;
-    let selectedTargets = new Set();
-    let previewTarget = null;
-    let detectedObjects = [];
-
-    window.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let lightOscillator = null;
-    let lightGain = null;
-
-    let lastSpokenTime = 0;
-    let lastDirection = "";
-    let GEMINI_API_KEY = localStorage.getItem('gemini_key') || "";
-
-    const colorNames = { '0,0,0': 'Nero', '255,255,255': 'Bianco', '255,0,0': 'Rosso', '0,255,0': 'Verde', '0,0,255': 'Blu', '255,255,0': 'Giallo', '255,0,255': 'Viola', '0,255,255': 'Azzurro', '128,128,128': 'Grigio', '165,42,42': 'Marrone', '255,165,0': 'Arancione' };
-    const translations = { 'person': 'Persona', 'bicycle': 'Bicicletta', 'car': 'Auto', 'bench': 'Panchina', 'dog': 'Cane', 'cat': 'Gatto', 'backpack': 'Zaino', 'umbrella': 'Ombrello', 'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bottle': 'Bottiglia', 'cup': 'Tazza', 'chair': 'Sedia', 'couch': 'Divano', 'potted plant': 'Pianta', 'bed': 'Letto', 'dining table': 'Tavolo', 'toilet': 'Water', 'tv': 'TV', 'laptop': 'Laptop', 'mouse': 'Mouse', 'keyboard': 'Tastiera', 'cell phone': 'Telefono', 'book': 'Libro', 'clock': 'Orologio', 'vase': 'Vaso' };
-
-    window.startCamera = async function() {
-        if (video.srcObject) {
-            const tracks = video.srcObject.getTracks();
-            tracks.forEach(t => t.stop());
-        }
-
-        if (cameraWatchdog) clearTimeout(cameraWatchdog);
-        cameraWatchdog = setTimeout(() => {
-            if (!isRunning) {
-                document.getElementById('force-cam-btn').style.display = 'block';
-                window.announce("La fotocamera non risponde. Premi Sblocca.");
-            }
-        }, 4000);
-
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode },
-                audio: false
-            });
-            handleStreamSuccess(stream);
-        } catch (err) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                window.announce("Modalità compatibilità.");
-                handleStreamSuccess(stream);
-            } catch (err3) {
-                console.error("Fallimento:", err3);
-                let msg = "Errore Fotocamera: " + err3.name;
-                if (err3.name === 'NotReadableError') msg = "Camera occupata.";
-                if (err3.name === 'NotAllowedError') msg = "Permesso negato.";
-
-                document.getElementById('error-text').innerText = msg;
-                document.getElementById('error-text').style.display = 'block';
-                document.getElementById('force-cam-btn').style.display = 'block';
-                document.getElementById('loading-spinner').classList.add('hidden');
-                document.getElementById('loading-text').classList.add('hidden');
-                
-                window.announce(msg);
-            }
-        }
-    }
-
-    window.forceCameraStart = function() { window.startCamera(); };
-
-    function handleStreamSuccess(stream) {
-        if (cameraWatchdog) clearTimeout(cameraWatchdog);
-        
-        video.srcObject = stream;
-        video.play().catch(e => console.log("Play error:", e));
-
-        videoTrack = stream.getVideoTracks()[0]; 
-        
-        if (currentFacingMode === 'user') video.classList.add('selfie');
-        else video.classList.remove('selfie');
-
-        const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
-        if ('zoom' in caps) {
-            supportsZoom = true; zoomCaps = caps.zoom; currentZoom = zoomCaps.min;
-            window.announce(currentFacingMode === 'user' ? "Selfie." : "Posteriore.");
-        } else {
-            supportsZoom = false;
-            window.announce(currentFacingMode === 'user' ? "Selfie." : "Posteriore.");
-        }
-
-        document.getElementById('btn-zoom-in').style.display = supportsZoom ? 'flex' : 'none';
-        document.getElementById('btn-zoom-out').style.display = supportsZoom ? 'flex' : 'none';
-        document.getElementById('btn-torch').style.display = ('torch' in caps) ? 'flex' : 'none';
-
-        const btnRadar = document.getElementById('btn-radar');
-        btnRadar.style.backgroundColor = "#FF0000";
-        btnRadar.innerText = "RADAR ATTIVO";
-        btnRadar.setAttribute('aria-pressed', 'true');
-
-        video.addEventListener("loadeddata", () => {
-            document.getElementById('start-overlay').classList.add('hidden');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            isRunning = true;
-            window.isRunning = true;
-            window.announce("Fotocamera attiva. Radar in funzione.");
-            predictWebcam();
-            processProbes(); 
-        });
-    }
-
-    // --- INTERAZIONI UTENTE (SOLO ANNOUNCE) ---
-
-    window.toggleDiscreteMode = function() {
-        discreteMode = !discreteMode;
-        const btn = document.getElementById('btn-discrete');
-        if (discreteMode) {
-            btn.innerText = "🔕 MODALITÀ DISCRETA (ON)"; btn.style.border = "4px solid #FF0000"; btn.setAttribute('aria-pressed', 'true');
-            window.announce("Discreta attiva.");
-        } else {
-            btn.innerText = "🔕 MODALITÀ DISCRETA (OFF)"; btn.style.border = "2px solid #FFF"; btn.setAttribute('aria-pressed', 'false');
-            window.announce("Discreta spenta.");
-        }
-    }
-
-    window.toggleAppMode = function() {
-        if (isRecording) return; 
-        if (appMode === 'photo') {
-            appMode = 'video';
-            document.getElementById('btn-mode').innerText = "MODALITÀ: VIDEO 🎥";
-            document.getElementById('btn-snap').innerText = "AVVIA REGISTRAZIONE";
-            document.getElementById('btn-snap').style.backgroundColor = "#FFCCCC";
-            window.announce("Video.");
-        } else {
-            appMode = 'photo';
-            document.getElementById('btn-mode').innerText = "MODALITÀ: FOTO 📷";
-            document.getElementById('btn-snap').innerText = "SCATTA FOTO";
-            document.getElementById('btn-snap').style.backgroundColor = "#EEE";
-            window.announce("Foto.");
-        }
-    }
-
-    window.handleAction = function() {
-        if (appMode === 'photo') {
-            takePhoto();
-        } else {
-            if (!isRecording) startRecording();
-            else stopRecording();
-        }
-    }
-
-    function startRecording() {
-        recordedChunks = [];
-        try {
-            const stream = video.srcObject;
-            let mimeType = 'video/webm;codecs=vp9';
-            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
-            
-            mediaRecorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
-            mediaRecorder.onstop = saveVideo;
-
-            mediaRecorder.start();
-            isRecording = true;
-            
-            const btn = document.getElementById('btn-snap');
-            btn.innerText = "STOP REGISTRAZIONE";
-            btn.classList.add('rec-active');
-            document.getElementById('rec-timer').style.display = 'block';
-            
-            recStartTime = Date.now();
-            updateTimer();
-            recInterval = setInterval(updateTimer, 1000);
-
-            window.announce("Registrazione avviata.");
-            // Suono di avvio anche in modalità discreta per conferma importante
-            if(window.audioCtx && window.audioCtx.state === 'suspended') window.audioCtx.resume();
-            const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-            o.frequency.value = 880; g.gain.value = 0.1; o.connect(g); g.connect(audioCtx.destination);
-            o.start(); o.stop(audioCtx.currentTime + 0.1);
-
-        } catch (e) { console.error(e); window.announce("Errore video."); }
-    }
-
-    function updateTimer() {
-        const diff = Math.floor((Date.now() - recStartTime) / 1000);
-        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
-        const secs = (diff % 60).toString().padStart(2, '0');
-        document.getElementById('rec-timer').innerText = `REC ${mins}:${secs}`;
-        if (diff > 0 && diff % 30 === 0) {
-            window.announce("Rec " + mins + " minuti.");
-        }
-    }
-
-    function stopRecording() {
-        if (!mediaRecorder) return;
-        mediaRecorder.stop();
-        isRecording = false;
-        clearInterval(recInterval);
-        document.getElementById('rec-timer').style.display = 'none';
-        const btn = document.getElementById('btn-snap');
-        btn.innerText = "AVVIA REGISTRAZIONE";
-        btn.classList.remove('rec-active');
-        window.announce("Video terminato.");
-        // Beep di fine
-        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.frequency.value = 440; g.gain.value = 0.1; o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + 0.2);
-    }
-
-    function saveVideo() {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'video_scan_' + Date.now() + '.webm';
-        a.click();
-    }
-
-    async function predictWebcam() {
-        if (!isRunning || !objectDetector) return;
-        let startTimeMs = performance.now();
-        if (video.currentTime !== lastVideoTime) {
-            lastVideoTime = video.currentTime;
-            const detections = window.objectDetector.detectForVideo(video, startTimeMs);
-            detectedObjects = detections.detections.filter(d => {
-                if (radarMode) return d.categories[0].score > 0.20; 
-                return d.categories[0].score > 0.50; 
-            });
-            drawAndGuide(detectedObjects);
-        }
-        window.requestAnimationFrame(predictWebcam);
-    }
-
-    function drawAndGuide(detections) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        let target = null;
-
-        // Logica Radar: Cerca il più grande
-        if (radarMode && detections.length > 0) {
-            detections.sort((a, b) => (b.boundingBox.width * b.boundingBox.height) - (a.boundingBox.width * a.boundingBox.height));
-            target = detections[0];
-            detections.forEach(d => drawBox(d, d === target ? '#00FF00' : 'rgba(255,255,255,0.2)'));
-        } 
-        // Logica Specifica
-        else {
-            let potential = [];
-            if (selectedTargets.size > 0) potential = detections.filter(d => selectedTargets.has(d.categories[0].categoryName));
-            else if (previewTarget) potential = detections.filter(d => d.categories[0].categoryName === previewTarget);
-            detections.forEach(d => {
-                let color = 'rgba(255,255,255,0.1)';
-                if (selectedTargets.has(d.categories[0].categoryName)) color = '#00FF00';
-                else if (d.categories[0].categoryName === previewTarget) color = '#FFFF00';
-                drawBox(d, color);
-            });
-            if (potential.length > 0) {
-                potential.sort((a, b) => (b.boundingBox.width * b.boundingBox.height) - (a.boundingBox.width * a.boundingBox.height));
-                target = potential[0];
-            }
-        }
-
-        if (target) {
-            const bbox = target.boundingBox;
-            const centerX = bbox.originX + (bbox.width / 2);
-            const screenCenter = canvas.width / 2;
-            const tolerance = canvas.width * 0.15;
-            let msg = "";
-            if (centerX < screenCenter - tolerance) msg = "Sinistra";
-            else if (centerX > screenCenter + tolerance) msg = "Destra";
-            else msg = "CENTRO";
-            
-            // Novità Radar: Prova a dire il nome anche in Radar mode se la confidenza è decente
-            let name = "";
-            if (radarMode && target.categories[0].score > 0.4) {
-                const engName = target.categories[0].categoryName;
-                name = translations[engName] || engName;
-            }
-
-            const statusMsg = document.getElementById('status-message');
-            
-            if (msg === "CENTRO") {
-                statusMsg.style.color = "#00FF00"; statusMsg.innerText = "CENTRATO!";
-                if (lastDirection !== "CENTRO") { 
-                    // Feedback sonoro o vibrazione, NO VOCE CONTINUA per non coprire il lettore
-                    if (discreteMode) { if(navigator.vibrate) navigator.vibrate(300); } 
-                    else { 
-                        // Beep corto per centro
-                        if(window.audioCtx && window.audioCtx.state === 'suspended') window.audioCtx.resume();
-                        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-                        o.frequency.value = 880; g.gain.value = 0.1; o.connect(g); g.connect(audioCtx.destination);
-                        o.start(); o.stop(audioCtx.currentTime + 0.1);
-                    }
+                video.addEventListener('loadeddata', () => {
+                    document.getElementById('start-screen').classList.add('hidden');
+                    document.getElementById('controls').classList.remove('hidden');
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                    isRunning = true;
+                    announce("Pronto. Pulsanti attivi.");
                     
-                    // Annuncia "Centrato" solo una volta
-                    window.announce(name ? name + " Centrato." : "Centrato.");
-                    lastDirection = "CENTRO"; 
+                    if(!GEMINI_KEY) openSettings();
+                    loop(); // Inizia ciclo continuo
+                });
+            } catch(e) { 
+                alert("Errore avvio: " + e.message); 
+                announce("Errore critico fotocamera.");
+            }
+        }
+
+        // Ciclo principale (60 volte al secondo)
+        function loop() {
+            if(!isRunning) return;
+            if(lightActive) processLight();
+            if(colorActive) processColor();
+            if(mode === 'guiding') processGuidance();
+            requestAnimationFrame(loop);
+        }
+
+        // --- 2. DESCRIZIONE SCENA (AI) ---
+        async function quickDescribe() {
+            if(mode === 'guiding') toggleGuidance(); // Spegni guida se attiva
+            announce("Scatto e analizzo.");
+            playShutter();
+            const b64 = captureFrame();
+            // Prompt ottimizzato per Screen Reader
+            const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
+            await callGemini(prompt, b64);
+        }
+
+        // --- 3. GUIDA AL CENTRAGGIO ---
+        function toggleGuidance() {
+            const btn = document.getElementById('btn-guide');
+            if(mode === 'guiding') {
+                mode = 'idle'; 
+                btn.classList.remove('guiding'); 
+                btn.innerText = "GUIDA CENTRAGGIO";
+                ctx.clearRect(0,0,canvas.width,canvas.height); 
+                announce("Guida spenta.");
+            } else {
+                mode = 'guiding'; 
+                centeredCount = 0; 
+                btn.classList.add('guiding'); 
+                btn.innerText = "CERCO SOGGETTO...";
+                announce("Cerco soggetto.");
+            }
+        }
+
+        function processGuidance() {
+            const detections = objectDetector.detectForVideo(video, performance.now()).detections;
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            
+            if(detections.length === 0) return;
+
+            // Prendi l'oggetto più grande
+            const target = detections.sort((a,b)=>(b.boundingBox.width*b.boundingBox.height)-(a.boundingBox.width*a.boundingBox.height))[0];
+            const box = target.boundingBox;
+            
+            // Coordinate
+            const cx = box.originX + box.width/2;
+            const cy = box.originY + box.height/2;
+            const sx = canvas.width/2, sy = canvas.height/2;
+            const tol = canvas.width * 0.15; // Tolleranza 15%
+
+            // Feedback Visivo (Quadrato verde)
+            ctx.strokeStyle = "#00FF00"; ctx.lineWidth = 5; 
+            ctx.strokeRect(box.originX, box.originY, box.width, box.height);
+
+            let msg = "";
+            if(cx < sx - tol) msg = "Sposta a DESTRA";
+            else if(cx > sx + tol) msg = "Sposta a SINISTRA";
+            else if(cy < sy - tol) msg = "ALZA il telefono";
+            else if(cy > sy + tol) msg = "ABBASSA il telefono";
+            
+            if(msg) {
+                centeredCount = 0;
+                // Parla ogni 1.2 secondi per non sovrapporsi
+                if(Date.now() - lastSpeak > 1200) { 
+                    announce(msg); 
+                    vibrate(50); 
+                    lastSpeak=Date.now(); 
                 }
             } else {
-                statusMsg.style.color = "#FFF"; statusMsg.innerText = msg;
-                // Throttle molto lento (2.5s) per dare tempo allo Screen Reader di finire
-                if (msg !== lastDirection || Date.now() - lastSpokenTime > 2500) { 
-                    if (discreteMode) {
-                        if (msg === "Sinistra") { if(navigator.vibrate) navigator.vibrate(50); } 
-                        if (msg === "Destra") { if(navigator.vibrate) navigator.vibrate([50, 50]); } 
-                    } else { 
-                        // Usa announce per l'SR
-                        window.announce(msg); 
-                    }
-                    lastDirection = msg; 
-                    lastSpokenTime = Date.now(); 
+                // Centrato
+                centeredCount++;
+                if(centeredCount === 1) { 
+                    announce("Centrato. Tieni fermo."); 
+                    vibrate([50,50,50]); 
+                }
+                
+                // Se rimane centrato per ~0.5 secondi
+                if(centeredCount > SNAP_THRESHOLD) {
+                    mode = 'idle'; 
+                    document.getElementById('btn-guide').classList.remove('guiding');
+                    document.getElementById('btn-guide').innerText = "ANALISI IN CORSO...";
+                    announce("Scatto automatico."); 
+                    playShutter();
+                    const b64 = captureFrame();
+                    callGemini("Descrivi in dettaglio l'oggetto che ho appena inquadrato.", b64).then(()=>{
+                        document.getElementById('btn-guide').innerText = "GUIDA CENTRAGGIO";
+                    });
                 }
             }
         }
-    }
 
-    function drawBox(detection, color) {
-        const { originX, originY, width, height } = detection.boundingBox;
-        ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.strokeRect(originX, originY, width, height);
-    }
-
-    window.toggleRadarMode = function() {
-        radarMode = !radarMode;
-        const btn = document.getElementById('btn-radar');
-        if (radarMode) {
-            selectedTargets.clear(); previewTarget = null;
-            btn.style.backgroundColor = "#FF0000"; btn.innerText = "RADAR ATTIVO"; btn.setAttribute('aria-pressed', 'true');
-            window.announce("Radar Attivo.");
-        } else {
-            btn.style.backgroundColor = "#FFA500"; btn.innerText = "ATTIVA RADAR"; btn.setAttribute('aria-pressed', 'false');
-            window.announce("Radar spento.");
+        // --- 4. SONDA LUCE ---
+        function toggleLight() {
+            lightActive = !lightActive;
+            const btn = document.getElementById('btn-light');
+            if(lightActive) {
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+                lightOsc = audioCtx.createOscillator(); 
+                lightGain = audioCtx.createGain();
+                lightOsc.connect(lightGain); 
+                lightGain.connect(audioCtx.destination);
+                lightGain.gain.value = 0.1; 
+                lightOsc.start();
+                btn.classList.add('active-tool'); btn.innerText = "LUCE: ON"; 
+                announce("Suono luce attivo.");
+            } else {
+                if(lightOsc) lightOsc.stop();
+                btn.classList.remove('active-tool'); btn.innerText = "SONDA LUCE"; 
+                announce("Suono luce spento.");
+            }
         }
-    };
-
-    window.cyclePreview = function() {
-        if (radarMode) { window.announce("Disattiva radar."); return; }
-        const names = [...new Set(detectedObjects.map(d => d.categories[0].categoryName))];
-        if (names.length === 0) { window.announce("Nessun oggetto."); return; }
-        if (!previewTarget || !names.includes(previewTarget)) previewTarget = names[0];
-        else { const i = names.indexOf(previewTarget); previewTarget = names[(i+1)%names.length]; }
-        const it = translations[previewTarget] || previewTarget;
-        window.announce("Opzione: " + it);
-        document.getElementById('status-message').innerText = "Opz: " + it;
-    };
-
-    window.toggleSelection = function() {
-        if (radarMode) return;
-        if (!previewTarget) { window.announce("Scegli prima un oggetto."); return; }
-        const it = translations[previewTarget] || previewTarget;
-        if (selectedTargets.has(previewTarget)) { selectedTargets.delete(previewTarget); window.announce("Sbloccato " + it); }
-        else { selectedTargets.add(previewTarget); window.announce("Bloccato " + it); }
-    };
-
-    window.takePhoto = function() {
-        window.announce("Salvo."); 
-        const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
-        c.getContext('2d').drawImage(video, 0, 0);
-        c.toBlob(async (blob) => {
-            const f = new File([blob], "foto.jpg", { type: "image/jpeg" });
-            if (navigator.canShare && navigator.canShare({files:[f]})) navigator.share({files:[f], title:'Foto', text:'AI Scan'});
-            else { const l = document.createElement('a'); l.download='foto.jpg'; l.href=URL.createObjectURL(blob); l.click(); }
-        }, 'image/jpeg');
-    };
-
-    window.askGemini = async function(mode) {
-        if (!GEMINI_API_KEY) { window.announce("Manca chiave API."); return; }
-        // Beep per conferma avvio
-        if(window.audioCtx && window.audioCtx.state === 'suspended') window.audioCtx.resume();
-        const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-        o.frequency.value = 880; g.gain.value = 0.1; o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + 0.1);
         
-        document.getElementById('tools-menu').classList.add('hidden');
-        let prompt = "";
-        if (mode === 'verify') prompt = "Analizza foto. Soggetto centrato? A fuoco? Luce ok? Dammi istruzioni correttive se serve.";
-        else if (mode === 'text') prompt = "Leggi tutto il testo.";
-        else if (mode === 'face') prompt = "Analisi volti: età, espressione.";
-        const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
-        c.getContext('2d').drawImage(video, 0, 0);
-        const base64 = c.toDataURL('image/jpeg', 0.8).split(',')[1];
-        try {
-            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: base64}}] }] })
+        function processLight() {
+            const size=10, cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
+            // Legge luminosità media al centro
+            const p = createTempContext().getImageData(cx-size/2, cy-size/2, size, size).data;
+            let sum=0; 
+            for(let i=0; i<p.length; i+=4) sum += (p[i]+p[i+1]+p[i+2])/3;
+            const level = sum/(p.length/4);
+            // Modula frequenza: Buio(0)=100Hz, Luce(255)=1100Hz
+            if(lightOsc) lightOsc.frequency.setValueAtTime(100+(level*4), audioCtx.currentTime);
+        }
+
+        // --- 5. SONDA COLORE ---
+        function toggleColor() {
+            colorActive = !colorActive;
+            const btn = document.getElementById('btn-color');
+            if(colorActive) { 
+                btn.classList.add('active-tool'); btn.innerText = "COLORE: ON"; 
+                announce("Lettura colori attiva."); 
+            } else { 
+                btn.classList.remove('active-tool'); btn.innerText = "SONDA COLORE"; 
+                announce("Lettura colori spenta."); 
+            }
+        }
+        
+        function processColor() {
+            if(Date.now()-lastSpeak<2000) return;
+            const cx=Math.floor(canvas.width/2), cy=Math.floor(canvas.height/2);
+            const p = createTempContext().getImageData(cx,cy,1,1).data;
+            announce(getColorName(p[0],p[1],p[2])); 
+            lastSpeak=Date.now();
+        }
+
+        // --- 6. LIVELLA ---
+        function toggleLevel() {
+            levelActive = !levelActive;
+            const btn = document.getElementById('btn-level');
+            if(levelActive) {
+                btn.classList.add('active-tool'); btn.innerText = "LIVELLA: ON"; 
+                announce("Livella attiva.");
+                // Richiesta permessi iOS
+                if(typeof DeviceOrientationEvent.requestPermission==='function') {
+                    DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted') window.addEventListener('deviceorientation', handleLevel)});
+                } else {
+                    window.addEventListener('deviceorientation', handleLevel);
+                }
+            } else {
+                btn.classList.remove('active-tool'); btn.innerText = "LIVELLA"; 
+                announce("Livella spenta.");
+                window.removeEventListener('deviceorientation', handleLevel);
+            }
+        }
+        
+        function handleLevel(e) {
+            if(Date.now()-lastSpeak<1500) return;
+            if(e.gamma > 10) { announce("Pende a destra"); vibrate(50); lastSpeak=Date.now(); }
+            else if(e.gamma < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
+        }
+
+        // --- 7. TORCIA (CON CONTROLLO REALE) ---
+        function toggleTorch() {
+            if(!videoTrack) { announce("Fotocamera non pronta."); return; }
+            
+            const targetState = !torchActive; // Lo stato che vorremmo
+            const btn = document.getElementById('btn-torch');
+
+            videoTrack.applyConstraints({advanced:[{torch: targetState}]})
+            .then(() => {
+                // CONTROLLO DI REALTA': Chiediamo alla videocamera come sta
+                const settings = videoTrack.getSettings();
+                
+                // Se il browser supporta la lettura dello stato
+                if ('torch' in settings) {
+                    const actualState = settings.torch;
+                    if (actualState === targetState) {
+                        torchActive = actualState;
+                        if(torchActive) {
+                            btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Luce accesa.");
+                        } else {
+                            btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Luce spenta.");
+                        }
+                    } else {
+                        announce("La torcia non risponde.");
+                    }
+                } else {
+                    // Fallback per dispositivi che non riportano lo stato (es. alcuni Android vecchi)
+                    torchActive = targetState;
+                    if(torchActive) {
+                        btn.classList.add('active-tool'); btn.innerText = "TORCIA: ON"; announce("Luce attivata.");
+                    } else {
+                        btn.classList.remove('active-tool'); btn.innerText = "TORCIA"; announce("Luce disattivata.");
+                    }
+                }
+            })
+            .catch(err => {
+                announce("Impossibile attivare torcia.");
+                torchActive = false;
+                btn.classList.remove('active-tool'); btn.innerText = "TORCIA";
             });
-            const d = await res.json();
-            window.announce(d.candidates[0].content.parts[0].text);
-        } catch(e) { window.announce("Errore connessione."); }
-    };
-
-    window.toggleTorch = function() {
-        if (!videoTrack) return; torchState = !torchState;
-        videoTrack.applyConstraints({ advanced: [{ torch: torchState }] }).then(()=>window.announce(torchState?"Luce on":"Luce off"));
-    };
-    
-    window.changeZoom = function(d) {
-        if (!supportsZoom) return;
-        let s = (zoomCaps.max-zoomCaps.min)/10;
-        let n = currentZoom + (d*s);
-        if(n>=zoomCaps.min && n<=zoomCaps.max) {
-            currentZoom = n;
-            videoTrack.applyConstraints({advanced:[{zoom:n}]}).then(()=>window.announce("Zoom "+n.toFixed(1)));
         }
-    };
-    
-    window.switchCamera = function() {
-        currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
-        window.announce("Cambio camera..."); startCamera();
-    };
-    
-    window.openKeySettings = () => { document.getElementById('key-overlay').classList.remove('hidden'); window.announce("Impostazioni"); };
-    window.closeKeySettings = () => { document.getElementById('key-overlay').classList.add('hidden'); window.announce("Chiuso"); };
-    window.saveKey = () => {
-        GEMINI_API_KEY = document.getElementById('key-input').value.trim();
-        localStorage.setItem('gemini_key', GEMINI_API_KEY);
-        closeKeySettings(); window.announce("Salvato.");
-    };
-    
-    window.openToolsMenu = () => { document.getElementById('tools-menu').classList.remove('hidden'); window.announce("Strumenti."); }
-    window.closeToolsMenu = () => { document.getElementById('tools-menu').classList.add('hidden'); window.announce("Chiuso."); }
-    
-    window.playTutorial = () => window.announce("Tutorial: Usa Radar Arancio per tutto. Tasto Blu per verifica con Gemini. Tasto Modo per Video. Stop video scarica il file.");
 
-    function processProbes() {
-        if (!isRunning) { requestAnimationFrame(processProbes); return; }
-        if ((lightProbeActive || colorProbeActive) && video.readyState === 4) {
-            const c = document.createElement('canvas'); c.width=1; c.height=1;
-            c.getContext('2d').drawImage(video,0,0,1,1);
-            const p = c.getContext('2d').getImageData(0,0,1,1).data;
-            if(lightProbeActive && lightOscillator) {
-                lightOscillator.frequency.setValueAtTime(200+((p[0]+p[1]+p[2])/3)*8, audioCtx.currentTime);
-            }
-            if(colorProbeActive && Date.now()-lastSpokenTime>1500) {
-                window.announce(getColorName(p[0],p[1],p[2])); lastSpokenTime=Date.now();
+        // --- MODO DISCRETO ---
+        function toggleDiscrete() {
+            discreteMode = !discreteMode;
+            const btn = document.getElementById('btn-discrete');
+            if(discreteMode) { 
+                btn.classList.add('active-discrete'); btn.innerText = "MODO DISCRETO: ON";
+                vibrate([100,50,100]); 
+            } else {
+                btn.classList.remove('active-discrete'); btn.innerText = "MODO DISCRETO";
+                announce("Modo discreto spento. Voce attiva.");
             }
         }
-        setTimeout(() => requestAnimationFrame(processProbes), 100);
-    }
-    
-    function getColorName(r, g, b) {
-        let min = Infinity; let col = "Sconosciuto";
-        for (let k in colorNames) {
-            const [cr, cg, cb] = k.split(',').map(Number);
-            const d = Math.sqrt((r-cr)**2 + (g-cg)**2 + (b-cb)**2);
-            if (d < min) { min = d; col = colorNames[k]; }
+
+        // --- FUNZIONI DI SUPPORTO ---
+        function captureFrame() {
+            const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+            c.getContext('2d').drawImage(video, 0, 0);
+            return c.toDataURL('image/jpeg', 0.7).split(',')[1]; // Compressione 0.7
         }
-        return col;
-    }
-    
-    window.toggleLightProbe = () => {
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        lightProbeActive = !lightProbeActive;
-        const btn = document.getElementById('btn-light-probe');
-        if(lightProbeActive) { 
-            btn.innerText="☀️ SONDA LUCE (ON)"; btn.style.border="4px solid yellow"; btn.setAttribute('aria-pressed', 'true');
-            lightOscillator = audioCtx.createOscillator(); lightGain = audioCtx.createGain();
-            lightOscillator.type='sine'; lightGain.gain.value=0.1;
-            lightOscillator.connect(lightGain); lightGain.connect(audioCtx.destination);
-            lightOscillator.start(); window.announce("Luce attiva");
-        } else { 
-            btn.innerText="☀️ SONDA LUCE (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false');
-            if(lightOscillator) lightOscillator.stop(); window.announce("Luce spenta");
+
+        async function callGemini(prompt, b64) {
+            if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: base64}}] }] })
+                });
+                const d = await res.json();
+                if(d.error) throw new Error(d.error.message);
+                const text = d.candidates[0].content.parts[0].text;
+                
+                if(!discreteMode) announce(text);
+                else alert("RISPOSTA AI:\n" + text); 
+            } catch(e) { 
+                console.error(e);
+                announce("Errore connessione intelligenza artificiale."); 
+            }
         }
-    };
-    
-    window.toggleColorProbe = () => {
-        colorProbeActive = !colorProbeActive;
-        const btn = document.getElementById('btn-color-probe');
-        if(colorProbeActive) { btn.innerText="🎨 COLORE (ON)"; btn.style.border="4px solid magenta"; btn.setAttribute('aria-pressed', 'true'); window.announce("Colore attivo"); }
-        else { btn.innerText="🎨 COLORE (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false'); window.announce("Colore spento"); }
-    };
-    
-    window.toggleLevel = () => {
-        levelActive = !levelActive;
-        const btn = document.getElementById('btn-level');
-        if(levelActive) {
-            btn.innerText="📐 LIVELLA (ON)"; btn.style.border="4px solid lime"; btn.setAttribute('aria-pressed', 'true'); window.announce("Livella attiva");
-            if(typeof DeviceOrientationEvent.requestPermission==='function') DeviceOrientationEvent.requestPermission().then(r=>{if(r==='granted')window.addEventListener('deviceorientation', handleOrientation)});
-            else window.addEventListener('deviceorientation', handleOrientation);
-        } else {
-            btn.innerText="📐 LIVELLA (OFF)"; btn.style.border="2px solid white"; btn.setAttribute('aria-pressed', 'false'); window.announce("Livella spenta");
-            window.removeEventListener('deviceorientation', handleOrientation);
+
+        function createTempContext() { 
+            const c=document.createElement('canvas'); c.width=canvas.width; c.height=canvas.height; 
+            c.getContext('2d').drawImage(video,0,0); return c.getContext('2d'); 
         }
-    };
-    
-    let lastLevelSpeak=0;
-    function handleOrientation(e) {
-        if(!levelActive || Date.now()-lastLevelSpeak<1500) return;
-        if(e.gamma>5) { window.announce("Pendi destra"); lastLevelSpeak=Date.now(); }
-        else if(e.gamma<-5) { window.announce("Pendi sinistra"); lastLevelSpeak=Date.now(); }
-    }
-</script>
+        
+        function playShutter() { 
+            if(!discreteMode && audioCtx){ 
+                const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); 
+                g.gain.value=0.1; o.connect(g); g.connect(audioCtx.destination); 
+                o.start(); o.stop(audioCtx.currentTime+0.1); 
+            } 
+        }
+        
+        // Dizionario Colori Semplice
+        const colors={'0,0,0':'Nero','255,255,255':'Bianco','255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo','128,128,128':'Grigio','165,42,42':'Marrone','255,165,0':'Arancione','128,0,128':'Viola'};
+        function getColorName(r,g,b){ 
+            let min=Infinity,res="Sconosciuto"; 
+            for(let k in colors){ 
+                const[cr,cg,cb]=k.split(',').map(Number); 
+                const d=Math.sqrt((r-cr)**2+(g-cg)**2+(b-cb)**2); 
+                if(d<min){min=d;res=colors[k];}
+            } 
+            return res;
+        }
+
+        // Gestione Impostazioni
+        window.openSettings = () => document.getElementById('key-screen').classList.remove('hidden');
+        window.closeSettings = () => document.getElementById('key-screen').classList.add('hidden');
+        window.saveKey = () => { 
+            GEMINI_KEY=document.getElementById('key-input').value.trim(); 
+            localStorage.setItem('gemini_key',GEMINI_KEY); 
+            closeSettings(); 
+            announce("Chiave salvata."); 
+        };
+
+    </script>
 </body>
 </html>
