@@ -89,7 +89,6 @@
 
     <div id="controls" class="hidden">
 
-        <!-- RIGA 0: guida + scatta -->
         <div class="top-bar">
             <button class="small-btn" id="btn-guide" onclick="toggleGuidance()"
                     aria-label="Attiva o disattiva guida di centraggio oggetto">
@@ -101,7 +100,6 @@
             </button>
         </div>
 
-        <!-- RIGA 1: strumenti sensoriali -->
         <div class="top-bar">
             <button class="small-btn" id="btn-light" onclick="toggleLight()" aria-label="SONDA LUCE">
                 SONDA LUCE
@@ -117,7 +115,6 @@
             </button>
         </div>
 
-        <!-- RIGA 2: scena generale + selfie -->
         <button id="btn-scene"
                 onclick="describeWithMode('scene')"
                 aria-label="Scatta e analizza come scena generale con descrizione dettagliata e qualità della foto">
@@ -129,7 +126,6 @@
             SELFIE / VOLTO
         </button>
 
-        <!-- RIGA 3: esterno + interno -->
         <button id="btn-outdoor"
                 onclick="describeWithMode('outdoor')"
                 aria-label="Scatta e analizza come ambiente esterno o paesaggio, con descrizione e qualità foto">
@@ -141,7 +137,6 @@
             INTERNO / STANZA
         </button>
 
-        <!-- RIGA 4: oggetto + testo -->
         <button id="btn-object"
                 onclick="describeWithMode('object')"
                 aria-label="Scatta e analizza per descrivere un oggetto in dettaglio, con qualità foto">
@@ -153,7 +148,6 @@
             TESTO / DOCUMENTO
         </button>
 
-        <!-- RIGA 5: cibo + sicurezza -->
         <button id="btn-food"
                 onclick="describeWithMode('food')"
                 aria-label="Scatta e analizza per descrivere un piatto o del cibo, con qualità foto">
@@ -165,14 +159,12 @@
             SICUREZZA / OSTACOLI
         </button>
 
-        <!-- Barra azioni dopo lo scatto -->
         <div id="shot-actions" class="shot-bar hidden">
             <button class="small-btn" id="btn-use" onclick="usePhoto()">USA FOTO</button>
             <button class="small-btn" id="btn-edit" onclick="editAndReviewPhoto()">MODIFICA E ANALIZZA</button>
             <button class="small-btn" id="btn-delete" onclick="deletePhoto()">ELIMINA</button>
         </div>
 
-        <!-- Barra inferiore: modo discreto + impostazioni -->
         <div class="bottom-bar">
             <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()">MODO DISCRETO</button>
             <button class="small-btn" onclick="openSettings()">IMPOSTAZIONI API</button>
@@ -198,10 +190,11 @@
         <button onclick="closeSettings()" style="padding: 15px; background:#333; color:#FFF; width:50%; border-radius: 8px;">CHIUDI</button>
     </div>
 
-    <!-- SCRIPT PRINCIPALE -->
     <script>
         // --- CONFIGURAZIONE ---
         let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
+        
+        // MANTENUTO IL MODELLO RICHIESTO DALL'UTENTE
         const MODEL_NAME = "gemini-3-pro-preview";
         const API_ENDPOINT = "v1beta";
 
@@ -326,7 +319,8 @@
             const text = await callGemini(prompt, b64);
 
             if (!text) {
-                announce("Analisi non riuscita. Controlla la connessione o la chiave API e riprova.");
+                // Messaggio generico se callGemini ritorna null (gli errori specifici sono già stati annunciati dentro callGemini)
+                announce("Analisi non riuscita. Riprova.");
                 return;
             }
 
@@ -499,7 +493,7 @@ Concentrati su:
 - eventuale disordine o ordine (oggetti sparsi, superfici libere, cose accatastate),
 - porte, finestre o passaggi che si vedono.
 
-Non inventare dettagli, descrivi solo ciò che è visibile.
+Non inventare dettagli, descrivi solo ciò che si vede.
 ` + qualityBlock;
 
                 case 'object':
@@ -868,14 +862,14 @@ Descrivi questa immagine in modo chiaro per una persona non vedente.
                 console.error("Errore HTTP Gemini:", res.status, d);
                 const msg = d.error && d.error.message ? d.error.message : "Errore sconosciuto";
                 announce("Errore API: " + msg);
-                alert("ERRORE API (" + res.status + "): " + msg);
+                // RIMOSSO ALERT BLOCCANTE PER PERMETTERE L'AUDIO
                 return null;
             }
 
             if (d.error) {
                 console.error("Errore API Gemini:", d.error);
                 announce("Errore API: " + d.error.message);
-                alert("ERRORE API: " + d.error.message);
+                // RIMOSSO ALERT BLOCCANTE PER PERMETTERE L'AUDIO
                 return null;
             }
 
@@ -1219,7 +1213,6 @@ Organizza la risposta in tre parti:
         };
     </script>
 
-    <!-- SCRIPT DI ROBUSTEZZA: STARTAPP, LOOP, TORCIA, LIVELLA -->
     <script>
         let lastGuideTime = 0;
         let lastColorTime = 0;
