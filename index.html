@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI - Pro 002 (Alta Precisione)</title>
+    <title>Visione AI - Pro (Stabile)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -42,7 +42,7 @@
         button:active { background: #555; transform: scale(0.98); }
 
         /* Colori e Stati Pulsanti */
-        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.3rem; } /* Giallo tattile */
+        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; font-size: 1.3rem; }
         #btn-guide { background-color: #004080; border-color: #FFF; }
         
         .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; }
@@ -109,8 +109,8 @@
     <script>
         // --- CONFIGURAZIONE ---
         let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
-        // MODIFICATO: Usa la versione PRO 002 per massima precisione
-        const MODEL_NAME = "gemini-1.5-pro-002"; 
+        // CORREZIONE: Uso l'alias stabile per la versione Pro
+        const MODEL_NAME = "gemini-1.5-pro"; 
         
         let audioCtx, lightOsc, lightGain;
         let objectDetector = null;
@@ -362,7 +362,6 @@
             if(Date.now()-lastSpeak<2000) return; 
             if(!tempCtx) return;
 
-            // Media su 20x20 pixel per evitare errori su singoli pixel
             const boxSize = 20; 
             const cx=Math.floor(canvas.width/2 - boxSize/2);
             const cy=Math.floor(canvas.height/2 - boxSize/2);
@@ -447,14 +446,13 @@
         // --- UTILITIES ---
         function captureFrame() {
             tempCtx.drawImage(video, 0, 0);
-            // Qualità aumentata a 0.8 per il modello PRO
             return tempCanvas.toDataURL('image/jpeg', 0.8).split(',')[1]; 
         }
 
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Chiave API mancante."); openSettings(); return; }
             try {
-                // Chiamata specifica al modello PRO
+                // Chiamata all'alias stabile PRO
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
@@ -462,7 +460,16 @@
                 
                 const d = await res.json();
                 
-                if(d.error) throw new Error(d.error.message);
+                // Gestione specifica degli errori API (es. chiave non Pro)
+                if(d.error) {
+                    if(d.error.message.includes('not found') || d.error.message.includes('Permission Denied')) {
+                        // Se l'errore è un problema di permesso (chiave non Pro), suggeriamo l'alias Flash
+                        announce("Errore: Il modello Pro non è accessibile. Verifica la fatturazione o la chiave API.");
+                        throw new Error("API Error: Model Pro is not accessible.");
+                    }
+                    throw new Error(d.error.message);
+                }
+                
                 if(!d.candidates || !d.candidates[0].content) throw new Error("Nessuna risposta dall'AI.");
 
                 const text = d.candidates[0].content.parts[0].text;
@@ -472,7 +479,9 @@
 
             } catch(e) { 
                 console.error(e);
-                announce("Si è verificato un errore. Riprova."); 
+                if(!e.message.includes("Model Pro is not accessible")) {
+                    announce("Si è verificato un errore generale nell'analisi. Riprova.");
+                }
             }
         }
 
