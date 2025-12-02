@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Visione AI Pro - v2</title>
+    <title>Visione AI Pro - Max Quality</title>
     <style>
         body {
             font-family: 'Arial', sans-serif; margin: 0; padding: 0;
@@ -11,7 +11,7 @@
             height: 100vh; display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* Accessibilità: testo per Screen Reader */
+        /* Accessibilità */
         .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
 
         /* Area Fotocamera */
@@ -41,19 +41,19 @@
         }
         button:active { background: #555; transform: scale(0.98); }
 
-        /* Colori Pulsanti per Alto Contrasto */
-        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; } /* Oro */
-        #btn-guide { background-color: #004080; border-color: #FFF; } /* Blu */
+        /* Colori Pulsanti */
+        #btn-desc { background-color: #D4AF37; color: #000; border-color: #FFF; }
+        #btn-guide { background-color: #004080; border-color: #FFF; }
         
-        .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; } /* Verde scuro */
-        .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; } /* Rosso scuro */
+        .active-tool { background-color: #006400 !important; border-color: #00FF00 !important; }
+        .guiding { background-color: #8B0000 !important; border-color: #FF0000 !important; }
 
         /* Riga impostazioni */
         .bottom-bar { grid-column: 1 / -1; display: flex; gap: 10px; }
         .small-btn { flex: 1; font-size: 1rem; background: #111; border: 1px solid #444; color: #CCC; }
         .active-discrete { border-color: #FF0000; color: #FF0000; }
 
-        /* Overlay Caricamento */
+        /* Overlay */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #000; z-index: 100; display: flex; flex-direction: column;
@@ -111,7 +111,7 @@
         let isRunning = false;
         let videoTrack = null;
         
-        // Stati dell'app
+        // Stati
         let mode = 'idle'; 
         let lightActive = false, colorActive = false, levelActive = false, torchActive = false;
         let discreteMode = false;
@@ -146,7 +146,6 @@
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
             try {
-                // Carica librerie visione
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
@@ -156,7 +155,6 @@
                     runningMode: "VIDEO"
                 });
 
-                // Avvia Camera (Configurazione Compatibile Windows/Android)
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
@@ -184,7 +182,6 @@
             }
         }
 
-        // Ciclo principale
         function loop() {
             if(!isRunning) return;
             if(lightActive) processLight();
@@ -193,15 +190,14 @@
             requestAnimationFrame(loop);
         }
 
-        // --- 2. DESCRIZIONE SCENA (AI) ---
+        // --- 2. DESCRIZIONE SCENA (AI PRO) ---
         async function quickDescribe() {
             if(mode === 'guiding') toggleGuidance(); 
-            announce("Scatto e analizzo.");
+            announce("Scatto e analizzo con alta precisione.");
             playShutter();
             const b64 = captureFrame();
             const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
             
-            // Chiamata con gestione errori avanzata
             await callGemini(prompt, b64);
         }
 
@@ -263,8 +259,8 @@
                 if(centeredCount > SNAP_THRESHOLD) {
                     mode = 'idle'; 
                     document.getElementById('btn-guide').classList.remove('guiding');
-                    document.getElementById('btn-guide').innerText = "ANALISI IN CORSO...";
-                    announce("Scatto automatico."); 
+                    document.getElementById('btn-guide').innerText = "ANALISI PRO...";
+                    announce("Scatto automatico. Analisi approfondita."); 
                     playShutter();
                     const b64 = captureFrame();
                     callGemini("Descrivi in dettaglio l'oggetto che ho appena inquadrato.", b64).then(()=>{
@@ -274,7 +270,7 @@
             }
         }
 
-        // --- 4. SONDA LUCE ---
+        // --- 4. STRUMENTI AGGIUNTIVI ---
         function toggleLight() {
             lightActive = !lightActive;
             const btn = document.getElementById('btn-light');
@@ -304,7 +300,6 @@
             if(lightOsc) lightOsc.frequency.setValueAtTime(100+(level*4), audioCtx.currentTime);
         }
 
-        // --- 5. SONDA COLORE ---
         function toggleColor() {
             colorActive = !colorActive;
             const btn = document.getElementById('btn-color');
@@ -325,7 +320,6 @@
             lastSpeak=Date.now();
         }
 
-        // --- 6. LIVELLA ---
         function toggleLevel() {
             levelActive = !levelActive;
             const btn = document.getElementById('btn-level');
@@ -350,10 +344,8 @@
             else if(e.gamma < -10) { announce("Pende a sinistra"); vibrate(50); lastSpeak=Date.now(); }
         }
 
-        // --- 7. TORCIA ---
         function toggleTorch() {
             if(!videoTrack) { announce("Fotocamera non pronta."); return; }
-            
             const targetState = !torchActive;
             const btn = document.getElementById('btn-torch');
 
@@ -388,7 +380,6 @@
             });
         }
 
-        // --- MODO DISCRETO ---
         function toggleDiscrete() {
             discreteMode = !discreteMode;
             const btn = document.getElementById('btn-discrete');
@@ -401,33 +392,27 @@
             }
         }
 
-        // --- FUNZIONI DI SUPPORTO ---
+        // --- FUNZIONI SUPPORTO ---
         function captureFrame() {
             const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
             c.getContext('2d').drawImage(video, 0, 0);
             return c.toDataURL('image/jpeg', 0.7).split(',')[1]; 
         }
 
-        // CHIAMATA API CON DEBUG DI ERRORI
+        // --- CHIAMATA AI CON MODELLO PRO (gemini-1.5-pro-latest) ---
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
             try {
-                // Notare uso di 'b64' corretto qui
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
+                // MODIFICA EFFETTUATA: 'gemini-1.5-pro-latest' per massima qualità
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
                 });
                 
                 const d = await res.json();
                 
-                // Se Google restituisce un errore, lo mostriamo chiaramente
-                if(d.error) {
-                    throw new Error("GOOGLE ERROR: " + d.error.message);
-                }
-
-                if(!d.candidates || !d.candidates[0].content) {
-                    throw new Error("Nessuna risposta generata. Forse immagine bloccata.");
-                }
+                if(d.error) throw new Error(d.error.message);
+                if(!d.candidates || !d.candidates[0].content) throw new Error("Nessuna risposta dall'AI.");
 
                 const text = d.candidates[0].content.parts[0].text;
                 
@@ -436,7 +421,6 @@
 
             } catch(e) { 
                 console.error(e);
-                // Legge l'errore specifico a voce o schermo
                 alert("ERRORE: " + e.message);
                 announce("Si è verificato un errore nell'analisi."); 
             }
@@ -466,7 +450,7 @@
             return res;
         }
 
-        // Gestione Impostazioni
+        // Settings
         window.openSettings = () => document.getElementById('key-screen').classList.remove('hidden');
         window.closeSettings = () => document.getElementById('key-screen').classList.add('hidden');
         window.saveKey = () => { 
