@@ -158,8 +158,15 @@
                     runningMode: "VIDEO"
                 });
 
-                // Avvia Camera
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                // Avvia Camera (Correzione per compatibilità Windows/Android)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
                 video.srcObject = stream;
                 videoTrack = stream.getVideoTracks()[0];
 
@@ -196,6 +203,7 @@
             const b64 = captureFrame();
             // Prompt ottimizzato per Screen Reader
             const prompt = "Descrivi brevemente cosa vedi. Se c'è testo leggilo. Sii utile per un non vedente.";
+            // Correzione: passiamo 'b64' invece di 'base64'
             await callGemini(prompt, b64);
         }
 
@@ -418,9 +426,10 @@
         async function callGemini(prompt, b64) {
             if(!GEMINI_KEY) { announce("Manca chiave API. Inseriscila nelle impostazioni."); openSettings(); return; }
             try {
+                // CORREZIONE APPLICATA QUI SOTTO (b64 invece di base64)
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`, {
                     method: 'POST', headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: base64}}] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: b64}}] }] })
                 });
                 const d = await res.json();
                 if(d.error) throw new Error(d.error.message);
