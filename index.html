@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Scanner AI v9.0 Sblocco</title>
+    <title>Scanner AI Fix Radar</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -141,13 +141,6 @@
     <div id="sr-announcer" class="sr-only" aria-live="assertive" role="status"></div>
 
     <script>
-        // UTILS
-        window.updateDebug = function(msg) {
-            const el = document.getElementById('debug-text');
-            if (el) el.innerText = msg;
-            console.log("[DEBUG] " + msg);
-        };
-
         window.announce = function(text) {
             const el = document.getElementById('sr-announcer');
             el.textContent = ""; 
@@ -167,33 +160,30 @@
             
             const startBtn = document.getElementById('start-btn');
             const retryBtn = document.getElementById('retry-btn');
-            const forceBtn = document.getElementById('force-cam-btn');
             const loader = document.getElementById('loading-spinner');
             const loadText = document.getElementById('loading-text');
             const progressText = document.getElementById('progress-text');
             const errorText = document.getElementById('error-text');
 
             if (window.location.protocol === 'file:') {
-                const warning = "Errore: Apri questo file su un server (localhost o Vercel). I file locali bloccano la fotocamera.";
+                const warning = "Errore: Protocollo FILE non supportato. Usa un server locale.";
                 alert(warning);
                 window.announce(warning);
             }
 
             startBtn.classList.add('hidden');
             retryBtn.style.display = 'none';
-            forceBtn.style.display = 'none';
             errorText.style.display = 'none';
             loader.classList.remove('hidden');
             loadText.classList.remove('hidden');
 
-            window.announce("Inizio scaricamento intelligenza artificiale.");
-            window.updateDebug("Download AI iniziato...");
+            window.announce("Inizio scaricamento intelligenza artificiale. Attendi.");
 
             try {
-                // 1. CARICAMENTO LIBRERIA
+                // 1. LIBRERIA
                 const { ObjectDetector, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
                 
-                // 2. SCARICAMENTO MODELLO
+                // 2. MODELLO
                 const modelUrl = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite2/float16/1/efficientdet_lite2.tflite";
                 const response = await fetch(modelUrl);
                 if (!response.ok) throw new Error("Errore rete: " + response.status);
@@ -218,18 +208,17 @@
                 const blob = new Blob(chunks);
                 const modelBlobUrl = URL.createObjectURL(blob);
 
-                window.updateDebug("AI Scaricata. Inizializzo...");
-                window.announce("Download completato. Avvio motore.");
+                window.announce("Download completato. Avvio fotocamera.");
 
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
                 
+                // FIX CRUCIALE: Assegna a window.objectDetector
                 window.objectDetector = await ObjectDetector.createFromOptions(vision, {
                     baseOptions: { modelAssetPath: modelBlobUrl, delegate: "GPU" },
                     scoreThreshold: 0.20,
                     runningMode: "VIDEO"
                 });
 
-                window.updateDebug("AI Pronta. Chiedo Fotocamera...");
                 window.startCamera();
 
             } catch (error) {
@@ -239,7 +228,7 @@
                 errorText.innerText = "Errore: " + error.message;
                 errorText.style.display = 'block';
                 retryBtn.style.display = 'block';
-                window.announce("Errore critico. Impossibile scaricare.");
+                window.announce("Errore critico.");
             }
         };
     </script>
@@ -294,14 +283,12 @@
         <div id="loading-spinner" class="loader hidden"></div>
         <div id="loading-text" style="color: #FFD700; margin-bottom: 20px;" aria-live="assertive">Caricamento Sistema...</div>
         <div id="progress-text" aria-live="polite">0%</div>
-        <div id="debug-text" aria-live="polite"></div>
         <div id="error-text" aria-live="assertive"></div>
         
         <button id="start-btn" onclick="bootstrapApp()">AVVIA SISTEMA</button>
         
         <button id="retry-btn" onclick="bootstrapApp()" style="display:none; margin-top:20px; padding:15px; background:red; color:white; border-radius:10px; border:none; font-size:1.2rem;">RIPROVA</button>
         
-        <!-- PULSANTE DI EMERGENZA PER FORZARE LA CAMERA -->
         <button id="force-cam-btn" onclick="forceCameraStart()">SBLOCCA FOTOCAMERA</button>
     </div>
 
@@ -317,7 +304,8 @@
 <script>
     // --- LOGICA PRINCIPALE ---
     
-    let objectDetector = null;
+    // Variabili Globali
+    // FIX: objectDetector ora è globale tramite window.objectDetector nel bootstrap
     let video = document.getElementById("webcam");
     let canvas = document.getElementById("overlay");
     let ctx = canvas.getContext("2d");
@@ -326,17 +314,15 @@
     let videoTrack = null; 
     let cameraWatchdog = null;
 
-    // Stati Globali
+    // Stati
     window.discreteMode = false;
     window.isRunning = false;
 
-    // Camera & Zoom
     let currentFacingMode = 'environment';
     let currentZoom = 1;
     let zoomCaps = { min: 1, max: 3, step: 0.1 };
     let supportsZoom = false;
 
-    // App State
     let appMode = 'photo'; 
     let isRecording = false;
     let mediaRecorder = null;
@@ -344,13 +330,11 @@
     let recStartTime = 0;
     let recInterval = null;
 
-    // Sensori
     let radarMode = true; 
     let torchState = false;
     let lightProbeActive = false; 
     let colorProbeActive = false; 
     let levelActive = false; 
-    let discreteMode = false;
     let selectedTargets = new Set();
     let previewTarget = null;
     let detectedObjects = [];
@@ -368,31 +352,50 @@
     const translations = { 'person': 'Persona', 'bicycle': 'Bicicletta', 'car': 'Auto', 'bench': 'Panchina', 'dog': 'Cane', 'cat': 'Gatto', 'backpack': 'Zaino', 'umbrella': 'Ombrello', 'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bottle': 'Bottiglia', 'cup': 'Tazza', 'chair': 'Sedia', 'couch': 'Divano', 'potted plant': 'Pianta', 'bed': 'Letto', 'dining table': 'Tavolo', 'toilet': 'Water', 'tv': 'TV', 'laptop': 'Laptop', 'mouse': 'Mouse', 'keyboard': 'Tastiera', 'cell phone': 'Telefono', 'book': 'Libro', 'clock': 'Orologio', 'vase': 'Vaso' };
 
     window.startCamera = async function() {
-        window.updateDebug("Chiedo permesso fotocamera...");
-        
-        // Watchdog: se in 5 secondi non parte, mostra tasto emergenza
+        if (video.srcObject) {
+            const tracks = video.srcObject.getTracks();
+            tracks.forEach(t => t.stop());
+        }
+
         if (cameraWatchdog) clearTimeout(cameraWatchdog);
         cameraWatchdog = setTimeout(() => {
             if (!isRunning) {
                 document.getElementById('force-cam-btn').style.display = 'block';
-                window.updateDebug("TIMEOUT PERMESSI");
-                window.announce("La fotocamera non risponde. Premi il pulsante rosso per forzare.");
-                window.speakGuide("La fotocamera non risponde. Cerca il pulsante Sblocca Fotocamera.");
+                window.announce("La fotocamera non risponde. Premi il pulsante Sblocca.");
             }
         }, 4000);
 
-        // RICHIESTA FOTOCAMERA MINIMA (Massima compatibilità)
+        // TENTATIVO 1: MINIMO (SOLO VIDEO, NO AUDIO)
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: true // Richiesta base: dammi qualsiasi video
+                video: { facingMode: currentFacingMode },
+                audio: false
             });
-            window.updateDebug("Permesso accordato!");
             handleStreamSuccess(stream);
         } catch (err) {
-            console.error("Errore Camera:", err);
-            window.updateDebug("Errore: " + err.name);
-            document.getElementById('force-cam-btn').style.display = 'block';
-            window.announce("Permesso negato. Premi Sblocca Fotocamera.");
+            // TENTATIVO 2: QUALSIASI COSA
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                window.announce("Modalità compatibilità attiva.");
+                handleStreamSuccess(stream);
+            } catch (err3) {
+                console.error("Fallimento totale:", err3);
+                let msg = "Errore Fotocamera: " + err3.name;
+                
+                if (err3.name === 'NotAllowedError' || err3.name === 'PermissionDeniedError') {
+                    msg = "Permesso negato. Sblocca dal browser.";
+                } else if (err3.name === 'NotReadableError') {
+                    msg = "Fotocamera occupata. Chiudi altre app.";
+                }
+
+                document.getElementById('error-text').innerText = msg;
+                document.getElementById('error-text').style.display = 'block';
+                document.getElementById('force-cam-btn').style.display = 'block';
+                document.getElementById('loading-spinner').classList.add('hidden');
+                document.getElementById('loading-text').classList.add('hidden');
+                
+                window.announce(msg);
+            }
         }
     }
 
@@ -408,15 +411,16 @@
 
         videoTrack = stream.getVideoTracks()[0]; 
         
-        // Dopo che il video base è partito, proviamo a migliorarlo (facoltativo)
-        // ...
+        if (currentFacingMode === 'user') video.classList.add('selfie');
+        else video.classList.remove('selfie');
 
-        // Configura pulsanti
         const caps = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
         if ('zoom' in caps) {
             supportsZoom = true; zoomCaps = caps.zoom; currentZoom = zoomCaps.min;
+            window.announce(currentFacingMode === 'user' ? "Modalità Selfie." : "Camera posteriore.");
         } else {
             supportsZoom = false;
+            window.announce(currentFacingMode === 'user' ? "Modalità Selfie." : "Camera posteriore.");
         }
 
         document.getElementById('btn-zoom-in').style.display = supportsZoom ? 'flex' : 'none';
@@ -429,129 +433,49 @@
         btnRadar.setAttribute('aria-pressed', 'true');
 
         video.addEventListener("loadeddata", () => {
+            checkVideoFeed();
             document.getElementById('start-overlay').classList.add('hidden');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             isRunning = true;
             window.isRunning = true;
-            
-            window.updateDebug("SISTEMA ATTIVO");
             window.speakGuide("Fotocamera attiva. Radar in funzione.");
             predictWebcam();
             processProbes(); 
         });
     }
 
-    // --- INTERAZIONI UTENTE ---
-
-    window.toggleDiscreteMode = function() {
-        discreteMode = !discreteMode;
-        window.discreteMode = discreteMode;
-        const btn = document.getElementById('btn-discrete');
-        if (discreteMode) {
-            btn.innerText = "🔕 MODALITÀ DISCRETA (ON)"; btn.style.border = "4px solid #FF0000"; btn.setAttribute('aria-pressed', 'true');
-            window.announce("Discreta attiva.");
-        } else {
-            btn.innerText = "🔕 MODALITÀ DISCRETA (OFF)"; btn.style.border = "2px solid #FFF"; btn.setAttribute('aria-pressed', 'false');
-            window.announce("Discreta spenta.");
+    function checkVideoFeed() {
+        const checkCanvas = document.createElement('canvas');
+        checkCanvas.width = 10; checkCanvas.height = 10;
+        const checkCtx = checkCanvas.getContext('2d');
+        checkCtx.drawImage(video, 0, 0, 10, 10);
+        const data = checkCtx.getImageData(0, 0, 10, 10).data;
+        
+        let allBlack = true;
+        for(let i=0; i<data.length; i+=4) {
+            if(data[i] > 10 || data[i+1] > 10 || data[i+2] > 10) { 
+                allBlack = false;
+                break;
+            }
+        }
+        
+        if(allBlack) {
+            window.speakGuide("Attenzione: Vedo tutto nero. Controlla coperture.");
         }
     }
 
-    window.toggleAppMode = function() {
-        if (isRecording) return; 
-        if (appMode === 'photo') {
-            appMode = 'video';
-            document.getElementById('btn-mode').innerText = "MODALITÀ: VIDEO 🎥";
-            document.getElementById('btn-snap').innerText = "AVVIA REGISTRAZIONE";
-            document.getElementById('btn-snap').style.backgroundColor = "#FFCCCC";
-            window.announce("Modalità Video.");
-        } else {
-            appMode = 'photo';
-            document.getElementById('btn-mode').innerText = "MODALITÀ: FOTO 📷";
-            document.getElementById('btn-snap').innerText = "SCATTA FOTO";
-            document.getElementById('btn-snap').style.backgroundColor = "#EEE";
-            window.announce("Modalità Foto.");
-        }
-    }
-
-    window.handleAction = function() {
-        if (appMode === 'photo') {
-            takePhoto();
-        } else {
-            if (!isRecording) startRecording();
-            else stopRecording();
-        }
-    }
-
-    function startRecording() {
-        recordedChunks = [];
-        try {
-            const stream = video.srcObject;
-            let mimeType = 'video/webm;codecs=vp9';
-            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
-            
-            mediaRecorder = new MediaRecorder(stream, { mimeType });
-            mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) recordedChunks.push(event.data); };
-            mediaRecorder.onstop = saveVideo;
-
-            mediaRecorder.start();
-            isRecording = true;
-            
-            const btn = document.getElementById('btn-snap');
-            btn.innerText = "STOP REGISTRAZIONE";
-            btn.classList.add('rec-active');
-            document.getElementById('rec-timer').style.display = 'block';
-            
-            recStartTime = Date.now();
-            updateTimer();
-            recInterval = setInterval(updateTimer, 1000);
-
-            window.speakGuide("Registrazione avviata.");
-            playBeep(); 
-
-        } catch (e) { console.error(e); window.announce("Errore video. Forse audio mancante."); }
-    }
-
-    function updateTimer() {
-        const diff = Math.floor((Date.now() - recStartTime) / 1000);
-        const mins = Math.floor(diff / 60).toString().padStart(2, '0');
-        const secs = (diff % 60).toString().padStart(2, '0');
-        document.getElementById('rec-timer').innerText = `REC ${mins}:${secs}`;
-        if (diff > 0 && diff % 30 === 0) {
-            window.speakGuide("Rec " + mins + " min.");
-        }
-    }
-
-    function stopRecording() {
-        if (!mediaRecorder) return;
-        mediaRecorder.stop();
-        isRecording = false;
-        clearInterval(recInterval);
-        document.getElementById('rec-timer').style.display = 'none';
-        const btn = document.getElementById('btn-snap');
-        btn.innerText = "AVVIA REGISTRAZIONE";
-        btn.classList.remove('rec-active');
-        window.speakGuide("Video terminato.");
-        playBeep();
-    }
-
-    function saveVideo() {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'video_scan_' + Date.now() + '.webm';
-        a.click();
-    }
-
+    // --- LOOP GUIDA (FIXED) ---
     async function predictWebcam() {
-        if (!isRunning || !objectDetector) return;
+        // USARE window.objectDetector QUI
+        if (!isRunning || !window.objectDetector) return;
         let startTimeMs = performance.now();
         if (video.currentTime !== lastVideoTime) {
             lastVideoTime = video.currentTime;
             const detections = window.objectDetector.detectForVideo(video, startTimeMs);
             detectedObjects = detections.detections.filter(d => {
-                if (radarMode) return true; 
+                // Soglia abbassata per Radar
+                if (radarMode) return d.categories[0].score > 0.20; 
                 return d.categories[0].score > 0.50; 
             });
             drawAndGuide(detectedObjects);
@@ -605,12 +529,12 @@
                 }
             } else {
                 statusMsg.style.color = "#FFF"; statusMsg.innerText = msg;
-                if (msg !== lastDirection || Date.now() - lastSpokenTime > 3500) { 
+                if (msg !== lastDirection || Date.now() - lastSpokenTime > 3000) { 
                     if (discreteMode) {
                         if (msg === "Sinistra") { if(navigator.vibrate) navigator.vibrate(50); } 
                         if (msg === "Destra") { if(navigator.vibrate) navigator.vibrate([50, 50]); } 
                     } else { 
-                        window.announce(msg); 
+                        window.speakGuide(msg); 
                     }
                     lastDirection = msg; 
                     lastSpokenTime = Date.now(); 
@@ -657,7 +581,7 @@
     };
 
     window.takePhoto = function() {
-        window.speakGuide("Salvo."); // Uso speakGuide per feedback immediato
+        window.speakGuide("Salvo."); 
         const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
         c.getContext('2d').drawImage(video, 0, 0);
         c.toBlob(async (blob) => {
@@ -668,24 +592,35 @@
     };
 
     window.askGemini = async function(mode) {
-        if (!GEMINI_API_KEY) { window.announce("Manca chiave API."); return; }
+        if (!GEMINI_API_KEY) { window.announce("Manca chiave API. Premi ingranaggio."); return; }
         playBeep();
         document.getElementById('tools-menu').classList.add('hidden');
         let prompt = "";
         if (mode === 'verify') prompt = "Analizza foto. Soggetto centrato? A fuoco? Luce ok? Dammi istruzioni correttive se serve.";
         else if (mode === 'text') prompt = "Leggi tutto il testo.";
         else if (mode === 'face') prompt = "Analisi volti: età, espressione.";
+        
         const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
         c.getContext('2d').drawImage(video, 0, 0);
         const base64 = c.toDataURL('image/jpeg', 0.8).split(',')[1];
+        
         try {
             const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: "image/jpeg", data: base64}}] }] })
             });
+            
+            if (res.status === 400 || res.status === 403) {
+                window.announce("Chiave API non valida. Controlla le impostazioni.");
+                return;
+            }
+            
             const d = await res.json();
             window.speakGuide(d.candidates[0].content.parts[0].text);
-        } catch(e) { window.announce("Errore connessione."); }
+        } catch(e) { 
+            window.announce("Errore connessione."); 
+            console.error(e);
+        }
     };
 
     window.toggleTorch = function() {
