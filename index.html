@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - Gemini 3</title>
+<title>Visione AI Fusion - Gemini 3 v2</title>
 <style>
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
@@ -45,15 +45,16 @@ input{background:#333;color:#fff;border:1px solid #777}
 <div id="main-interface">
   <div id="camera-controls" aria-hidden="false">
     <div class="top-bar">
-      <button class="small-btn" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva o disattiva guida di centraggio oggetto">GUIDA CENTRAGGIO</button>
-      <button class="small-btn" id="btn-shot" onclick="takeShot()" aria-label="Scatta una foto senza analizzarla">SCATTA</button>
+      <button class="small-btn" onclick="flipCamera()" aria-label="Ruota fotocamera tra anteriore e posteriore" style="background:#444;color:#fff;border-color:#999">RUOTA FOTOCAMERA</button>
+      <button class="small-btn" id="btn-shot" onclick="takeShot()" aria-label="Scatta una foto senza analizzarla">SCATTA FOTO</button>
     </div>
     <div class="top-bar">
+      <button class="small-btn" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva o disattiva guida di centraggio oggetto">GUIDA CENTRAGGIO</button>
       <button class="small-btn" id="btn-light" onclick="toggleLight()" aria-label="Sonda luce">SONDA LUCE</button>
       <button class="small-btn" id="btn-color" onclick="toggleColor()" aria-label="Sonda colore">SONDA COLORE</button>
       <button class="small-btn" id="btn-level" onclick="toggleLevel()" aria-label="Livella">LIVELLA</button>
-      <button class="small-btn" id="btn-torch" onclick="toggleTorch()" aria-label="Torcia">TORCIA</button>
     </div>
+    
     <button id="btn-scene"  onclick="describeWithMode('scene')"  aria-label="Scatta e analizza come scena generale">SCENA GENERALE</button>
     <button id="btn-selfie" onclick="describeWithMode('selfie')" aria-label="Scatta e analizza come selfie o volto">SELFIE / VOLTO</button>
     <button id="btn-outdoor"onclick="describeWithMode('outdoor')"aria-label="Scatta e analizza ambiente esterno">ESTERNO</button>
@@ -62,6 +63,7 @@ input{background:#333;color:#fff;border:1px solid #777}
     <button id="btn-text"   onclick="describeWithMode('text')"   aria-label="Scatta e analizza testo o documento">TESTO / DOCUMENTO</button>
     <button id="btn-food"   onclick="describeWithMode('food')"   aria-label="Scatta e analizza cibo">CIBO</button>
     <button id="btn-safety" onclick="describeWithMode('safety')" aria-label="Scatta e analizza per sicurezza">SICUREZZA</button>
+    
     <div class="top-bar" style="margin-top:5px">
       <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()" aria-label="Attiva o disattiva modo discreto">MODO DISCRETO</button>
       <button class="small-btn" onclick="openSettings()" aria-label="Impostazioni chiave API">IMPOSTAZIONI API</button>
@@ -96,17 +98,18 @@ input{background:#333;color:#fff;border:1px solid #777}
 
 <script>
 let GEMINI_KEY=localStorage.getItem('gemini_key')||"";
-// QUI usi Gemini 3
-const MODEL_NAME="gemini-3-pro-preview";
+const MODEL_NAME="gemini-3-pro-preview"; // Assicurati che questo modello sia attivo sul tuo account, altrimenti usa gemini-1.5-flash
 const API_ENDPOINT="v1beta";
 
-let audioCtx,lightOsc,lightGain,objectDetector=null,isRunning=false,videoTrack=null;
+let audioCtx,lightOsc,lightGain,objectDetector=null,isRunning=false,stream=null;
 const tempCanvas=document.createElement('canvas');let tempCtx=null;
-let mode='idle',lightActive=false,colorActive=false,levelActive=false,torchActive=false,discreteMode=false,lastSpeak=0,centeredCount=0,lastGuideMessage="",lastGuideMessageTime=0;
+let mode='idle',lightActive=false,colorActive=false,levelActive=false,discreteMode=false,lastSpeak=0,centeredCount=0,lastGuideMessage="",lastGuideMessageTime=0;
+// Gestione Camera
+let currentFacingMode='environment'; // 'environment' (retro) o 'user' (fronte)
+
 const video=document.getElementById('webcam'),canvas=document.getElementById('overlay'),ctx=canvas.getContext('2d');
 let lastShotB64=null,lastShotUrl=null;
 
-// Annunci
 function announce(t){
   if(discreteMode)return;
   const e=document.getElementById('sr-announcer');
@@ -115,41 +118,26 @@ function announce(t){
 }
 function vibrate(p){if(navigator.vibrate)navigator.vibrate(p)}
 
-// Gestione focus per cambiare vista
 function blurIfInside(element, container){
   if(!element)return;
   if(container.contains(element)) element.blur();
 }
 
-// Cambio vista camera/risultato
 function showResultOnly(text){
   const cam=document.getElementById('camera-controls');
   const res=document.getElementById('result-screen');
-  const active=document.activeElement;
-  blurIfInside(active,cam);
-
-  cam.classList.add('hidden');
-  cam.setAttribute('aria-hidden','true');
-  cam.setAttribute('inert','');
-  res.classList.remove('hidden');
-  res.removeAttribute('aria-hidden');
-  res.removeAttribute('inert');
-  const c=document.getElementById('result-content');
-  c.textContent=text||"";
+  blurIfInside(document.activeElement,cam);
+  cam.classList.add('hidden');cam.setAttribute('aria-hidden','true');cam.setAttribute('inert','');
+  res.classList.remove('hidden');res.removeAttribute('aria-hidden');res.removeAttribute('inert');
+  const c=document.getElementById('result-content');c.textContent=text||"";
   setTimeout(()=>c.focus(),200);
 }
 function showCameraOnly(){
   const cam=document.getElementById('camera-controls');
   const res=document.getElementById('result-screen');
-  const active=document.activeElement;
-  blurIfInside(active,res);
-
-  res.classList.add('hidden');
-  res.setAttribute('aria-hidden','true');
-  res.setAttribute('inert','');
-  cam.classList.remove('hidden');
-  cam.setAttribute('aria-hidden','false');
-  cam.removeAttribute('inert');
+  blurIfInside(document.activeElement,res);
+  res.classList.add('hidden');res.setAttribute('aria-hidden','true');res.setAttribute('inert','');
+  cam.classList.remove('hidden');cam.setAttribute('aria-hidden','false');cam.removeAttribute('inert');
 }
 function deletePhoto(){
   lastShotB64=null;
@@ -160,13 +148,19 @@ function deletePhoto(){
   announce("Foto eliminata, torno alla fotocamera.");
 }
 
-// Scatto
 function captureFrame(){
-  if(tempCtx)tempCtx.drawImage(video,0,0);
+  // Assicura che il canvas temporaneo abbia le dimensioni corrette
+  if(video.videoWidth>0 && (tempCanvas.width!==video.videoWidth || tempCanvas.height!==video.videoHeight)){
+     tempCanvas.width=video.videoWidth;
+     tempCanvas.height=video.videoHeight;
+  }
+  if(tempCtx)tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
   return tempCanvas.toDataURL('image/jpeg',0.8).split(',')[1];
 }
+
 function playShutter(){
   if(!discreteMode&&audioCtx){
+    if(audioCtx.state==='suspended')audioCtx.resume();
     const o=audioCtx.createOscillator(),g=audioCtx.createGain();
     g.gain.value=0.1;o.frequency.value=600;o.connect(g);g.connect(audioCtx.destination);
     o.start();o.stop(audioCtx.currentTime+0.1);
@@ -185,126 +179,98 @@ async function takeShot(){
   announce("Foto scattata. Puoi avviare un'analisi.");
 }
 
-// PROMPTS COMPLETI + QUALITÀ SOCIAL (NON TOCCATI)
+// PROMPTS E QUALITÀ
 function buildPromptForContext(c){
   const qualityBlock = `
-Infine, valuta la qualità tecnica dello scatto e se è adatto ai vari usi sui social (feed, storie, foto profilo).
-Basati su nitidezza, centratura, luce, eventuali tagli del volto o dell’oggetto.
-Se noti problemi, spiega brevemente il problema principale e suggerisci da 1 a 3 consigli pratici, semplici e concreti
-per migliorare lo scatto successivo. Usa un linguaggio chiaro e diretto.`;
+Infine, valuta brevemente la qualità tecnica (luce, inquadratura).
+Se noti problemi gravi, dai un consiglio pratico per la prossima foto.`;
   switch(c){
-    case 'scene':
-      return "Descrivi l'immagine per una persona non vedente. Parti dal soggetto principale in primo piano, poi sfondo, persone, oggetti, colori dominanti, atmosfera (serena, caotica, ecc.), eventuale direzione delle linee (orizzontale/verticale) che danno profondità. Evita frasi troppo lunghe e concentra le informazioni utili e concrete."+qualityBlock;
-    case 'selfie':
-      return "Analisi selfie/volto. 1) Di' quanti volti ci sono e se quello principale è ben centrato o tagliato (sopra, sotto, lato). 2) Descrivi espressione e direzione dello sguardo. 3) Descrivi la luce sul viso (troppo scuro, controluce, uniforme ecc.). 4) Di' se ci sono elementi fastidiosi sullo sfondo che distraggono."+qualityBlock;
-    case 'outdoor':
-      return "Descrivi l'ambiente esterno. Indica se è strada, parco, piazza, marciapiede, giardino o altro. Descrivi meteo, presenza di auto, bici, persone, elementi naturali (alberi, prato, acqua). Indica se la scena sembra affollata o tranquilla."+qualityBlock;
-    case 'indoor':
-      return "Descrivi l'ambiente interno. Indica se sembra casa, ufficio, negozio, bar o altro. Descrivi i mobili principali e dove si trovano (davanti, a sinistra, a destra), eventuale disordine, porte o passaggi e se sembrano liberi o ingombri."+qualityBlock;
-    case 'object':
-      return "Descrivi l'oggetto principale della foto come se dovessi farlo riconoscere a una persona non vedente. Di' cos'è, la forma, il materiale, i colori, se ci sono scritte o etichette leggibili, lo stato (nuovo, usato, rovinato)."+qualityBlock;
-    case 'text':
-      return "LEGGI TUTTO IL TESTO VISIBILE esattamente come scritto, riga per riga, mantenendo l'ordine e andando a capo dove vedi un cambio riga. Non riassumere, non correggere, non tradurre. Dopo la lettura, spiega se la foto è adatta per leggere chiaramente (messa a fuoco, tagli, luce, inclinazione).";
-    case 'food':
-      return "Descrivi il piatto o il cibo come se lo stessi raccontando a una persona non vedente: tipo di piatto, ingredienti visibili, disposizione nel piatto, eventuali salse, condimenti e contorni, aspetto generale (curato, semplice, disordinato, molto elaborato)."+qualityBlock;
-    case 'safety':
-      return "Analisi sicurezza. Ignora l'estetica. Descrivi solo elementi utili a capire se posso camminare in sicurezza: ostacoli a terra, gradini, buche, dislivelli, marciapiedi, scale, oggetti sporgenti all'altezza della testa, porte chiuse o aperte, veicoli in movimento. Concludi con una frase chiara: posso camminare dritto in sicurezza, devo fare attenzione, oppure è meglio fermarmi.";
-    default:
-      return "Descrivi l'immagine per una persona non vedente, dando informazioni pratiche e dettagli utili sulla scena, sugli oggetti e sulle persone."+qualityBlock;
+    case 'scene': return "Descrivi l'immagine per una persona non vedente. Soggetto principale, sfondo, atmosfera."+qualityBlock;
+    case 'selfie': return "Analisi selfie. Quanti volti? Espressione? Luce sul viso? Sfondo fastidioso?"+qualityBlock;
+    case 'outdoor': return "Ambiente esterno. Strada, parco, piazza? Meteo? Affollato o tranquillo?"+qualityBlock;
+    case 'indoor': return "Ambiente interno. Casa, ufficio, negozio? Mobili principali, porte, ostacoli?"+qualityBlock;
+    case 'object': return "Descrivi l'oggetto per farlo riconoscere. Cos'è, forma, colore, materiale, scritte."+qualityBlock;
+    case 'text': return "LEGGI TUTTO IL TESTO VISIBILE riga per riga. Non riassumere. Poi valuta se è leggibile.";
+    case 'food': return "Descrivi il cibo. Piatto, ingredienti, aspetto."+qualityBlock;
+    case 'safety': return "Analisi sicurezza. Ignora estetica. Ostacoli a terra, gradini, buche, rami bassi, veicoli. Posso camminare sicuro?";
+    default: return "Descrivi l'immagine con dettagli utili."+qualityBlock;
   }
 }
 
-// ANALISI GEMINI 3 – schermo risultato subito, testo aggiornato dopo
 async function describeWithMode(c){
-  if(!GEMINI_KEY){
-    announce("Manca la chiave API, apro le impostazioni.");
-    openSettings();
-    return;
-  }
+  if(!GEMINI_KEY){announce("Manca la chiave API, apro le impostazioni.");openSettings();return;}
   await captureNewShot();
-  showResultOnly("Analisi in corso, attendi qualche secondo...");
+  showResultOnly("Analisi in corso...");
   announce("Analisi in corso.");
   const p=buildPromptForContext(c);
   const t=await callGemini(p,lastShotB64);
   const content=document.getElementById('result-content');
   if(!t){
-    content.textContent="Errore durante l'analisi. Controlla la chiave API o la connessione e riprova.";
-    announce("Analisi non riuscita.");
+    content.textContent="Errore analisi. Riprova.";
+    announce("Analisi fallita.");
     return;
   }
   content.textContent=t;
-  announce("Analisi pronta. Puoi usare, modificare o eliminare la foto.");
+  announce("Analisi pronta. Usa i tasti in basso per le azioni.");
 }
 
-// CHIAMATA GEMINI 3
 async function callGemini(prompt,b64){
   try{
     const url=`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=`+encodeURIComponent(GEMINI_KEY);
     const r=await fetch(url,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        contents:[{
-          parts:[
-            {text:prompt},
-            {inline_data:{mime_type:"image/jpeg",data:b64}}
-          ]
-        }]
-      })
+      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}]})
     });
-    if(!r.ok){
-      console.error("Errore HTTP Gemini",r.status,r.statusText);
-      announce("Errore server AI "+r.status);
-      return null;
-    }
+    if(!r.ok)return null;
     const d=await r.json();
-    const parts=d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts||[];
-    const out=(parts.map(p=>p.text||"").join("\n").trim())||"Nessun testo.";
-    return out;
-  }catch(e){
-    console.error("Errore rete Gemini",e);
-    announce("Errore di rete verso intelligenza artificiale.");
-    return null;
-  }
+    return d.candidates?.[0]?.content?.parts?.map(p=>p.text).join("\n").trim()||"Nessun testo.";
+  }catch(e){console.error(e);return null;}
 }
 
 // GUIDA CENTRAGGIO
 function toggleGuidance(){
+  if(!objectDetector){announce("Rilevamento oggetti non ancora pronto.");return;}
   const b=document.getElementById('btn-guide');
   if(mode==='guiding'){
-    mode='idle';
-    b.classList.remove('guiding');
-    b.innerText="GUIDA CENTRAGGIO";
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    announce("Guida spenta.");
+    mode='idle';b.classList.remove('guiding');b.innerText="GUIDA CENTRAGGIO";
+    ctx.clearRect(0,0,canvas.width,canvas.height);announce("Guida spenta.");
   }else{
-    mode='guiding';
-    centeredCount=0;lastGuideMessage="";
-    b.classList.add('guiding');
-    b.innerText="GUIDA ATTIVA";
-    announce("Guida attiva. Cerco oggetti.");
+    mode='guiding';centeredCount=0;lastGuideMessage="";
+    b.classList.add('guiding');b.innerText="GUIDA ATTIVA";announce("Guida attiva. Cerco oggetti.");
   }
 }
 function processGuidance(){
-  if(!objectDetector)return;
+  if(!objectDetector || video.readyState<2)return;
   try{
     const r=objectDetector.detectForVideo(video,performance.now()),d=r?r.detections:[];
     ctx.clearRect(0,0,canvas.width,canvas.height);
     if(!d.length){
-      if(Date.now()-lastSpeak>2500){announce("Nessun oggetto.");lastSpeak=Date.now()}
+      if(Date.now()-lastSpeak>3000){announce("Nessun oggetto.");lastSpeak=Date.now();}
       return;
     }
     const t=d.sort((a,b)=>b.boundingBox.width*b.boundingBox.height-a.boundingBox.width*a.boundingBox.height)[0],b=t.boundingBox;
-    ctx.strokeStyle="#0f0";ctx.lineWidth=5;ctx.strokeRect(b.originX,b.originY,b.width,b.height);
-    const cx=b.originX+b.width/2,cy=b.originY+b.height/2,sx=canvas.width/2,sy=canvas.height/2,tolX=canvas.width*0.15,tolY=canvas.height*0.2;
+    
+    // Disegna box
+    const ratioX = canvas.width / video.videoWidth;
+    const ratioY = canvas.height / video.videoHeight;
+    ctx.strokeStyle="#0f0";ctx.lineWidth=5;
+    ctx.strokeRect(b.originX*ratioX, b.originY*ratioY, b.width*ratioX, b.height*ratioY);
+
+    const cx=b.originX+b.width/2,cy=b.originY+b.height/2;
+    const sx=video.videoWidth/2,sy=video.videoHeight/2;
+    const tolX=video.videoWidth*0.15,tolY=video.videoHeight*0.2;
+    
     let m="",label=t.categories[0].categoryName;
-    const map={person:"Persona",cup:"Tazza",bottle:"Bottiglia",chair:"Sedia",tv:"TV",laptop:"PC","cell phone":"Telefono"};
+    const map={person:"Persona",cup:"Tazza",bottle:"Bottiglia",chair:"Sedia",tv:"TV",laptop:"PC","cell phone":"Telefono",book:"Libro"};
     if(map[label])label=map[label];
+    
     if(cx<sx-tolX)m=label+": sposta a sinistra";
     else if(cx>sx+tolX)m=label+": sposta a destra";
     else if(cy<sy-tolY)m=label+": alza fotocamera";
     else if(cy>sy+tolY)m=label+": abbassa fotocamera";
     else{m=label+": centrato!";centeredCount++}
+    
     const now=Date.now();
     if(m!==lastGuideMessage||now-lastGuideMessageTime>3000){
       announce(m);if(m.toLowerCase().includes("centrato"))vibrate(50);
@@ -313,14 +279,15 @@ function processGuidance(){
   }catch(e){console.warn(e)}
 }
 
-// SONDA LUCE
+// LUCE
 function toggleLight(){
   lightActive=!lightActive;const b=document.getElementById('btn-light');
   if(lightActive){
     if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume();
     lightOsc=audioCtx.createOscillator();lightGain=audioCtx.createGain();
     lightOsc.connect(lightGain);lightGain.connect(audioCtx.destination);
-    lightGain.gain.value=0.05;lightOsc.start();
+    lightGain.gain.value=0; // Inizia muto
+    lightOsc.start();
     b.classList.add('active-tool');b.innerText="LUCE: ON";announce("Sonda luce attiva.");
   }else{
     if(lightOsc){lightOsc.stop();lightOsc.disconnect()}
@@ -328,26 +295,43 @@ function toggleLight(){
   }
 }
 function processLight(){
-  if(!tempCtx)return;
-  const p=tempCtx.getImageData(canvas.width/2-10,canvas.height/2-10,20,20).data;let s=0;
+  if(!tempCtx || tempCanvas.width===0)return;
+  // Prendi un campione dal centro
+  const cx=Math.floor(tempCanvas.width/2), cy=Math.floor(tempCanvas.height/2);
+  const p=tempCtx.getImageData(cx-5,cy-5,10,10).data;
+  let s=0;
   for(let i=0;i<p.length;i+=4)s+=(p[i]+p[i+1]+p[i+2])/3;
-  const level=s/(p.length/4);if(lightOsc)lightOsc.frequency.setValueAtTime(100+level*4,audioCtx.currentTime);
+  const level=s/(p.length/4); // 0..255
+  if(lightOsc && lightGain){
+      lightGain.gain.setTargetAtTime(0.02 + (level/255)*0.1, audioCtx.currentTime, 0.1);
+      lightOsc.frequency.setTargetAtTime(100 + level*3, audioCtx.currentTime, 0.1);
+  }
 }
 
-// SONDA COLORE
+// COLORE
 function toggleColor(){
   colorActive=!colorActive;const b=document.getElementById('btn-color');
   if(colorActive){b.classList.add('active-tool');b.innerText="COLORE: ON";announce("Sonda colore attiva.");}
   else{b.classList.remove('active-tool');b.innerText="SONDA COLORE";announce("Sonda colore spenta.");}
 }
 function processColor(){
-  if(!tempCtx)return;if(Date.now()-lastSpeak<2000)return;
-  const p=tempCtx.getImageData(canvas.width/2,canvas.height/2,1,1).data,r=p[0],g=p[1],b=p[2];
-  const colors={'0,0,0':'Nero','255,255,255':'Bianco','128,128,128':'Grigio','255,0,0':'Rosso','0,255,0':'Verde','0,0,255':'Blu','255,255,0':'Giallo','255,165,0':'Arancione'};
+  if(!tempCtx || tempCanvas.width===0)return; 
+  if(Date.now()-lastSpeak<2000)return;
+  
+  const cx=Math.floor(tempCanvas.width/2), cy=Math.floor(tempCanvas.height/2);
+  const p=tempCtx.getImageData(cx,cy,1,1).data;
+  const r=p[0],g=p[1],b=p[2];
+  
+  // Semplice mappa colori
+  if(r<30 && g<30 && b<30){announce("Molto scuro o Nero");lastSpeak=Date.now();return;}
+  if(r>220 && g>220 && b>220){announce("Bianco o Luce");lastSpeak=Date.now();return;}
+  
+  const colors={'Rosso':[255,0,0],'Verde':[0,255,0],'Blu':[0,0,255],'Giallo':[255,255,0],'Arancione':[255,165,0],'Grigio':[128,128,128],'Marrone':[139,69,19],'Viola':[128,0,128]};
   let min=Infinity,res="Indefinito";
   for(let k in colors){
-    const[cr,cg,cb]=k.split(',').map(Number),d=Math.sqrt((r-cr)**2+(g-cg)**2+(b-cb)**2);
-    if(d<min){min=d;res=colors[k]}
+    const c=colors[k];
+    const d=Math.sqrt((r-c[0])**2+(g-c[1])**2+(b-c[2])**2);
+    if(d<min){min=d;res=k;}
   }
   announce(res);lastSpeak=Date.now();
 }
@@ -372,51 +356,31 @@ function handleLevel(e){
   else if(t<-10){announce("Pende a sinistra.");vibrate(30);lastSpeak=Date.now();}
 }
 
-// TORCIA
-function toggleTorch(){
-  const b=document.getElementById('btn-torch');
-  if(!videoTrack){announce("Fotocamera non pronta.");return}
-  const caps=videoTrack.getCapabilities&&videoTrack.getCapabilities();
-  if(!caps||!caps.torch){announce("Torcia non supportata.");torchActive=false;b.classList.remove('active-tool');b.innerText="TORCIA";return}
-  const target=!torchActive;
-  videoTrack.applyConstraints({advanced:[{torch:target}]}).then(()=>{
-    torchActive=target;
-    if(torchActive){b.classList.add('active-tool');b.innerText="TORCIA: ON";announce("Torcia accesa.");}
-    else{b.classList.remove('active-tool');b.innerText="TORCIA";announce("Torcia spenta.");}
-  }).catch(e=>{
-    console.warn(e);torchActive=false;b.classList.remove('active-tool');b.innerText="TORCIA";announce("Torcia non disponibile.");
-  });
-}
-
 // DISCRETO
 function toggleDiscrete(){
   discreteMode=!discreteMode;
   document.getElementById('btn-discrete').classList.toggle('active-discrete');
-  vibrate(100);
-  if(!discreteMode)announce("Modo discreto spento.");
+  vibrate(100);if(!discreteMode)announce("Modo discreto spento.");
 }
 
-// USA / MODIFICA / SOCIAL OVERLAY
+// USA FOTO
 async function usePhoto(){
-  if(!lastShotB64){announce("Nessuna foto da usare.");return}
+  if(!lastShotB64){announce("Nessuna foto.");return}
   try{
     const blob=await(await fetch("data:image/jpeg;base64,"+lastShotB64)).blob();
     const file=new File([blob],"foto.jpg",{type:"image/jpeg"});
-    if(navigator.share){
-      await navigator.share({files:[file],title:"Scatto Visione AI"});
-      announce("Condivisione aperta.");
-    }else{
+    if(navigator.share){await navigator.share({files:[file],title:"Scatto Visione AI"});announce("Menu condivisione.");}
+    else{
       lastShotUrl=URL.createObjectURL(blob);
       const l=document.getElementById('download-link');l.href=lastShotUrl;l.download="scatto.jpg";l.classList.remove('hidden');
-      announce("Link di download pronto.");
+      announce("Link download creato.");
     }
   }catch(e){console.error(e);announce("Errore condivisione.");}
 }
-
 async function editAndReviewPhoto(){
-  if(!lastShotB64){announce("Nessuna foto da modificare.");return}
-  const text=prompt("Testo da scrivere sulla foto:");if(!text)return;
-  announce("Modifico la foto...");
+  if(!lastShotB64){announce("Nessuna foto.");return}
+  const text=prompt("Scrivi testo da aggiungere:");if(!text)return;
+  announce("Elaboro...");
   const img=new Image();
   img.onload=async()=>{
     const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
@@ -425,83 +389,99 @@ async function editAndReviewPhoto(){
     ct.fillStyle="rgba(0,0,0,0.6)";ct.fillRect(0,c.height-fs*3,c.width,fs*3);
     ct.fillStyle="#fff";ct.textAlign="center";ct.fillText(text,c.width/2,c.height-fs*1.5);
     lastShotB64=c.toDataURL("image/jpeg",0.9).split(',')[1];
-    showResultOnly("Analisi in corso sulla foto modificata...");
-    if(GEMINI_KEY){
-      const overlayPrompt=
-        "Questa foto ha del testo sovrapposto in stile grafica social. "+
-        "1) Descrivi brevemente la scena. "+
-        "2) Indica dove appare il testo (alto, centro, basso) e se si legge chiaramente. "+
-        "3) Valuta se la composizione funziona come immagine per i social (ad esempio storia o post), "+
-        "considerando leggibilità del testo, posizione del soggetto, equilibrio fra foto e scritta. "+
-        "4) Se vedi problemi, suggerisci uno o due cambiamenti pratici (spostare il testo, cambiare posizione del soggetto, ecc.). "+
-        "Il testo aggiunto è: \""+text+"\".";
-      const nd=await callGemini(overlayPrompt,lastShotB64);
-      document.getElementById('result-content').textContent=nd||"Foto modificata.";
-      announce("Nuova analisi pronta.");
-    }else{
-      document.getElementById('result-content').textContent="Foto modificata con il testo: "+text+" (manca chiave AI per analisi social).";
-      announce("Foto modificata, ma manca la chiave AI.");
-    }
+    showResultOnly("Rianalizzo foto modificata...");
+    const nd=await callGemini("Foto con testo sovrapposto: \""+text+"\". Valuta leggibilità e composizione per social.",lastShotB64);
+    document.getElementById('result-content').textContent=nd||"Fatto.";
+    announce("Nuova analisi pronta.");
   };
   img.src="data:image/jpeg;base64,"+lastShotB64;
 }
 
-// CAMERA + MEDIAPIPE
-async function initCamera(){
-  try{
-    let s;
-    try{s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}})}
-    catch(e){s=await navigator.mediaDevices.getUserMedia({video:true})}
-    return s;
-  }catch(e){console.error(e);throw new Error("Impossibile avviare la fotocamera.");}
+// SETUP CAMERA E LOOP
+async function setupCamera(facing){
+    if(stream){
+        stream.getTracks().forEach(t=>t.stop());
+    }
+    const constraints = {
+        video: {
+            facingMode: facing,
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        }
+    };
+    try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        await video.play();
+        // Aggiorna dimensioni canvas
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        tempCanvas.width = video.videoWidth;
+        tempCanvas.height = video.videoHeight;
+    } catch(e) {
+        console.error(e);
+        announce("Errore avvio fotocamera.");
+    }
 }
-async function initObjectDetectorSafe(){
+
+async function flipCamera(){
+    announce("Ruoto fotocamera...");
+    currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+    await setupCamera(currentFacingMode);
+    announce(currentFacingMode === 'user' ? "Fotocamera frontale attiva." : "Fotocamera posteriore attiva.");
+}
+
+async function startApp(){
+  document.querySelector('#start-screen button').style.display='none';
+  document.getElementById('loader').classList.remove('hidden');
+  document.getElementById('load-msg').classList.remove('hidden');
+  announce("Avvio sistema...");
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  
+  await setupCamera(currentFacingMode);
+
+  // Carica MediaPipe in background
   try{
     const{ObjectDetector,FilesetResolver}=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
     const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-    return await ObjectDetector.createFromOptions(vision,{
+    objectDetector=await ObjectDetector.createFromOptions(vision,{
       baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",delegate:"GPU"},
-      scoreThreshold:0.1,maxResults:5,runningMode:"VIDEO"
+      scoreThreshold:0.3,runningMode:"VIDEO"
     });
-  }catch(e){console.warn(e);return null}
+    announce("Riconoscimento oggetti pronto.");
+  }catch(e){console.warn("MediaPipe error",e);announce("Attenzione: guida oggetti non disponibile.");}
+
+  document.getElementById('start-screen').classList.add('hidden');
+  showCameraOnly();
+  tempCtx=tempCanvas.getContext('2d',{willReadFrequently:true});
+  isRunning=true;
+  loop();
 }
-async function startApp(){
-  const btn=document.querySelector('#start-screen button');
-  btn.style.display='none';
-  document.getElementById('loader').classList.remove('hidden');
-  document.getElementById('load-msg').classList.remove('hidden');
-  announce("Avvio sistema.");
-  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  let stream;
-  try{stream=await initCamera()}catch(e){alert(e.message);announce("Errore fotocamera.");return}
-  video.srcObject=stream;videoTrack=stream.getVideoTracks()[0];
-  try{await video.play()}catch(e){console.warn(e)}
-  objectDetector=await initObjectDetectorSafe();
-  if(!objectDetector)announce("Rilevamento oggetti non disponibile.");
-  function ready(){
-    video.removeEventListener('loadeddata',ready);
-    document.getElementById('start-screen').classList.add('hidden');
-    showCameraOnly();
-    canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-    tempCanvas.width=video.videoWidth;tempCanvas.height=video.videoHeight;
-    tempCtx=tempCanvas.getContext('2d',{willReadFrequently:true});
-    isRunning=true;announce("Sistema pronto.");
-    if(!GEMINI_KEY)setTimeout(()=>announce("Manca la chiave AI. Puoi comunque scattare e usare le foto."),1000);
-    loop();
-  }
-  if(video.readyState>=2)ready();else video.addEventListener('loadeddata',ready);
-}
+
 function loop(){
-  if(!isRunning)return;
-  const now=performance.now();
-  if(lightActive||colorActive||mode==='guiding'){if(tempCtx)tempCtx.drawImage(video,0,0)}
-  if(lightActive)processLight();
-  if(colorActive)processColor();
-  if(mode==='guiding'&&now-lastGuideMessageTime>200)processGuidance();
+  if(!isRunning){requestAnimationFrame(loop);return;}
+  
+  // AGGIORNAMENTO FONDAMENTALE: Copia SEMPRE il frame video se attivo, così i sensori hanno dati freschi
+  if(video.readyState === video.HAVE_ENOUGH_DATA && tempCtx){
+      // Sincronizza dimensioni se cambiate
+      if(tempCanvas.width !== video.videoWidth) {
+          tempCanvas.width = video.videoWidth;
+          tempCanvas.height = video.videoHeight;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+      }
+      tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+      
+      // Esegui sensori
+      if(lightActive) processLight();
+      if(colorActive) processColor();
+      if(mode==='guiding') processGuidance();
+  }
+
   requestAnimationFrame(loop);
 }
 
-// IMPOSTAZIONI CHIAVE
+// IMPOSTAZIONI
 window.openSettings=()=>{
   const k=document.getElementById('key-screen');
   k.classList.remove('hidden');k.removeAttribute('aria-hidden');k.removeAttribute('inert');
