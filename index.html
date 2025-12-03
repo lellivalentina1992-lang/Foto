@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - Gemini 3 v2</title>
+<title>Visione AI Fusion - Gemini 3 v3</title>
 <style>
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
@@ -11,7 +11,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0
 video{width:100%;height:100%;object-fit:cover;opacity:.6}
 canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 #main-interface{height:60vh;width:100%;background:#000;border-top:4px solid #333;position:relative}
-#camera-controls{height:100%;width:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto 1fr 1fr 1fr 1fr auto auto;gap:8px;padding:8px;box-sizing:border-box;overflow-y:auto}
+#camera-controls{height:100%;width:100%;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto auto 1fr 1fr 1fr 1fr auto auto;gap:8px;padding:8px;box-sizing:border-box;overflow-y:auto}
 .top-bar{grid-column:1/-1;display:flex;gap:10px}
 #result-screen{height:100%;width:100%;display:flex;flex-direction:column;padding:15px;box-sizing:border-box;background:#111;position:absolute;top:0;left:0;z-index:50}
 #result-content{flex-grow:1;overflow-y:auto;margin-bottom:15px;padding:15px;border:1px solid #555;border-radius:8px;background:#000;font-size:1.3rem;line-height:1.5;color:#fff;white-space:pre-wrap}
@@ -20,6 +20,7 @@ button{border:2px solid #555;border-radius:12px;font-size:1rem;font-weight:bold;
 button:active{background:#555;transform:scale(.98)}
 .small-btn{flex:1;font-size:.9rem;background:#111;border:1px solid #444;color:#ccc}
 #btn-scene{background:#D4AF37;color:#000;border-color:#fff;font-size:1.1rem}
+#btn-custom{background:#4B0082;border-color:#DA70D6;grid-column:1/-1} /* Viola per distinguersi */
 #btn-selfie{background:#004080;border-color:#fff}
 #btn-outdoor{background:#3B6C2A;border-color:#fff}
 #btn-indoor{background:#6A1B9A;border-color:#fff}
@@ -54,6 +55,8 @@ input{background:#333;color:#fff;border:1px solid #777}
       <button class="small-btn" id="btn-color" onclick="toggleColor()" aria-label="Sonda colore">SONDA COLORE</button>
       <button class="small-btn" id="btn-level" onclick="toggleLevel()" aria-label="Livella">LIVELLA</button>
     </div>
+
+    <button id="btn-custom" onclick="askCustomDetail()" aria-label="Fai una domanda specifica sulla foto">CHIEDI DETTAGLIO</button>
     
     <button id="btn-scene"  onclick="describeWithMode('scene')"  aria-label="Scatta e analizza come scena generale">SCENA GENERALE</button>
     <button id="btn-selfie" onclick="describeWithMode('selfie')" aria-label="Scatta e analizza come selfie o volto">SELFIE / VOLTO</button>
@@ -98,7 +101,7 @@ input{background:#333;color:#fff;border:1px solid #777}
 
 <script>
 let GEMINI_KEY=localStorage.getItem('gemini_key')||"";
-const MODEL_NAME="gemini-3-pro-preview"; // Assicurati che questo modello sia attivo sul tuo account, altrimenti usa gemini-1.5-flash
+const MODEL_NAME="gemini-3-pro-preview"; 
 const API_ENDPOINT="v1beta";
 
 let audioCtx,lightOsc,lightGain,objectDetector=null,isRunning=false,stream=null;
@@ -149,7 +152,6 @@ function deletePhoto(){
 }
 
 function captureFrame(){
-  // Assicura che il canvas temporaneo abbia le dimensioni corrette
   if(video.videoWidth>0 && (tempCanvas.width!==video.videoWidth || tempCanvas.height!==video.videoHeight)){
      tempCanvas.width=video.videoWidth;
      tempCanvas.height=video.videoHeight;
@@ -177,6 +179,36 @@ async function captureNewShot(){
 async function takeShot(){
   await captureNewShot();
   announce("Foto scattata. Puoi avviare un'analisi.");
+}
+
+// NUOVA FUNZIONE: CHIEDI DETTAGLIO
+async function askCustomDetail(){
+  if(!GEMINI_KEY){announce("Manca la chiave API, apro le impostazioni.");openSettings();return;}
+  
+  // Prima scatta la foto per assicurarsi di averla
+  await captureNewShot();
+  
+  // Chiede all'utente la domanda
+  const userQuestion = prompt("Cosa vuoi sapere su questa immagine?");
+  if(!userQuestion){
+    announce("Domanda annullata.");
+    return;
+  }
+
+  showResultOnly("Sto cercando la risposta a: " + userQuestion + "...");
+  announce("Analisi domanda personalizzata in corso.");
+  
+  const customPrompt = "L'utente, che è una persona non vedente, chiede riguardo a questa immagine: \"" + userQuestion + "\". Rispondi in modo diretto, preciso e utile solo a questa domanda. Se la risposta non si trova nell'immagine, dillo chiaramente.";
+  
+  const t = await callGemini(customPrompt, lastShotB64);
+  const content = document.getElementById('result-content');
+  if(!t){
+    content.textContent = "Errore analisi. Riprova.";
+    announce("Analisi fallita.");
+    return;
+  }
+  content.textContent = "Risposta: " + t;
+  announce("Risposta pronta.");
 }
 
 // PROMPTS E QUALITÀ
@@ -322,7 +354,6 @@ function processColor(){
   const p=tempCtx.getImageData(cx,cy,1,1).data;
   const r=p[0],g=p[1],b=p[2];
   
-  // Semplice mappa colori
   if(r<30 && g<30 && b<30){announce("Molto scuro o Nero");lastSpeak=Date.now();return;}
   if(r>220 && g>220 && b>220){announce("Bianco o Luce");lastSpeak=Date.now();return;}
   
@@ -461,9 +492,8 @@ async function startApp(){
 function loop(){
   if(!isRunning){requestAnimationFrame(loop);return;}
   
-  // AGGIORNAMENTO FONDAMENTALE: Copia SEMPRE il frame video se attivo, così i sensori hanno dati freschi
+  // COPIA COSTANTE PER SENSORI
   if(video.readyState === video.HAVE_ENOUGH_DATA && tempCtx){
-      // Sincronizza dimensioni se cambiate
       if(tempCanvas.width !== video.videoWidth) {
           tempCanvas.width = video.videoWidth;
           tempCanvas.height = video.videoHeight;
@@ -472,7 +502,6 @@ function loop(){
       }
       tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
       
-      // Esegui sensori
       if(lightActive) processLight();
       if(colorActive) processColor();
       if(mode==='guiding') processGuidance();
