@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion</title>
+<title>Visione AI Fusion - Gemini 3</title>
 <style>
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
@@ -95,7 +95,11 @@ input{background:#333;color:#fff;border:1px solid #777}
 </div>
 
 <script>
-let GEMINI_KEY=localStorage.getItem('gemini_key')||"",MODEL_NAME="gemini-1.5-flash",API_ENDPOINT="v1beta";
+let GEMINI_KEY=localStorage.getItem('gemini_key')||"";
+// QUI usi Gemini 3
+const MODEL_NAME="gemini-3-pro-preview";
+const API_ENDPOINT="v1beta";
+
 let audioCtx,lightOsc,lightGain,objectDetector=null,isRunning=false,videoTrack=null;
 const tempCanvas=document.createElement('canvas');let tempCtx=null;
 let mode='idle',lightActive=false,colorActive=false,levelActive=false,torchActive=false,discreteMode=false,lastSpeak=0,centeredCount=0,lastGuideMessage="",lastGuideMessageTime=0;
@@ -103,13 +107,27 @@ const video=document.getElementById('webcam'),canvas=document.getElementById('ov
 let lastShotB64=null,lastShotUrl=null;
 
 // Annunci
-function announce(t){if(discreteMode)return;const e=document.getElementById('sr-announcer');e.textContent="";setTimeout(()=>e.textContent=t,50)}
+function announce(t){
+  if(discreteMode)return;
+  const e=document.getElementById('sr-announcer');
+  e.textContent="";
+  setTimeout(()=>e.textContent=t,50);
+}
 function vibrate(p){if(navigator.vibrate)navigator.vibrate(p)}
+
+// Gestione focus per cambiare vista
+function blurIfInside(element, container){
+  if(!element)return;
+  if(container.contains(element)) element.blur();
+}
 
 // Cambio vista camera/risultato
 function showResultOnly(text){
   const cam=document.getElementById('camera-controls');
   const res=document.getElementById('result-screen');
+  const active=document.activeElement;
+  blurIfInside(active,cam);
+
   cam.classList.add('hidden');
   cam.setAttribute('aria-hidden','true');
   cam.setAttribute('inert','');
@@ -123,6 +141,9 @@ function showResultOnly(text){
 function showCameraOnly(){
   const cam=document.getElementById('camera-controls');
   const res=document.getElementById('result-screen');
+  const active=document.activeElement;
+  blurIfInside(active,res);
+
   res.classList.add('hidden');
   res.setAttribute('aria-hidden','true');
   res.setAttribute('inert','');
@@ -140,12 +161,31 @@ function deletePhoto(){
 }
 
 // Scatto
-function captureFrame(){if(tempCtx)tempCtx.drawImage(video,0,0);return tempCanvas.toDataURL('image/jpeg',0.8).split(',')[1]}
-function playShutter(){if(!discreteMode&&audioCtx){const o=audioCtx.createOscillator(),g=audioCtx.createGain();g.gain.value=0.1;o.frequency.value=600;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.1)}}
-async function captureNewShot(){if(mode==='guiding')toggleGuidance();announce("Scatto in corso.");playShutter();lastShotB64=captureFrame();document.getElementById('download-link').classList.add('hidden');return lastShotB64}
-async function takeShot(){await captureNewShot();announce("Foto scattata. Puoi avviare un'analisi.");}
+function captureFrame(){
+  if(tempCtx)tempCtx.drawImage(video,0,0);
+  return tempCanvas.toDataURL('image/jpeg',0.8).split(',')[1];
+}
+function playShutter(){
+  if(!discreteMode&&audioCtx){
+    const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+    g.gain.value=0.1;o.frequency.value=600;o.connect(g);g.connect(audioCtx.destination);
+    o.start();o.stop(audioCtx.currentTime+0.1);
+  }
+}
+async function captureNewShot(){
+  if(mode==='guiding')toggleGuidance();
+  announce("Scatto in corso.");
+  playShutter();
+  lastShotB64=captureFrame();
+  document.getElementById('download-link').classList.add('hidden');
+  return lastShotB64;
+}
+async function takeShot(){
+  await captureNewShot();
+  announce("Foto scattata. Puoi avviare un'analisi.");
+}
 
-// PROMPTS COMPLETI + QUALITÀ SOCIAL
+// PROMPTS COMPLETI + QUALITÀ SOCIAL (NON TOCCATI)
 function buildPromptForContext(c){
   const qualityBlock = `
 Infine, valuta la qualità tecnica dello scatto e se è adatto ai vari usi sui social (feed, storie, foto profilo).
@@ -174,9 +214,13 @@ per migliorare lo scatto successivo. Usa un linguaggio chiaro e diretto.`;
   }
 }
 
-// ANALISI GEMINI – schermo risultato subito, testo aggiornato dopo
+// ANALISI GEMINI 3 – schermo risultato subito, testo aggiornato dopo
 async function describeWithMode(c){
-  if(!GEMINI_KEY){announce("Manca la chiave API, apro le impostazioni.");openSettings();return}
+  if(!GEMINI_KEY){
+    announce("Manca la chiave API, apro le impostazioni.");
+    openSettings();
+    return;
+  }
   await captureNewShot();
   showResultOnly("Analisi in corso, attendi qualche secondo...");
   announce("Analisi in corso.");
@@ -192,24 +236,22 @@ async function describeWithMode(c){
   announce("Analisi pronta. Puoi usare, modificare o eliminare la foto.");
 }
 
+// CHIAMATA GEMINI 3
 async function callGemini(prompt,b64){
   try{
-    const r=await fetch(
-      "https://generativelanguage.googleapis.com/"+API_ENDPOINT+
-      "/models/"+MODEL_NAME+":generateContent?key="+GEMINI_KEY,
-      {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{
-            parts:[
-              {text:prompt},
-              {inline_data:{mime_type:"image/jpeg",data:b64}}
-            ]
-          }]
-        })
-      }
-    );
+    const url=`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=`+encodeURIComponent(GEMINI_KEY);
+    const r=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{
+          parts:[
+            {text:prompt},
+            {inline_data:{mime_type:"image/jpeg",data:b64}}
+          ]
+        }]
+      })
+    });
     if(!r.ok){
       console.error("Errore HTTP Gemini",r.status,r.statusText);
       announce("Errore server AI "+r.status);
