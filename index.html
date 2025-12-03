@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - Pro V9 (5s)</title>
+<title>Visione AI Fusion - Pro V9 (Dettagli Totali)</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -60,7 +60,7 @@ input{background:#333;color:#fff;border:1px solid #777}
 
 <div id="main-interface" class="hidden" aria-hidden="true">
   <div id="camera-controls">
-    <button class="full-width" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva guida centraggio. Include controllo automatico luce.">GUIDA CENTRAGGIO</button>
+    <button class="full-width" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva guida scena live. Legge tutti gli oggetti visibili.">GUIDA SCENA LIVE</button>
     
     <div class="top-bar full-width">
        <button class="small-btn" id="btn-shot" onclick="startCountdown()" aria-label="Scatta con timer di 5 secondi">SCATTA (5s)</button>
@@ -120,7 +120,7 @@ input{background:#333;color:#fff;border:1px solid #777}
 
 <script>
 let GEMINI_KEY=localStorage.getItem('gemini_key')||"";
-const MODEL_NAME="gemini-3-pro-preview"; const API_ENDPOINT="v1beta";
+const MODEL_NAME="gemini-2.0-flash-exp"; const API_ENDPOINT="v1beta";
 
 let audioCtx,lightOsc,lightGain,objectDetector=null,isRunning=false,stream=null;
 const tempCanvas=document.createElement('canvas');let tempCtx=null;
@@ -130,6 +130,27 @@ let lastLowLightWarning=0;
 let currentFacingMode='environment'; 
 const video=document.getElementById('webcam'),canvas=document.getElementById('overlay'),ctx=canvas.getContext('2d');
 let lastShotB64=null,lastShotUrl=null;
+
+// TRADUZIONI OGGETTI
+const objectDict = {
+    'person': 'Persona', 'cup': 'Tazza', 'chair': 'Sedia', 'bottle': 'Bottiglia', 
+    'cell phone': 'Cellulare', 'laptop': 'Computer', 'book': 'Libro', 
+    'tv': 'TV', 'potted plant': 'Pianta', 'keyboard': 'Tastiera', 
+    'mouse': 'Mouse', 'remote': 'Telecomando', 'dining table': 'Tavolo',
+    'refrigerator': 'Frigo', 'microwave': 'Microonde', 'sink': 'Lavandino',
+    'cat': 'Gatto', 'dog': 'Cane', 'bowl': 'Ciotola', 'car': 'Auto', 
+    'bicycle': 'Bici', 'motorcycle': 'Moto', 'airplane': 'Aereo', 'bus': 'Bus',
+    'train': 'Treno', 'truck': 'Camion', 'boat': 'Barca', 'traffic light': 'Semaforo',
+    'fire hydrant': 'Idrante', 'stop sign': 'Stop', 'bench': 'Panchina',
+    'backpack': 'Zaino', 'umbrella': 'Ombrello', 'handbag': 'Borsa', 'tie': 'Cravatta',
+    'suitcase': 'Valigia', 'frisbee': 'Frisbee', 'skis': 'Sci', 'snowboard': 'Snowboard',
+    'sports ball': 'Palla', 'kite': 'Aquilone', 'baseball bat': 'Mazza da baseball',
+    'baseball glove': 'Guanto', 'skateboard': 'Skateboard', 'surfboard': 'Tavola surf',
+    'tennis racket': 'Racchetta', 'fork': 'Forchetta', 'knife': 'Coltello', 'spoon': 'Cucchiaio',
+    'toilet': 'WC', 'bed': 'Letto', 'couch': 'Divano', 'clock': 'Orologio',
+    'vase': 'Vaso', 'scissors': 'Forbici', 'teddy bear': 'Orsacchiotto',
+    'hair drier': 'Phon', 'toothbrush': 'Spazzolino'
+};
 
 function announce(t){if(!discreteMode){const e=document.getElementById('sr-announcer');e.textContent="";setTimeout(()=>e.textContent=t,50);}}
 function vibrate(p){if(navigator.vibrate)navigator.vibrate(p);}
@@ -164,21 +185,15 @@ function captureFrame(){
   return tempCanvas.toDataURL('image/jpeg',0.8).split(',')[1];
 }
 
-// TIMER 5 SECONDI
 async function startCountdown(andAnalyzeMode = null) {
     if(mode==='guiding') toggleGuidance(); 
-    
     announce("5"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("4"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("3"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("2"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("1"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
-    
-    announce("Click");
-    playShutter();
-    vibrate(200);
+    announce("Click"); playShutter(); vibrate(200);
     lastShotB64 = captureFrame();
-
     if(andAnalyzeMode) processAnalysis(andAnalyzeMode);
     else announce("Foto salvata.");
 }
@@ -193,79 +208,86 @@ function playShutter(){
   }
 }
 
-// GUIDA CON FOCUS PRIORITY
+// *** NUOVA FUNZIONE GUIDA DETTAGLIATA ***
 function toggleGuidance(){
   if(!objectDetector){announce("Non pronto.");return;}
   const b=document.getElementById('btn-guide');vibrate(50);
   if(mode==='guiding'){
-    mode='idle';b.classList.remove('guiding');b.innerText="GUIDA CENTRAGGIO";
+    mode='idle';b.classList.remove('guiding');b.innerText="GUIDA SCENA LIVE";
     ctx.clearRect(0,0,canvas.width,canvas.height);announce("Guida spenta.");
   }else{
     mode='guiding';centeredCount=0;lastGuideMessage="";
-    b.classList.add('guiding');b.innerText="GUIDA ATTIVA";announce("Guida attiva.");
+    b.classList.add('guiding');b.innerText="GUIDA ATTIVA";announce("Guida attiva. Scansiono...");
   }
 }
+
 function processGuidance(){
-  if(tempCtx && Date.now() - lastLowLightWarning > 5000) {
+  if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
       const p=tempCtx.getImageData(tempCanvas.width/2,tempCanvas.height/2,10,10).data;
       let s=0; for(let i=0;i<p.length;i+=4)s+=(p[i]+p[i+1]+p[i+2])/3;
-      const level=s/(p.length/4);
-      if(level < 40) { announce("Troppo buio. Accendi una luce."); lastLowLightWarning = Date.now(); }
+      if(s/(p.length/4) < 40) { announce("Troppo buio."); lastLowLightWarning = Date.now(); }
   }
 
   if(!objectDetector||video.readyState<2)return;
   try{
     const r=objectDetector.detectForVideo(video,performance.now()),d=r?r.detections:[];
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!d.length){if(Date.now()-lastSpeak>3000){announce("Nessun oggetto.");lastSpeak=Date.now();}return;}
-
-    let target = null;
-    let others = [];
-    const persons = d.filter(x => x.categories[0].categoryName === 'person');
-    if (persons.length > 0) {
-        target = persons.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height)[0];
-        others = d.filter(x => x !== target);
-    } else {
-        target = d.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height)[0];
-        others = d.filter(x => x !== target);
-    }
-
-    const b = target.boundingBox;
+    
+    // Disegno sempre i box per riferimento visivo
     const rx=canvas.width/video.videoWidth, ry=canvas.height/video.videoHeight;
-    ctx.strokeStyle="#0f0";ctx.lineWidth=5;
-    ctx.strokeRect(b.originX*rx, b.originY*ry, b.width*rx, b.height*ry);
+    d.forEach(obj => {
+        const b = obj.boundingBox;
+        ctx.strokeStyle="#0f0";ctx.lineWidth=3;
+        ctx.strokeRect(b.originX*rx, b.originY*ry, b.width*rx, b.height*ry);
+    });
 
-    const cx = b.originX + b.width/2;
-    const cy = b.originY + b.height/2;
-    const sx=video.videoWidth/2, sy=video.videoHeight/2;
-    const tolX=video.videoWidth*0.15, tolY=video.videoHeight*0.2;
-
-    let warning = "";
-    if(others.length > 0){
-        let minX = b.originX, maxX = b.originX + b.width;
-        others.forEach(o => {
-            if(o.boundingBox.originX < minX) minX = o.boundingBox.originX;
-            if(o.boundingBox.originX + o.boundingBox.width > maxX) maxX = o.boundingBox.originX + o.boundingBox.width;
-        });
-        if (minX < video.videoWidth * 0.05 || maxX > video.videoWidth * 0.95) warning = "Allontanati";
+    if(!d.length){
+        if(Date.now()-lastGuideMessageTime>4000){announce("Nulla.");lastGuideMessageTime=Date.now();}
+        return;
     }
 
-    let m="";
-    if(warning) m = warning;
-    else if(cx<sx-tolX) m="Sposta sinistra";
-    else if(cx>sx+tolX) m="Sposta destra";
-    else if(cy<sy-tolY) m="In alto";
-    else if(cy>sy+tolY) m="In basso";
-    else { m = (others.length>0 ? "Gruppo centrato!" : "Centrato!"); centeredCount++; }
-
+    // Qui la magia: costruiamo una frase con TUTTO quello che vede
     const now=Date.now();
-    if(m!==lastGuideMessage || now-lastGuideMessageTime>3000){
-      announce(m);
-      if(m.includes("entrato")) vibrate([80,50,80]);
-      else if(m==="Allontanati") vibrate([200]); 
-      lastGuideMessage=m;lastGuideMessageTime=now;
+    // Parla solo ogni 4 secondi per dare tempo di leggere la lista
+    if (now - lastGuideMessageTime > 4000) {
+        
+        // Ordina per grandezza (i più vicini prima)
+        const sorted = d.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height);
+        
+        let details = [];
+        let seenTypes = {}; // Per evitare "Sedia, Sedia, Sedia"
+        
+        // Prendi fino a 4 oggetti principali
+        for(let i=0; i<Math.min(sorted.length, 4); i++){
+            const obj = sorted[i];
+            const rawName = obj.categories[0].categoryName;
+            const name = objectDict[rawName] || rawName;
+            
+            // Calcola posizione orizzontale
+            const cx = (obj.boundingBox.originX + obj.boundingBox.width/2) / video.videoWidth;
+            let pos = "centro";
+            if(cx < 0.35) pos = "sinistra";
+            else if(cx > 0.65) pos = "destra";
+            
+            // Evita ripetizioni esatte tipo "Sedia centro, Sedia centro"
+            const key = name+pos;
+            if(!seenTypes[key]){
+                details.push(`${name} a ${pos}`);
+                seenTypes[key] = true;
+            }
+        }
+
+        if(sorted.length > 4) details.push("e altro");
+
+        const msg = "Vedo: " + details.join(", ");
+        
+        announce(msg);
+        vibrate(30); // Piccolo feedback tattile
+        lastGuideMessageTime = now;
+        lastGuideMessage = msg;
     }
-  }catch(e){}
+
+  }catch(e){ console.error(e); }
 }
 
 function toggleLight(){
