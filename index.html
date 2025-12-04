@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V25 Full Fix</title>
+<title>Visione AI Fusion - V27 Robust</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -190,6 +190,12 @@ function toggleVoiceControl(){
 }
 
 function manualFind(){
+    // FIX V27: Controllo preventivo del modello
+    if(!objectDetector){
+        announce("Modello non ancora caricato. Attendi.");
+        return;
+    }
+
     const b = document.getElementById('btn-find');
     if(targetClass){
         targetClass = null;
@@ -278,16 +284,21 @@ async function setupCamera(facing){
     if(stream) stream.getTracks().forEach(t=>t.stop());
     try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } });
-        video.srcObject = stream; await video.play();
+        video.srcObject = stream; 
+        // Await vero: aspettiamo che il video sia davvero in play
+        await video.play();
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
     } catch(e) { announce("Errore fotocamera."); }
 }
+
 async function flipCamera(){
     currentFacingMode=(currentFacingMode==='environment')?'user':'environment';
-    vibrate(50); await setupCamera(currentFacingMode);
+    vibrate(50); 
+    await setupCamera(currentFacingMode);
     announce(currentFacingMode==='user'?"Frontale." : "Posteriore.");
 }
+
 function captureFrame(){
   if(video.videoWidth>0&&(tempCanvas.width!==video.videoWidth)){tempCanvas.width=video.videoWidth;tempCanvas.height=video.videoHeight;}
   if(tempCtx)tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
@@ -296,26 +307,32 @@ function captureFrame(){
 
 async function startCountdown(andAnalyzeMode = null) {
     if(mode==='guiding') toggleGuidance(); 
+    
+    // Countdown
     announce("5"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("4"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("3"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("2"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("1"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
+    
     announce("Click"); playShutter(); vibrate(200);
     lastShotB64 = captureFrame();
     hasPerformedSocialCheck = false; 
     
-    // --- MODIFICA WINDOWS: Salvataggio automatico ---
+    // Salvataggio
     const filename = "foto_visione_" + Date.now() + ".jpg";
     const dLink = document.getElementById('download-link');
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
     dLink.download = filename;
     dLink.classList.remove('hidden');
     dLink.click(); 
-    // ------------------------------------------------
 
-    if(andAnalyzeMode) processAnalysis(andAnalyzeMode);
-    else announce("Foto salvata.");
+    // FIX V27: Await dell'analisi se richiesta
+    if(andAnalyzeMode) {
+        await processAnalysis(andAnalyzeMode);
+    } else {
+        announce("Foto salvata.");
+    }
 }
 async function takeShot(){ await startCountdown(); }
 
@@ -342,7 +359,7 @@ function toggleGuidance(){
 }
 
 // -----------------------------------------------------------
-// V25 FIX: CORREZIONE LOGICA GUIDA (CONTROLLO VERTICALE AGGIUNTO)
+// LOGICA GUIDA V26/V27 (Focus Testa + Ignora Tagli Bassi)
 // -----------------------------------------------------------
 function processGuidance(){
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
@@ -401,9 +418,6 @@ function processGuidance(){
         const yMin = box.originY;
         const yMax = box.originY + box.height;
 
-        const cx = (xMin + xMax) / 2 / imgW; 
-        const widthPct = box.width / imgW; 
-        
         const rawName = mainObj.categories[0].categoryName;
         const mainName = objectDict[rawName] || rawName;
 
@@ -412,36 +426,47 @@ function processGuidance(){
         // PARAMETRI ORIENTAMENTO
         const LIMIT_LEFT = 0.35; const LIMIT_RIGHT = 0.65;
         const isSelfie = (currentFacingMode === 'user');
+        const isPerson = (mainName === 'Persona');
+
+        // --- TRUCCO FOCUS TESTA ---
+        let effectiveHeight = box.height;
+        if (isPerson) {
+             effectiveHeight = box.height * 0.35; 
+        }
+        
+        const focusCenterY = box.originY + (effectiveHeight / 2);
+        const focusCenterX = box.originX + (box.width / 2); 
+        const cx = focusCenterX / imgW;
+        
         const txtLeft = isSelfie ? "Sposta a Destra" : "Ruota a Sinistra";
         const txtRight = isSelfie ? "Sposta a Sinistra" : "Ruota a Destra";
 
-        // LOGICA PRIORITÀ: PRIMA I TAGLI (ANCHE VERTICALI ORA), POI IL CENTRAMENTO
-        
-        // 1. Controlla Tagli Verticali (Nuovo!)
+        // 1. TAGLIO IN ALTO 
         if (yMin < (imgH * 0.02)) {
              msg = mainName + " Tagliato in ALTO! Abbassa la camera.";
         } 
-        else if (yMax > (imgH * 0.98)) {
+        // 2. TAGLIO IN BASSO (Ignora se persona/selfie)
+        else if (yMax > (imgH * 0.98) && !isPerson && !isSelfie) {
              msg = mainName + " Tagliato in BASSO! Alza la camera.";
         }
-        // 2. Controlla Tagli Orizzontali
+        // 3. TAGLIO LATERALE 
         else if (xMin < (imgW * 0.02)) {
              msg = mainName + " Tagliato a " + (isSelfie ? "DESTRA" : "SINISTRA") + "! " + txtLeft;
         }
         else if (xMax > (imgW * 0.98)) {
              msg = mainName + " Tagliato a " + (isSelfie ? "SINISTRA" : "DESTRA") + "! " + txtRight;
         }
-        // 3. Controlla Distanza
-        else if (widthPct < 0.25) { // Aumentato un po' per sicurezza
-             msg = mainName + " lontano. Avvicinati."; 
-        }
-        // 4. Controlla Centratura Orizzontale
+        // 4. CENTRATURA 
         else {
             if (cx < LIMIT_LEFT) msg = txtLeft; 
             else if (cx > LIMIT_RIGHT) msg = txtRight; 
             else {
-                msg = mainName + " Perfetto. Ferma.";
-                if(navigator.vibrate) navigator.vibrate([50, 100, 50]); 
+                if (isPerson && yMin > (imgH * 0.20)) {
+                    msg = "Troppo in basso. Alza la camera.";
+                } else {
+                    msg = mainName + " Perfetto. Ferma.";
+                    if(navigator.vibrate) navigator.vibrate([50, 100, 50]); 
+                }
             }
         }
         announce(msg); 
@@ -549,6 +574,7 @@ function buildPrompt(mode){
 
 // 1. ANALISI SOCIAL
 async function performSocialCheck(){
+    if(!GEMINI_KEY){announce("Manca chiave. Imposta.");openSettings();return;}
     announce("Analisi Social in corso...");
     const prompt = `
     Analizza questa foto per i Social Media (Instagram/TikTok).
@@ -573,8 +599,9 @@ async function performSocialCheck(){
     announce("Report Social pronto. Puoi aggiungere testo.");
 }
 
-// 2. AGGIUNTA TESTO CON AI DIRECTOR E WORD WRAP
+// 2. AGGIUNTA TESTO CON AI DIRECTOR
 async function startTextAddition(){
+    if(!GEMINI_KEY){announce("Manca chiave.");openSettings();return;}
     const textToAdd = prompt("Cosa vuoi scrivere sulla foto?");
     if(!textToAdd) return;
 
@@ -661,12 +688,11 @@ function drawTextOnCanvas(text, position){
 
         lastShotB64 = c.toDataURL('image/jpeg', 0.9).split(',')[1];
         
-        // MODIFICA WINDOWS: Forziamo download anche dopo modifica testo
         const dLink = document.getElementById('download-link');
         const filename = "foto_visione_edit_" + Date.now() + ".jpg";
         dLink.href = "data:image/jpeg;base64,"+lastShotB64;
         dLink.download = filename;
-        dLink.click(); // Scarica subito la versione modificata
+        dLink.click(); 
         
         reAnalyzeAfterEdit(position);
     };
@@ -674,6 +700,7 @@ function drawTextOnCanvas(text, position){
 }
 
 async function reAnalyzeAfterEdit(posName){
+    if(!GEMINI_KEY){announce("Chiave mancante.");return;}
     announce("Testo aggiunto. Controllo finale...");
     const prompt = `Ho aggiunto il testo alla foto. Conferma che sia leggibile e non copra nulla. Descrivi il risultato finale.`;
     const text = await callGemini(prompt, lastShotB64);
@@ -683,11 +710,18 @@ async function reAnalyzeAfterEdit(posName){
 
 async function describeWithMode(c){
   if(!GEMINI_KEY){announce("Manca chiave.");openSettings();return;}
+  
+  // FIX V27: Selfie molto più robusto
   if(c === 'selfie' && currentFacingMode !== 'user') {
-      await flipCamera(); setTimeout(() => startCountdown(c), 1000); return;
+      announce("Giro la fotocamera...");
+      await flipCamera(); 
+      // Aspettiamo un attimo per l'esposizione automatica
+      await new Promise(r => setTimeout(r, 800));
   }
+  
   await startCountdown(c); 
 }
+
 async function processAnalysis(c){
   showResultOnly("Analisi...");announce("Analisi AI in corso...");
   const t=await callGemini(buildPrompt(c),lastShotB64);
@@ -715,12 +749,14 @@ async function usePhoto(){
         try {
             const b=await(await fetch("data:image/jpeg;base64,"+lastShotB64)).blob();
             const f=new File([b], filename ,{type:"image/jpeg"});
-            await navigator.share({files:[f]});
-            return;
+            if (navigator.canShare({ files: [f] })) {
+                await navigator.share({files:[f]});
+                return;
+            }
         } catch(e) { console.log("Share fallito o annullato, passo al download"); }
     }
     
-    // Fallback Desktop: Download forzato se Share non va
+    // Fallback Desktop
     const dLink = document.getElementById('download-link');
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
     dLink.download = filename;
