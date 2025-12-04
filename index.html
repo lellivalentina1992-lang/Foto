@@ -44,7 +44,8 @@ button:active{background:#555;transform:scale(.98)}
 #btn-scene{background:#D4AF37;color:#000}
 #btn-text{background:#fff;color:#000}
 #btn-object{background:#444;border-color:#999}
-#btn-selfie{background:#1e90ff;border-color:#add8e6}
+#btn-selfie-face{background:#1e90ff;border-color:#add8e6}
+#btn-selfie-full{background:#1e90ff;border-color:#87cefa}
 .active-tool{background:#006400!important;border-color:#0f0!important}
 .guiding{background:#8B0000!important;border-color:#f00!important}
 .searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
@@ -91,7 +92,9 @@ input{background:#333;color:#fff;border:1px solid #777}
     <button id="btn-scene"  onclick="describeWithMode('scene')"  aria-label="Scena">SCENA GENERALE</button>
     <button id="btn-text"   onclick="describeWithMode('text')"   aria-label="Testo">TESTO</button>
     <button id="btn-object" onclick="describeWithMode('object')" aria-label="Oggetto">OGGETTO</button>
-    <button id="btn-selfie" onclick="describeWithMode('selfie')" aria-label="Selfie">SELFIE</button>
+    <!-- SELFIE DIVISI -->
+    <button id="btn-selfie-face" onclick="describeWithMode('selfie_face')" aria-label="Selfie volto">SELFIE VOLTO</button>
+    <button id="btn-selfie-full" onclick="describeWithMode('selfie_full')" aria-label="Selfie corpo intero">SELFIE CORPO INTERO</button>
     
     <button id="btn-custom" class="full-width" onclick="askCustomDetail()" aria-label="Chiedi dettaglio">CHIEDI DETTAGLIO</button>
 
@@ -154,7 +157,7 @@ let selfieMode = 'face'; // 'face' | 'full'
 let isRunning = false, stream = null;
 const tempCanvas = document.createElement('canvas'); let tempCtx = null;
 let mode = 'idle', lightActive = false, colorActive = false, levelActive = false, discreteMode = false;
-let lastSpeak = 0, centeredCount = 0, lastGuideMessage = "", lastGuideMessageTime = 0;
+let lastSpeak = 0, centeredCount = 0, centeredFrames = 0, lastGuideMessage = "", lastGuideMessageTime = 0;
 let lastLowLightWarning = 0; 
 let lastLightAnnounce = 0; 
 let currentFacingMode = 'environment'; 
@@ -171,8 +174,9 @@ const objectDict = {
   'tv': 'TV', 'potted plant': 'Pianta', 'keyboard': 'Tastiera', 
   'mouse': 'Mouse', 'remote': 'Telecomando', 'dining table': 'Tavolo',
   'cat': 'Gatto', 'dog': 'Cane', 'bowl': 'Ciotola', 'car': 'Auto', 
-  'bicycle': 'Bici', 'motorcycle': 'Moto', 'bed': 'Letto', 'couch': 'Divano', 
-  'toilet': 'WC', 'vase': 'Vaso', 'suitcase': 'Valigia', 'backpack': 'Zaino'
+  'bicycle': 'Bici', 'motorcycle': 'Moto', 'bed': 'Letto', 'couch': 'Divano',
+  'sofa': 'Divano', 'toilet': 'WC', 'vase': 'Vaso', 'suitcase': 'Valigia',
+  'backpack': 'Zaino', 'refrigerator': 'Frigorifero', 'fridge': 'Frigorifero'
 };
 
 // GESTIONE VOCALE
@@ -358,7 +362,7 @@ async function setupCamera(facing){
   if(stream) stream.getTracks().forEach(t=>t.stop());
   try {
     stream = await navigator.mediaDevices.getUserMedia({ 
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } } 
+      video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 360 } } 
     });
     video.srcObject = stream; 
     await video.play();
@@ -446,6 +450,7 @@ function toggleGuidance(){
   }else{
     mode = 'guiding';
     centeredCount = 0;
+    centeredFrames = 0;
     lastGuideMessage = "";
     b.classList.add('guiding');
     b.innerText = "GUIDA ATTIVA";
@@ -668,10 +673,17 @@ function processGuidance(){
       let msg = "";
       let type = 'warn';
       
-      const LIMIT_LEFT = 0.35; 
-      const LIMIT_RIGHT = 0.65;
+      let LIMIT_LEFT = 0.35; 
+      let LIMIT_RIGHT = 0.65;
       const isSelfie = (currentFacingMode === 'user');
       const isPerson = (mainName === 'Persona');
+
+      // Oggetti molto grandi (es. divano) → finestra più permissiva
+      const isLargeObject = box.width > imgW * 0.6 || box.height > imgH * 0.6;
+      if(isLargeObject){
+        LIMIT_LEFT = 0.30;
+        LIMIT_RIGHT = 0.70;
+      }
 
       let effectiveHeight = box.height;
       if (isPerson) {
@@ -688,36 +700,49 @@ function processGuidance(){
       if (yMin < (imgH * 0.02)) {
         msg = mainName + " tagliato in alto. Abbassa un po' la camera.";
         type = 'down';
+        centeredFrames = 0;
       } 
       else if (yMax > (imgH * 0.98) && !isPerson && !isSelfie) {
         msg = mainName + " tagliato in basso. Alza un po' la camera.";
         type = 'up';
+        centeredFrames = 0;
       }
-      else if (xMin < (imgW * 0.02)) {
-        msg = mainName + " tagliato da un lato. " + txtLeft;
+      else if (xMin < (imgW * 0.02)) {   // QUI ora è imgW, non imgH
+        msg = mainName + " tagliato in un lato. " + txtLeft;
         type = isSelfie ? 'right' : 'left';
+        centeredFrames = 0;
       }
       else if (xMax > (imgW * 0.98)) {
         msg = mainName + " tagliato dall'altro lato. " + txtRight;
         type = isSelfie ? 'left' : 'right';
+        centeredFrames = 0;
       }
       else {
         if (cx < LIMIT_LEFT){
           msg = txtLeft;
           type = isSelfie ? 'right' : 'left';
+          centeredFrames = 0;
         }
         else if (cx > LIMIT_RIGHT){
           msg = txtRight;
           type = isSelfie ? 'left' : 'right';
+          centeredFrames = 0;
         }
         else {
           if (isPerson && yMin > (imgH * 0.20)) {
             msg = "Persona troppo in basso. Alza la camera.";
             type = 'up';
+            centeredFrames = 0;
           } else {
-            msg = mainName + " centrato. Ferma.";
-            type = 'ok';
-            if(navigator.vibrate) navigator.vibrate([50,100,50]); 
+            centeredFrames++;
+            if(centeredFrames >= 8){
+              msg = mainName + " centrato. Ferma.";
+              type = 'ok';
+              if(navigator.vibrate) navigator.vibrate([50,100,50]); 
+            } else {
+              msg = "Quasi centrato, piccole regolazioni.";
+              type = 'ok';
+            }
           }
         }
       }
@@ -1011,40 +1036,23 @@ async function reAnalyzeAfterEdit(){
   announce("Testo aggiunto. Controllo finale AI...");
   const prompt = `Ho aggiunto del testo alla foto. Conferma che sia leggibile e non copra elementi importanti. Descrivi il risultato finale.`;
   const text = await callGemini(prompt, lastShotB64);
+  const out = document.getElementById('result-content');
   if(!text){
-    document.getElementById('result-content').textContent =
+    out.textContent =
       "--- FOTO MODIFICATA ---\n" +
       "Non sono riuscita a fare il controllo finale con l'AI.\n" +
       "Controlla connessione o chiave Gemini. La nuova foto è comunque salvata.";
     announce("Controllo finale non riuscito.");
     return;
   }
-  document.getElementById('result-content').textContent = "--- FOTO MODIFICATA ---\n" + text;
+  out.textContent = "--- FOTO MODIFICATA ---\n" + text;
   announce("Foto modificata pronta.");
 }
 
 async function describeWithMode(c){
   if(!GEMINI_KEY){announce("Manca chiave Gemini. Apri le impostazioni.");openSettings();return;}
   
-  // gestione speciale per selfie: volto vs corpo intero
-  if(c === 'selfie'){
-    if(currentFacingMode !== 'user') {
-      announce("Passo alla fotocamera frontale per il selfie.");
-      await flipCamera(); 
-      await new Promise(r => setTimeout(r, 800));
-    }
-    const choice = prompt("Vuoi selfie VOLTO o CORPO INTERO? Scrivi 'volto' o 'corpo'.");
-    if(!choice){announce("Selfie annullato.");return;}
-    const ch = choice.trim().toLowerCase();
-    if(ch.startsWith('c')) selfieMode = 'full';
-    else selfieMode = 'face';
-
-    const modeCode = (selfieMode === 'full') ? 'selfie_full' : 'selfie_face';
-    await startCountdown(modeCode);
-    return;
-  }
-
-  // altri casi
+  // SELFIE: due modalità separate, niente prompt da scrivere
   if(c === 'selfie_face' || c === 'selfie_full'){
     if(currentFacingMode !== 'user') {
       announce("Passo alla fotocamera frontale per il selfie.");
@@ -1052,8 +1060,11 @@ async function describeWithMode(c){
       await new Promise(r => setTimeout(r, 800));
     }
     selfieMode = (c === 'selfie_full') ? 'full' : 'face';
+    await startCountdown(c);
+    return;
   }
-  
+
+  // altri casi (scene, text, object)
   await startCountdown(c); 
 }
 
