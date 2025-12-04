@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V27 Robust + Pose</title>
+<title>Visione AI Fusion - Selfie Friendly AutoShot</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -36,24 +36,22 @@ button{border:2px solid #555;border-radius:12px;font-size:1rem;font-weight:bold;
 button:active{background:#555;transform:scale(.98)}
 .small-btn{flex:1;font-size:.9rem;background:#111;border:1px solid #444;color:#ccc;min-width:80px}
 
-/* COLORI */
+/* COLORI E STATI */
 #btn-voice{background:#00008B;border-color:#4169E1} 
 #btn-guide{border:2px solid #fff;background:#002200;font-size:1.1rem}
 #btn-find{background:#2F4F4F;border-color:#008080;color:#fff}
 #btn-custom{background:#4B0082;border-color:#DA70D6}
-#btn-scene{background:#D4AF37;color:#000}
-#btn-text{background:#fff;color:#000}
-#btn-object{background:#444;border-color:#999}
-#btn-selfie-face{background:#1e90ff;border-color:#add8e6}
-#btn-selfie-full{background:#1e90ff;border-color:#87cefa}
 .active-tool{background:#006400!important;border-color:#0f0!important}
 .guiding{background:#8B0000!important;border-color:#f00!important}
 .searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
 .active-discrete{border-color:#f00;color:#f00}
 
-/* STILE SOCIAL */
-.btn-social-check{background:#E1306C!important;border-color:#fff!important;color:#fff!important;width:100%;margin-bottom:5px}
-.btn-add-text{background:#833AB4!important;border-color:#fff!important;width:100%;margin-bottom:5px}
+/* STILE SOCIAL / RISULTATO */
+.btn-primary-wide{flex:1 1 100%;font-size:1rem;background:#004080;border-color:#88b4ff}
+.btn-analyze{flex:1 1 45%;font-size:.9rem;background:#333;border-color:#777}
+.btn-danger{flex:1 1 45%;background:#8B0000;border-color:#ff5555}
+.btn-social-check{flex:1 1 45%;background:#E1306C!important;border-color:#fff!important;color:#fff!important}
+.btn-add-text{flex:1 1 45%;background:#833AB4!important;border-color:#fff!important;color:#fff!important}
 
 /* OVERLAY AVVIO */
 .overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:100;display:flex;flex-direction:column;justify-content:center;align-items:center}
@@ -80,23 +78,14 @@ input{background:#333;color:#fff;border:1px solid #777}
 
     <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
 
-    <button class="full-width" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva guida scena live.">GUIDA SCENA LIVE</button>
+    <button class="full-width" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva guida scena live con autoscatto.">GUIDA SCENA LIVE</button>
     
     <div class="top-bar full-width">
-       <button class="small-btn" id="btn-shot" onclick="startCountdown()" aria-label="Scatta foto (Timer 5s)">SCATTA (5s)</button>
+       <button class="small-btn" id="btn-shot" onclick="startCountdown()" aria-label="Scatta foto manuale con conto alla rovescia di 5 secondi">SCATTA (5s)</button>
        <button class="small-btn" onclick="flipCamera()" aria-label="Ruota fotocamera">RUOTA CAMERA</button>
     </div>
 
-    <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
-    
-    <button id="btn-scene"  onclick="describeWithMode('scene')"  aria-label="Scena">SCENA GENERALE</button>
-    <button id="btn-text"   onclick="describeWithMode('text')"   aria-label="Testo">TESTO</button>
-    <button id="btn-object" onclick="describeWithMode('object')" aria-label="Oggetto">OGGETTO</button>
-    <!-- SELFIE DIVISI -->
-    <button id="btn-selfie-face" onclick="describeWithMode('selfie_face')" aria-label="Selfie volto">SELFIE VOLTO</button>
-    <button id="btn-selfie-full" onclick="describeWithMode('selfie_full')" aria-label="Selfie corpo intero">SELFIE CORPO INTERO</button>
-    
-    <button id="btn-custom" class="full-width" onclick="askCustomDetail()" aria-label="Chiedi dettaglio">CHIEDI DETTAGLIO</button>
+    <button id="btn-custom" class="full-width" onclick="askCustomDetail()" aria-label="Scatta e poni una domanda specifica sulla scena">CHIEDI DETTAGLIO</button>
 
     <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
     <div class="top-bar full-width">
@@ -106,15 +95,15 @@ input{background:#333;color:#fff;border:1px solid #777}
     </div>
 
     <div class="top-bar full-width" style="margin-top:10px">
-      <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()" aria-label="Modo discreto">MODO DISCRETO</button>
+      <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()" aria-label="Modo discreto senza voce">MODO DISCRETO</button>
       <button class="small-btn" id="btn-voice" onclick="toggleVoiceControl()" aria-label="Comandi vocali opzionali">COMANDI VOCALI (OPZ)</button>
       <button class="small-btn" id="btn-guide-mode" onclick="cycleGuideMode()" aria-label="Cambia livello di dettaglio della guida">GUIDA: STANDARD</button>
-      <button class="small-btn" onclick="openSettings()" aria-label="Impostazioni">IMPOSTAZIONI</button>
+      <button class="small-btn" onclick="openSettings()" aria-label="Impostazioni e chiave Gemini">IMPOSTAZIONI</button>
     </div>
   </div>
 
   <div id="result-screen" class="hidden" aria-hidden="true" inert role="main">
-    <h2 style="margin:0 0 10px;color:#D4AF37;font-size:1.1rem">Risultato Analisi</h2>
+    <h2 style="margin:0 0 10px;color:#D4AF37;font-size:1.1rem">Foto acquisita</h2>
     <div id="result-content" tabindex="0">In attesa...</div>
     <a id="download-link" href="#" class="hidden">Scarica foto</a>
     
@@ -152,12 +141,22 @@ let faceLandmarker = null;
 
 let modelsReady = { detector:false, pose:false, face:false };
 let guideVerbosity = 'standard'; // 'breve' | 'standard' | 'dettagliata'
-let selfieMode = 'face'; // 'face' | 'full'
+
+// stato guida per evitare spam ma ricordare ogni 5s
+let lastGuideType = null;
+let lastGuideText = "";
+let lastGuideSpeakTime = 0;
+
+// stato autoscatto
+let autoShotTimer = null;
+let autoShotMode = null;          // 'selfie_face' | 'selfie_full' | 'object'
+let lastGuidancePublishable = false;
 
 let isRunning = false, stream = null;
-const tempCanvas = document.createElement('canvas'); let tempCtx = null;
+const tempCanvas = document.createElement('canvas');
+let tempCtx = tempCanvas.getContext('2d',{willReadFrequently:true}); // <-- inizializzato subito
 let mode = 'idle', lightActive = false, colorActive = false, levelActive = false, discreteMode = false;
-let lastSpeak = 0, centeredCount = 0, centeredFrames = 0, lastGuideMessage = "", lastGuideMessageTime = 0;
+let lastSpeak = 0, centeredFrames = 0, lastGuideMessageTime = 0;
 let lastLowLightWarning = 0; 
 let lastLightAnnounce = 0; 
 let currentFacingMode = 'environment'; 
@@ -168,6 +167,7 @@ let lastShotB64 = null;
 let targetClass = null;
 let hasPerformedSocialCheck = false;
 
+// Dizionario nomi oggetti
 const objectDict = {
   'person': 'Persona', 'cup': 'Tazza', 'chair': 'Sedia', 'bottle': 'Bottiglia', 
   'cell phone': 'Cellulare', 'laptop': 'Computer', 'book': 'Libro', 
@@ -179,8 +179,26 @@ const objectDict = {
   'backpack': 'Zaino', 'refrigerator': 'Frigorifero', 'fridge': 'Frigorifero'
 };
 
+// Costanti guida / bounding box
+const BOUND_MARGIN = 0.02;      // margine per "tagliato"
+const CENTER_LEFT = 0.35;       // centro "quasi preciso"
+const CENTER_RIGHT = 0.65;
+const LOOSE_LEFT = 0.25;        // centro "pubblicabile" ma più spostato
+const LOOSE_RIGHT = 0.75;
+const LARGE_OBJ_SIZE = 0.6;
+const MIN_CENTER_FRAMES = 8;
+
+let smoothCx = null;
+function smoothCenter(cx) {
+  if (smoothCx === null) smoothCx = cx;
+  smoothCx = smoothCx * 0.7 + cx * 0.3;
+  return smoothCx;
+}
+
 // GESTIONE VOCALE
 let recognition = null, voiceActive = false;
+const voiceStatus = document.getElementById('voice-status');
+
 if ('webkitSpeechRecognition' in window) {
   recognition = new webkitSpeechRecognition();
   recognition.continuous = true;
@@ -207,10 +225,12 @@ function toggleVoiceControl(){
   if(voiceActive){
     recognition.start();
     b.classList.add('active-tool');b.innerText="🎙️ VOCE: ON";
+    if(voiceStatus){voiceStatus.style.display='block';voiceStatus.classList.add('listening');}
     announce("Comandi vocali attivati.");
   }else{
     recognition.stop();
     b.classList.remove('active-tool');b.innerText="COMANDI VOCALI (OPZ)";
+    if(voiceStatus){voiceStatus.style.display='none';voiceStatus.classList.remove('listening');}
     announce("Comandi vocali disattivati.");
   }
 }
@@ -276,7 +296,7 @@ function cycleGuideMode(){
   else announce("Guida in modalità dettagliata.");
 }
 
-// guida in base al tipo
+// guida in base al tipo, con reminder ogni 5s
 function guideSpeak(type, fullMsg){
   let msg = fullMsg || "";
   if(guideVerbosity === 'breve'){
@@ -289,7 +309,39 @@ function guideSpeak(type, fullMsg){
       default: msg = "Regola la posizione."; break;
     }
   }
+  const now = Date.now();
+  const same = (type === lastGuideType && msg === lastGuideText);
+  if(same && (now - lastGuideSpeakTime) < 5000) return;
   announce(msg);
+  lastGuideType = type;
+  lastGuideText = msg;
+  lastGuideSpeakTime = now;
+}
+
+// autoscatto dalla guida
+function scheduleAutoShot(modeName, msgPrefix){
+  if(autoShotTimer) return; // già in corso
+  autoShotMode = modeName || null;
+  const prefix = msgPrefix || "";
+  guideSpeak('ok', (prefix ? prefix + " " : "") + "Scatto tra 3 secondi, resta ferma.");
+  autoShotTimer = setTimeout(()=>{
+    autoShotTimer = null;
+    autoShotMode = null;
+    if(mode !== 'guiding') return; // guida disattivata nel frattempo
+    playShutter();
+    vibrate(200);
+    lastShotB64 = captureFrame();
+    onPhotoCaptured('auto');
+  }, 3000);
+}
+
+function cancelAutoShot(){
+  if(autoShotTimer){
+    clearTimeout(autoShotTimer);
+    autoShotTimer = null;
+    autoShotMode = null;
+  }
+  lastGuidancePublishable = false;
 }
 
 function showCameraOnly(){
@@ -301,8 +353,9 @@ function showCameraOnly(){
   cam.classList.remove('hidden');
   cam.removeAttribute('aria-hidden');
   cam.removeAttribute('inert');
-  setTimeout(()=>document.getElementById('btn-scene').focus(),200);
+  setTimeout(()=>document.getElementById('btn-shot').focus(),200);
 }
+
 function showResultOnly(text){
   const res = document.getElementById('result-screen');
   const cam = document.getElementById('camera-controls');
@@ -318,42 +371,92 @@ function showResultOnly(text){
   renderResultButtons(); 
 }
 
-// PULSANTI DINAMICI
+// quando una foto è stata catturata (manuale o auto)
+function onPhotoCaptured(origin){
+  if(!lastShotB64){
+    announce("Errore nello scatto.");
+    return;
+  }
+  hasPerformedSocialCheck = false;
+  const dLink = document.getElementById('download-link');
+  dLink.href = "data:image/jpeg;base64,"+lastShotB64;
+  dLink.download = "foto_visione_" + Date.now() + ".jpg";
+  dLink.classList.remove('hidden');
+
+  showResultOnly("Foto scattata. Scegli se usarla così o che tipo di analisi vuoi.");
+  vibrate(200);
+}
+
+// PULSANTI DINAMICI DOPO LO SCATTO
 function renderResultButtons(){
   const container = document.getElementById('action-buttons');
   container.innerHTML = ''; 
+  if(!lastShotB64) return;
 
-  if(!hasPerformedSocialCheck){
-    const btnSocial = document.createElement('button');
-    btnSocial.className = 'btn-social-check';
-    btnSocial.innerText = '🔍 VALIDATOR SOCIAL DETTAGLIATO';
-    btnSocial.onclick = performSocialCheck;
-    container.appendChild(btnSocial);
-  } else {
-    const btnText = document.createElement('button');
-    btnText.className = 'btn-add-text';
-    btnText.innerText = '✏️ AGGIUNGI SCRITTA AI';
-    btnText.onclick = startTextAddition;
-    container.appendChild(btnText);
-  }
-
+  // 1) Usa foto senza analisi
   const btnUse = document.createElement('button');
-  btnUse.className = 'small-btn';
-  btnUse.style.background = '#004080';
-  btnUse.innerText = 'USA / SALVA';
+  btnUse.className = 'btn-primary-wide';
+  btnUse.innerText = '📷 USA FOTO SENZA ANALISI';
   btnUse.onclick = usePhoto;
   container.appendChild(btnUse);
 
+  // 2) Analisi base (sempre disponibili)
+  const btnScene = document.createElement('button');
+  btnScene.className = 'btn-analyze';
+  btnScene.innerText = 'SCENA GENERALE';
+  btnScene.onclick = ()=>processAnalysis('scene');
+  container.appendChild(btnScene);
+
+  const btnSelfieFace = document.createElement('button');
+  btnSelfieFace.className = 'btn-analyze';
+  btnSelfieFace.innerText = 'SELFIE VOLTO';
+  btnSelfieFace.onclick = ()=>processAnalysis('selfie_face');
+  container.appendChild(btnSelfieFace);
+
+  const btnSelfieFull = document.createElement('button');
+  btnSelfieFull.className = 'btn-analyze';
+  btnSelfieFull.innerText = 'SELFIE CORPO INTERO';
+  btnSelfieFull.onclick = ()=>processAnalysis('selfie_full');
+  container.appendChild(btnSelfieFull);
+
+  const btnText = document.createElement('button');
+  btnText.className = 'btn-analyze';
+  btnText.innerText = 'TESTO';
+  btnText.onclick = ()=>processAnalysis('text');
+  container.appendChild(btnText);
+
+  const btnObject = document.createElement('button');
+  btnObject.className = 'btn-analyze';
+  btnObject.innerText = 'OGGETTO';
+  btnObject.onclick = ()=>processAnalysis('object');
+  container.appendChild(btnObject);
+
+  // 3) Analisi social / scritta
+  if(!hasPerformedSocialCheck){
+    const btnSocial = document.createElement('button');
+    btnSocial.className = 'btn-social-check';
+    btnSocial.innerText = 'ANALISI SOCIAL';
+    btnSocial.onclick = performSocialCheck;
+    container.appendChild(btnSocial);
+  } else {
+    const btnTextAI = document.createElement('button');
+    btnTextAI.className = 'btn-add-text';
+    btnTextAI.innerText = 'AGGIUNGI SCRITTA AI';
+    btnTextAI.onclick = startTextAddition;
+    container.appendChild(btnTextAI);
+  }
+
+  // 4) Domanda sulla stessa foto
   const btnReview = document.createElement('button');
-  btnReview.className = 'small-btn';
-  btnReview.innerText = 'CHIEDI ANCORA';
+  btnReview.className = 'btn-analyze';
+  btnReview.innerText = 'DOMANDA SU QUESTA FOTO';
   btnReview.onclick = editAndReviewPhoto;
   container.appendChild(btnReview);
 
+  // 5) Elimina
   const btnDel = document.createElement('button');
-  btnDel.className = 'small-btn';
-  btnDel.style.background = '#8B0000';
-  btnDel.innerText = 'ELIMINA';
+  btnDel.className = 'btn-danger';
+  btnDel.innerText = 'ELIMINA FOTO';
   btnDel.onclick = deletePhoto;
   container.appendChild(btnDel);
 }
@@ -384,17 +487,26 @@ async function flipCamera(){
 }
 
 function captureFrame(){
-  if(video.videoWidth>0 && (tempCanvas.width!==video.videoWidth)){
+  if(!video.videoWidth || !video.videoHeight || !tempCtx){
+    console.warn("Frame non pronto per lo scatto.");
+    return null;
+  }
+  if(tempCanvas.width!==video.videoWidth){
     tempCanvas.width = video.videoWidth;
     tempCanvas.height = video.videoHeight;
   }
-  if(tempCtx) tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
-  return tempCanvas.toDataURL('image/jpeg',0.8).split(',')[1];
+  tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
+  const dataUrl = tempCanvas.toDataURL('image/jpeg',0.8);
+  const parts = dataUrl.split(',');
+  if(parts.length<2) return null;
+  return parts[1];
 }
 
-async function startCountdown(andAnalyzeMode = null) {
+// SCATTO MANUALE (5s) – sempre sotto il tuo controllo
+async function startCountdown() {
   if(mode === 'guiding') toggleGuidance(); 
-  
+  cancelAutoShot();
+
   for(let i=5;i>=1;i--){
     announce(String(i));
     vibrate(50);
@@ -405,20 +517,7 @@ async function startCountdown(andAnalyzeMode = null) {
   playShutter(); 
   vibrate(200);
   lastShotB64 = captureFrame();
-  hasPerformedSocialCheck = false; 
-  
-  const filename = "foto_visione_" + Date.now() + ".jpg";
-  const dLink = document.getElementById('download-link');
-  dLink.href = "data:image/jpeg;base64,"+lastShotB64;
-  dLink.download = filename;
-  dLink.classList.remove('hidden');
-  dLink.click(); 
-
-  if(andAnalyzeMode) {
-    await processAnalysis(andAnalyzeMode);
-  } else {
-    announce("Foto salvata.");
-  }
+  onPhotoCaptured('manual');
 }
 async function takeShot(){ await startCountdown(); }
 
@@ -445,21 +544,25 @@ function toggleGuidance(){
     b.classList.remove('guiding');
     b.innerText = "GUIDA SCENA LIVE";
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    cancelAutoShot();
     announce("Guida disattivata.");
     if(targetClass) manualFind(); 
   }else{
     mode = 'guiding';
-    centeredCount = 0;
     centeredFrames = 0;
-    lastGuideMessage = "";
+    lastGuideMessageTime = 0;
+    lastGuideType = null;
+    lastGuideText = "";
+    lastGuidancePublishable = false;
     b.classList.add('guiding');
     b.innerText = "GUIDA ATTIVA";
-    announce("Guida attivata.");
+    announce("Guida attivata. Quando selfie o oggetto saranno pubblicabili, scatto automatico tra 3 secondi.");
   }
 }
 
-// GUIDA: Pose/Face per selfie + ObjectDetector per oggetti
+// GUIDA LIVE (selfie + oggetti)
 function processGuidance(){
+  // Avviso luce insufficiente ogni tanto
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
     const size = 100; 
     const startX = Math.max(0, tempCanvas.width/2 - size/2);
@@ -471,7 +574,7 @@ function processGuidance(){
       count++; 
     }
     if(count>0 && (total / count) < 40) { 
-      announce("Luce insufficiente."); 
+      announce("Luce molto bassa, il selfie potrebbe venire scuro."); 
       lastLowLightWarning = Date.now(); 
     }
   }
@@ -488,37 +591,37 @@ function processGuidance(){
   const now = Date.now();
 
   // SELFIE: usa Pose/Face se disponibili e nessun targetClass
-  if(currentFacingMode === 'user' && poseLandmarker && !targetClass){
+  if(currentFacingMode === 'user' && (poseLandmarker || faceLandmarker) && !targetClass){
     try{
-      const poseResult = poseLandmarker.detectForVideo(video, performance.now());
-      if(!poseResult || !poseResult.landmarks || !poseResult.landmarks.length){
-        if(now - lastGuideMessageTime > 3000){
-          guideSpeak('warn',"Non vedo il corpo. Avvicinati o entra nel riquadro.");
-          lastGuideMessageTime = now;
-        }
-        return;
+      let poseResult = null;
+      if(poseLandmarker){
+        poseResult = poseLandmarker.detectForVideo(video, performance.now());
       }
-      const lm = poseResult.landmarks[0];
 
-      let xMin = 1, xMax = 0, yMin = 1, yMax = 0;
-      lm.forEach(p=>{
-        if(p.x < xMin) xMin = p.x;
-        if(p.x > xMax) xMax = p.x;
-        if(p.y < yMin) yMin = p.y;
-        if(p.y > yMax) yMax = p.y;
-      });
+      let box = null;
+      if(poseResult && poseResult.landmarks && poseResult.landmarks.length){
+        const lm = poseResult.landmarks[0];
 
-      xMin = Math.max(0, Math.min(1, xMin));
-      xMax = Math.max(0, Math.min(1, xMax));
-      yMin = Math.max(0, Math.min(1, yMin));
-      yMax = Math.max(0, Math.min(1, yMax));
+        let xMin = 1, xMax = 0, yMin = 1, yMax = 0;
+        lm.forEach(p=>{
+          if(p.x < xMin) xMin = p.x;
+          if(p.x > xMax) xMax = p.x;
+          if(p.y < yMin) yMin = p.y;
+          if(p.y > yMax) yMax = p.y;
+        });
 
-      const box = {
-        originX: xMin * imgW,
-        originY: yMin * imgH,
-        width: (xMax - xMin) * imgW,
-        height: (yMax - yMin) * imgH
-      };
+        xMin = Math.max(0, Math.min(1, xMin));
+        xMax = Math.max(0, Math.min(1, xMax));
+        yMin = Math.max(0, Math.min(1, yMin));
+        yMax = Math.max(0, Math.min(1, yMax));
+
+        box = {
+          originX: xMin * imgW,
+          originY: yMin * imgH,
+          width: (xMax - xMin) * imgW,
+          height: (yMax - yMin) * imgH
+        };
+      }
 
       let faceBox = null;
       if(faceLandmarker){
@@ -545,62 +648,100 @@ function processGuidance(){
         }
       }
 
-      ctx.strokeStyle="#FFD700";
-      ctx.lineWidth=4;
-      ctx.strokeRect(
-        box.originX*rx,
-        box.originY*ry,
-        box.width*rx,
-        box.height*ry
-      );
+      // se non vedo né corpo né volto: messaggio generale
+      if(!box && !faceBox){
+        if(now - lastGuideMessageTime > 3000){
+          guideSpeak('warn',"Non ti vedo nel riquadro. Avvicinati o entra meglio nella camera.");
+          lastGuideMessageTime = now;
+        }
+        if(lastGuidancePublishable){
+          cancelAutoShot();
+        }
+        return;
+      }
+
+      // box "generale" per disegnare (se manca pose, uso il volto)
+      if(!box && faceBox){
+        box = {
+          originX: faceBox.originX - faceBox.width,
+          originY: Math.max(0, faceBox.originY - faceBox.height * 1.5),
+          width: faceBox.width * 3,
+          height: faceBox.height * 3
+        };
+      }
+
+      // qui decidiamo automaticamente se è volto o corpo intero
+      let dynamicSelfieMode = 'face';
+      if(box){
+        const hRatio = box.height / imgH;
+        if(hRatio > 0.5){           // più di metà schermata = consideralo corpo intero
+          dynamicSelfieMode = 'full';
+        }
+      }
+
+      if(box){
+        ctx.strokeStyle="#FFD700";
+        ctx.lineWidth=4;
+        ctx.strokeRect(
+          box.originX*rx,
+          box.originY*ry,
+          box.width*rx,
+          box.height*ry
+        );
+      }
 
       if(now - lastGuideMessageTime > 1200){
-        const LIMIT_LEFT = 0.35;
-        const LIMIT_RIGHT = 0.65;
+        const xMinPx = box ? box.originX : (faceBox ? faceBox.originX : imgW/2);
+        const xMaxPx = box ? box.originX + box.width : (faceBox ? faceBox.originX + faceBox.width : imgW/2);
+        const yMinPx = box ? box.originY : (faceBox ? faceBox.originY : imgH/2);
+        const yMaxPx = box ? box.originY + box.height : (faceBox ? faceBox.originY + faceBox.height : imgH/2);
 
-        const xMinPx = box.originX;
-        const xMaxPx = box.originX + box.width;
-        const yMinPx = box.originY;
-        const yMaxPx = box.originY + box.height;
-
-        const cxNorm = (box.originX + box.width/2) / imgW;
+        const cxNorm = (xMinPx + (xMaxPx - xMinPx)/2) / imgW;
 
         let msg = "";
         let type = 'warn';
+        let publishable = false;
 
-        // testa tagliata in alto (sempre importante)
-        if(faceBox && faceBox.originY < imgH * 0.02){
-          msg = "Testa tagliata in alto. Abbassa leggermente la camera.";
+        // 1) errori veri: testa/corpo tagliati => NON pubblicabile
+        if(faceBox && faceBox.originY < imgH * BOUND_MARGIN){
+          msg = "Testa tagliata in alto. Abbassa la camera: così il selfie non sarebbe pubblicabile.";
           type = 'down';
+          publishable = false;
         }
-        // corpo tagliato in basso: severo solo in modalità corpo intero
-        else if(selfieMode === 'full' && yMaxPx > imgH * 0.98 && box.height > imgH * 0.5){
-          msg = "Sei tagliata in basso. Allontana o alza un po' la camera.";
+        else if(dynamicSelfieMode === 'full' && yMaxPx > imgH * (1 - BOUND_MARGIN) && box && box.height > imgH * 0.5){
+          msg = "Corpo tagliato in basso. Allontana o alza la camera, così il selfie non sarebbe pubblicabile.";
           type = 'up';
-        }
-        else if(xMinPx < imgW * 0.02){
-          msg = "Sei troppo a sinistra. Sposta a destra.";
-          type = 'right';
-        }
-        else if(xMaxPx > imgW * 0.98){
-          msg = "Sei troppo a destra. Sposta a sinistra.";
-          type = 'left';
+          publishable = false;
         }
         else {
-          if(cxNorm < LIMIT_LEFT){
-            msg = "Sposta a destra.";
-            type = 'right';
-          } else if(cxNorm > LIMIT_RIGHT){
-            msg = "Sposta a sinistra.";
-            type = 'left';
+          // 2) selfie tecnicamente pubblicabile (volto o corpo intero)
+          if(faceBox && faceBox.originY > imgH * 0.35){
+            msg = "Selfie pubblicabile, ma il volto è piuttosto in basso. Alza un po' la camera per un effetto migliore.";
+            type = 'up';
+            publishable = true;
           } else {
-            // controllo verticale testa (per entrambi, ma più critico per volto)
-            if(faceBox && faceBox.originY > imgH * 0.25){
-              msg = "Testa troppo bassa nel riquadro. Alza un po' la camera.";
-              type = 'up';
-            } else {
-              msg = selfieMode === 'full' ? "Selfie corpo intero ok. Ferma." : "Selfie volto ok. Ferma.";
+            if(cxNorm < LOOSE_LEFT){
+              msg = "Selfie pubblicabile, ma sei molto a sinistra. Spostati un po' a destra per un selfie più classico.";
+              type = 'right';
+              publishable = true;
+            } else if(cxNorm > LOOSE_RIGHT){
+              msg = "Selfie pubblicabile, ma sei molto a destra. Spostati un po' a sinistra.";
+              type = 'left';
+              publishable = true;
+            } else if(cxNorm < CENTER_LEFT){
+              msg = "Selfie pubblicabile. Sei leggermente a sinistra nel riquadro.";
               type = 'ok';
+              publishable = true;
+            } else if(cxNorm > CENTER_RIGHT){
+              msg = "Selfie pubblicabile. Sei leggermente a destra nel riquadro.";
+              type = 'ok';
+              publishable = true;
+            } else {
+              msg = (dynamicSelfieMode === 'full')
+                ? "Selfie corpo intero ok e pubblicabile. Sei ben centrata."
+                : "Selfie volto ok e pubblicabile. Sei ben centrata.";
+              type = 'ok';
+              publishable = true;
               if(navigator.vibrate) navigator.vibrate([50,100,50]);
             }
           }
@@ -608,6 +749,22 @@ function processGuidance(){
 
         guideSpeak(type, msg);
         lastGuideMessageTime = now;
+
+        // gestisci autoscatto in base alla pubblicabilità
+        if(publishable){
+          if(!lastGuidancePublishable){
+            scheduleAutoShot(
+              dynamicSelfieMode === 'full' ? 'selfie_full' : 'selfie_face',
+              "Selfie pubblicabile."
+            );
+          }
+          lastGuidancePublishable = true;
+        } else {
+          if(lastGuidancePublishable){
+            cancelAutoShot();
+          }
+          lastGuidancePublishable = false;
+        }
       }
       return;
     }catch(e){
@@ -629,8 +786,12 @@ function processGuidance(){
         const visible = d.slice(0,2).map(o=> objectDict[o.categories[0].categoryName] || o.categories[0].categoryName).join(", ");
         guideSpeak('warn',"Cerco " + (objectDict[targetClass] || targetClass) + " ma vedo solo: " + visible);
         lastGuideMessageTime = now;
+        if(lastGuidancePublishable) cancelAutoShot();
         return;
-      } else if(relevantObjects.length === 0) return;
+      } else if(relevantObjects.length === 0){
+        if(lastGuidancePublishable) cancelAutoShot();
+        return;
+      }
     } else {
       relevantObjects = d;
     }
@@ -640,6 +801,7 @@ function processGuidance(){
         guideSpeak('warn',"Non vedo oggetti rilevanti.");
         lastGuideMessageTime = now;
       }
+      if(lastGuidancePublishable) cancelAutoShot();
       return;
     }
 
@@ -672,14 +834,14 @@ function processGuidance(){
 
       let msg = "";
       let type = 'warn';
+      let publishable = false;
       
-      let LIMIT_LEFT = 0.35; 
-      let LIMIT_RIGHT = 0.65;
+      let LIMIT_LEFT = CENTER_LEFT; 
+      let LIMIT_RIGHT = CENTER_RIGHT;
       const isSelfie = (currentFacingMode === 'user');
       const isPerson = (mainName === 'Persona');
 
-      // Oggetti molto grandi (es. divano) → finestra più permissiva
-      const isLargeObject = box.width > imgW * 0.6 || box.height > imgH * 0.6;
+      const isLargeObject = box.width > imgW * LARGE_OBJ_SIZE || box.height > imgH * LARGE_OBJ_SIZE;
       if(isLargeObject){
         LIMIT_LEFT = 0.30;
         LIMIT_RIGHT = 0.70;
@@ -692,62 +854,83 @@ function processGuidance(){
       
       const focusCenterY = box.originY + (effectiveHeight / 2);
       const focusCenterX = box.originX + (box.width / 2); 
-      const cx = focusCenterX / imgW;
+      const cx = smoothCenter(focusCenterX / imgW);
       
       const txtLeft  = isSelfie ? "Sposta a destra." : "Ruota a sinistra.";
       const txtRight = isSelfie ? "Sposta a sinistra." : "Ruota a destra.";
 
-      if (yMin < (imgH * 0.02)) {
+      if (yMin < (imgH * BOUND_MARGIN)) {
         msg = mainName + " tagliato in alto. Abbassa un po' la camera.";
         type = 'down';
         centeredFrames = 0;
+        publishable = false;
       } 
-      else if (yMax > (imgH * 0.98) && !isPerson && !isSelfie) {
+      else if (yMax > (imgH * (1 - BOUND_MARGIN)) && !isPerson && !isSelfie) {
         msg = mainName + " tagliato in basso. Alza un po' la camera.";
         type = 'up';
         centeredFrames = 0;
+        publishable = false;
       }
-      else if (xMin < (imgW * 0.02)) {   // QUI ora è imgW, non imgH
+      else if (xMin < (imgW * BOUND_MARGIN)) {
         msg = mainName + " tagliato in un lato. " + txtLeft;
         type = isSelfie ? 'right' : 'left';
         centeredFrames = 0;
+        publishable = false;
       }
-      else if (xMax > (imgW * 0.98)) {
+      else if (xMax > (imgW * (1 - BOUND_MARGIN))) {
         msg = mainName + " tagliato dall'altro lato. " + txtRight;
         type = isSelfie ? 'left' : 'right';
         centeredFrames = 0;
+        publishable = false;
       }
       else {
         if (cx < LIMIT_LEFT){
           msg = txtLeft;
           type = isSelfie ? 'right' : 'left';
-          centeredFrames = 0;
+          centeredFrames = Math.max(0, centeredFrames - 2);
+          publishable = false;
         }
         else if (cx > LIMIT_RIGHT){
           msg = txtRight;
           type = isSelfie ? 'left' : 'right';
-          centeredFrames = 0;
+          centeredFrames = Math.max(0, centeredFrames - 2);
+          publishable = false;
         }
         else {
           if (isPerson && yMin > (imgH * 0.20)) {
             msg = "Persona troppo in basso. Alza la camera.";
             type = 'up';
             centeredFrames = 0;
+            publishable = false;
           } else {
             centeredFrames++;
-            if(centeredFrames >= 8){
+            if(centeredFrames >= MIN_CENTER_FRAMES){
               msg = mainName + " centrato. Ferma.";
               type = 'ok';
+              publishable = true;
               if(navigator.vibrate) navigator.vibrate([50,100,50]); 
             } else {
               msg = "Quasi centrato, piccole regolazioni.";
               type = 'ok';
+              publishable = false;
             }
           }
         }
       }
       guideSpeak(type, msg); 
       lastGuideMessageTime = now;
+
+      if(publishable){
+        if(!lastGuidancePublishable){
+          scheduleAutoShot('object', "Oggetto centrato.");
+        }
+        lastGuidancePublishable = true;
+      } else {
+        if(lastGuidancePublishable){
+          cancelAutoShot();
+        }
+        lastGuidancePublishable = false;
+      }
     }
   }catch(e){ 
     console.error(e); 
@@ -772,7 +955,7 @@ function toggleLight(){
   }else{
     if(lightOsc){lightOsc.stop();lightOsc.disconnect();}
     b.classList.remove('active-tool');
-    b.innerText = "SONDA LUCE";
+    b.innerText = "LUCE";
     announce("Sonda luce disattivata.");
   }
 }
@@ -800,28 +983,60 @@ function toggleColor(){
     announce("Sonda colore attivata.");
   } else {
     b.classList.remove('active-tool');
-    b.innerText = "SONDA COLORE";
+    b.innerText = "COLORE";
     announce("Sonda colore disattivata.");
   }
 }
+
+// conversione colore più robusta (HSV)
+function rgbToHsv(r, g, b){
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  const d = max - min;
+  let h = 0;
+  const s = max === 0 ? 0 : d / max;
+  const v = max;
+  if(d !== 0){
+    switch(max){
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+      case g: h = ((b - r) / d + 2); break;
+      case b: h = ((r - g) / d + 4); break;
+    }
+    h *= 60;
+  }
+  return { h, s, v };
+}
+
+function describeColor(r,g,b){
+  const {h,s,v} = rgbToHsv(r,g,b);
+  if(v < 0.15) return "Nero o molto scuro";
+  if(v > 0.9 && s < 0.2) return "Bianco o molto chiaro";
+  if(s < 0.2) return "Grigio o colore poco saturo";
+
+  if(h < 15 || h >= 345) return "Rosso";
+  if(h < 45) return "Arancione";
+  if(h < 70) return "Giallo";
+  if(h < 160) return "Verde";
+  if(h < 250) return "Blu";
+  if(h < 290) return "Viola";
+
+  return "Colore indefinito";
+}
+
 function processColor(){
-  if(Date.now()-lastSpeak<2000)return;
+  if(Date.now()-lastSpeak<2000 || !tempCtx)return;
   const size = 20;
   const p = tempCtx.getImageData(tempCanvas.width/2 - size/2, tempCanvas.height/2 - size/2, size, size).data;
   let rT=0, gT=0, bT=0;
   for(let i=0; i<p.length; i+=4) { rT += p[i]; gT += p[i+1]; bT += p[i+2]; }
-  const count = p.length/4; const r = rT/count; const g = gT/count; const b = bT/count;
-  if(r<30&&g<30&&b<30){announce("Nero");lastSpeak=Date.now();return;}
-  if(r>220&&g>220&&b>220){announce("Bianco");lastSpeak=Date.now();return;}
-  const colors={'Rosso':[255,0,0],'Verde':[0,255,0],'Blu':[0,0,255],'Giallo':[255,255,0],'Arancione':[255,165,0],'Grigio':[128,128,128]};
-  let min=Infinity,res="Indefinito";
-  for(let k in colors){
-    const c=colors[k],
-          d=Math.sqrt((r-c[0])**2+(g-c[1])**2+(b-c[2])**2);
-    if(d<min){min=d;res=k;}
-  }
-  announce(res);lastSpeak=Date.now();
+  const count = p.length/4;
+  if(count === 0) return;
+  const r = rT/count; const g = gT/count; const b = bT/count;
+  const desc = describeColor(r,g,b);
+  announce(desc);
+  lastSpeak=Date.now();
 }
+
 function toggleLevel(){
   const b=document.getElementById('btn-level');vibrate(50);
   if(levelActive){
@@ -878,24 +1093,53 @@ async function callGemini(prompt,b64){
   }
 }
 
-// LOGICA SOCIAL & AI DIRECTOR
-
+// PROMPT ANALISI
 function buildPrompt(mode){
   let basePrompt = `
-Sei un assistente visivo per un non vedente.
-PRIMA di tutto, valida la foto.
+Sei un assistente visivo per una persona non vedente.
+Devi essere molto chiaro e pratico.
 
-1. VERDETTO RAPIDO (Obbligatorio):
-- "✅ FOTO VALIDA" (Se soggetto intero, anche se decentrato).
-- "❌ FOTO NON VALIDA: [Motivo]" (Se tagliato, sfocato, disordine grave).
+1. VERDETTO RAPIDO FOTO:
+- "✅ FOTO VALIDA" se la foto è tecnicamente leggibile (non sfocata, soggetto non completamente tagliato).
+- "❌ FOTO NON VALIDA: [Motivo]" se è davvero problematica (sfocatura forte, soggetto quasi assente).
 
-2. DESCRIZIONE:
+2. DESCRIZIONE DETTAGLIATA:
 `;
-  if(mode === 'text') basePrompt += `- Leggi tutto il testo visibile.`;
-  else if(mode === 'object') basePrompt += `- Descrivi l'oggetto principale.`;
-  else if(mode === 'selfie_face') basePrompt += `- Selfie volto: descrivi espressione, viso e parte superiore del corpo. Indica se il volto è tagliato o poco leggibile.`;
-  else if(mode === 'selfie_full') basePrompt += `- Selfie corpo intero: controlla se testa, busto e gambe sono interi nel riquadro. Indica chiaramente se manca una parte del corpo.`;
-  else basePrompt += `- Descrivi la scena in modo chiaro.`;
+
+  if(mode === 'text'){
+    basePrompt += `- Leggi tutto il testo visibile nella foto in ordine logico.`;
+  } else if(mode === 'object'){
+    basePrompt += `- Descrivi l'oggetto principale a cui sembra essere puntata la camera.`;
+  } else if(mode === 'selfie_face'){
+    basePrompt += `
+- SELFIE VOLTO:
+  - Descrivi espressione, viso e parte superiore del corpo.
+  - Indica se testa o mento sono tagliati.
+  - Indica se il volto è spostato a sinistra, a destra, troppo in alto o troppo in basso.
+  - Distingui chiaramente:
+    - "✅ SELFIE PUBBLICABILE": volto intero, occhi visibili, luce sufficiente, anche se il viso è un po' decentrato.
+    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": i tratti sono visibili ma suggerisci cosa migliorare (es. un po' troppo in basso, luce un po' debole).
+    - "❌ SELFIE NON PUBBLICABILE": testa seriamente tagliata, volto quasi invisibile, luce pessima.
+  - Se è pubblicabile ma non perfettamente centrato, dillo esplicitamente (es. "volto leggermente a destra ma selfie pubblicabile").`;
+  } else if(mode === 'selfie_full'){
+    basePrompt += `
+- SELFIE CORPO INTERO:
+  - Controlla se testa, busto e gambe sono nel riquadro (specifica se manca una parte: testa, piedi, ginocchia ecc.).
+  - Indica se il corpo è molto decentrato a sinistra/destra o solo leggermente.
+  - Distingui chiaramente:
+    - "✅ SELFIE PUBBLICABILE": corpo sufficientemente completo (testa e gran parte delle gambe visibili) e luce sufficiente, anche se leggermente decentrato.
+    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": tecnicamente ok ma suggerisci correzioni (es. un po' troppo tagliato ai piedi, corpo molto a sinistra).
+    - "❌ SELFIE NON PUBBLICABILE": testa o gran parte del corpo tagliata in modo pesante.
+  - Se è pubblicabile ma non perfetto, spiegalo (es. "sei un po' spostata a sinistra ma la foto è comunque pubblicabile").`;
+  } else {
+    basePrompt += `- Descrivi la scena generale in modo chiaro, indicando cosa sembra al centro dell'inquadratura.`;
+  }
+
+  basePrompt += `
+
+3. SE NECESSARIO, UN BREVE CONSIGLIO:
+- Una frase molto pratica su cosa correggere nel prossimo scatto (es. "alza leggermente la camera", "ti conviene spostarti un po' a destra").`;
+
   return basePrompt;
 }
 
@@ -903,6 +1147,10 @@ async function performSocialCheck(){
   if(!GEMINI_KEY){
     announce("Manca la chiave Gemini. Apri le impostazioni.");
     openSettings();return;
+  }
+  if(!lastShotB64){
+    announce("Nessuna foto da analizzare.");
+    return;
   }
   announce("Analisi Social in corso...");
   const prompt = `
@@ -933,8 +1181,18 @@ Considera le zone di interfaccia (pulsanti in basso, nome profilo in alto).
   announce("Report Social pronto. Puoi aggiungere testo.");
 }
 
+function parsePositionCode(raw){
+  const upper = (raw || "").toUpperCase();
+  const codes = ["TOP_CENTER","BOTTOM_CENTER","TOP_LEFT","TOP_RIGHT","CENTER"];
+  for(const c of codes){
+    if(upper.includes(c)) return c;
+  }
+  return "BOTTOM_CENTER";
+}
+
 async function startTextAddition(){
   if(!GEMINI_KEY){announce("Manca chiave Gemini. Apri le impostazioni.");openSettings();return;}
+  if(!lastShotB64){announce("Nessuna foto da modificare.");return;}
   const textToAdd = prompt("Cosa vuoi scrivere sulla foto?");
   if(!textToAdd) return;
 
@@ -961,14 +1219,7 @@ Rispondi SOLO con uno di questi codici:
     return;
   }
   
-  const cleanCode = positionCode.trim().toUpperCase();
-  let pos = 'BOTTOM_CENTER'; 
-  if(cleanCode.includes('TOP_CENTER')) pos = 'TOP_CENTER';
-  else if(cleanCode.includes('TOP_LEFT')) pos = 'TOP_LEFT';
-  else if(cleanCode.includes('TOP_RIGHT')) pos = 'TOP_RIGHT';
-  else if(cleanCode.includes('BOTTOM')) pos = 'BOTTOM_CENTER';
-  else if(cleanCode.includes('CENTER')) pos = 'CENTER';
-
+  const pos = parsePositionCode(positionCode);
   drawTextOnCanvas(textToAdd, pos);
 }
 
@@ -1024,9 +1275,9 @@ function drawTextOnCanvas(text, position){
     const filename = "foto_visione_edit_" + Date.now() + ".jpg";
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
     dLink.download = filename;
-    dLink.click(); 
+    dLink.classList.remove('hidden');
     
-    reAnalyzeAfterEdit(position);
+    reAnalyzeAfterEdit();
   };
   img.src = "data:image/jpeg;base64," + lastShotB64;
 }
@@ -1049,26 +1300,12 @@ async function reAnalyzeAfterEdit(){
   announce("Foto modificata pronta.");
 }
 
-async function describeWithMode(c){
-  if(!GEMINI_KEY){announce("Manca chiave Gemini. Apri le impostazioni.");openSettings();return;}
-  
-  // SELFIE: due modalità separate, niente prompt da scrivere
-  if(c === 'selfie_face' || c === 'selfie_full'){
-    if(currentFacingMode !== 'user') {
-      announce("Passo alla fotocamera frontale per il selfie.");
-      await flipCamera(); 
-      await new Promise(r => setTimeout(r, 800));
-    }
-    selfieMode = (c === 'selfie_full') ? 'full' : 'face';
-    await startCountdown(c);
+// Analisi su foto già scattata
+async function processAnalysis(c){
+  if(!lastShotB64){
+    announce("Nessuna foto da analizzare.");
     return;
   }
-
-  // altri casi (scene, text, object)
-  await startCountdown(c); 
-}
-
-async function processAnalysis(c){
   showResultOnly("Analisi in corso...");
   announce("Analisi AI della foto in corso.");
   const t = await callGemini(buildPrompt(c), lastShotB64);
@@ -1086,9 +1323,15 @@ async function processAnalysis(c){
   vibrate(200);
 }
 
+// Flusso "chiedi dettaglio": scatta + analisi diretta
 async function askCustomDetail(){
   if(!GEMINI_KEY){announce("Manca chiave Gemini. Apri le impostazioni.");openSettings();return;}
-  await captureNewShot(); 
+  playShutter();
+  lastShotB64 = captureFrame();
+  if(!lastShotB64){
+    announce("Errore nello scatto. Riprova.");
+    return;
+  }
   const q = prompt("Domanda sulla scena?");
   if(!q){announce("Domanda annullata.");return;}
   showResultOnly("Analisi domanda...");
@@ -1109,7 +1352,7 @@ async function askCustomDetail(){
 }
 
 async function editAndReviewPhoto(){
-  if(!lastShotB64)return;
+  if(!lastShotB64){announce("Nessuna foto caricata.");return;}
   const q=prompt("Altra domanda sulla stessa foto?");
   if(!q)return;
   announce("Analizzo la foto per la nuova domanda.");
@@ -1126,7 +1369,7 @@ async function editAndReviewPhoto(){
 }
 
 async function usePhoto(){
-  if(!lastShotB64)return;
+  if(!lastShotB64){announce("Nessuna foto da usare.");return;}
   const filename = "foto_visione_" + Date.now() + ".jpg";
   
   if(navigator.share && navigator.canShare){
@@ -1135,6 +1378,7 @@ async function usePhoto(){
       const f=new File([b], filename ,{type:"image/jpeg"});
       if (navigator.canShare({ files: [f] })) {
         await navigator.share({files:[f]});
+        announce("Foto condivisa.");
         return;
       }
     } catch(e) { 
@@ -1145,6 +1389,7 @@ async function usePhoto(){
   const dLink = document.getElementById('download-link');
   dLink.href = "data:image/jpeg;base64,"+lastShotB64;
   dLink.download = filename;
+  dLink.classList.remove('hidden');
   dLink.click();
   announce("Foto scaricata sul dispositivo.");
 }
@@ -1155,22 +1400,17 @@ function deletePhoto(){
   announce("Foto scartata. Torno alla camera.");
 }
 
-async function captureNewShot(){
-  if(mode==='guiding')toggleGuidance();
-  playShutter();
-  lastShotB64 = captureFrame();
-}
-
 async function startApp(){
   document.getElementById('main-interface').classList.remove('hidden');
   document.getElementById('main-interface').removeAttribute('aria-hidden');
   document.getElementById('start-screen').classList.add('hidden');
   document.getElementById('start-screen').setAttribute('aria-hidden','true');
-  document.getElementById('btn-scene').focus();
+  document.getElementById('btn-shot').focus();
   updateGuideModeLabel();
   announce("Visione AI avviata.");
   audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   await setupCamera(currentFacingMode);
+
   try{
     const {
       ObjectDetector,
@@ -1242,13 +1482,16 @@ async function startApp(){
     console.error("Errore import MediaPipe", e);
     announce("Errore nel caricare i modelli di riconoscimento. Avrai solo funzioni base.");
   }
+
   isRunning = true;
-  tempCtx = tempCanvas.getContext('2d',{willReadFrequently:true});
   loop();
 }
 
 function loop(){
-  if(!isRunning){requestAnimationFrame(loop);return;}
+  if(!isRunning){
+    requestAnimationFrame(loop);
+    return;
+  }
   if(video.readyState===4 && tempCtx){
     if(tempCanvas.width!==video.videoWidth){
       tempCanvas.width=video.videoWidth;
