@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V24 Windows Fix</title>
+<title>Visione AI Fusion - V25 Full Fix</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -311,7 +311,7 @@ async function startCountdown(andAnalyzeMode = null) {
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
     dLink.download = filename;
     dLink.classList.remove('hidden');
-    dLink.click(); // Questo forza il download sul PC
+    dLink.click(); 
     // ------------------------------------------------
 
     if(andAnalyzeMode) processAnalysis(andAnalyzeMode);
@@ -341,6 +341,9 @@ function toggleGuidance(){
   }
 }
 
+// -----------------------------------------------------------
+// V25 FIX: CORREZIONE LOGICA GUIDA (CONTROLLO VERTICALE AGGIUNTO)
+// -----------------------------------------------------------
 function processGuidance(){
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
       const size = 100; 
@@ -389,8 +392,15 @@ function processGuidance(){
         const sorted = relevantObjects.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height);
         const mainObj = sorted[0]; 
         const box = mainObj.boundingBox;
+        
         const imgW = video.videoWidth;
-        const xMin = box.originX; const xMax = box.originX + box.width;
+        const imgH = video.videoHeight;
+        
+        const xMin = box.originX; 
+        const xMax = box.originX + box.width;
+        const yMin = box.originY;
+        const yMax = box.originY + box.height;
+
         const cx = (xMin + xMax) / 2 / imgW; 
         const widthPct = box.width / imgW; 
         
@@ -398,20 +408,40 @@ function processGuidance(){
         const mainName = objectDict[rawName] || rawName;
 
         let msg = "";
+        
+        // PARAMETRI ORIENTAMENTO
         const LIMIT_LEFT = 0.35; const LIMIT_RIGHT = 0.65;
         const isSelfie = (currentFacingMode === 'user');
         const txtLeft = isSelfie ? "Sposta a Destra" : "Ruota a Sinistra";
         const txtRight = isSelfie ? "Sposta a Sinistra" : "Ruota a Destra";
 
-        if (xMin < (imgW * 0.01)) msg = mainName + " tagliato! " + txtLeft;
-        else if (xMax > (imgW * 0.99)) msg = mainName + " tagliato! " + txtRight;
-        else if (widthPct < 0.20) msg = mainName + " lontano. Avvicinati."; 
+        // LOGICA PRIORITÀ: PRIMA I TAGLI (ANCHE VERTICALI ORA), POI IL CENTRAMENTO
+        
+        // 1. Controlla Tagli Verticali (Nuovo!)
+        if (yMin < (imgH * 0.02)) {
+             msg = mainName + " Tagliato in ALTO! Abbassa la camera.";
+        } 
+        else if (yMax > (imgH * 0.98)) {
+             msg = mainName + " Tagliato in BASSO! Alza la camera.";
+        }
+        // 2. Controlla Tagli Orizzontali
+        else if (xMin < (imgW * 0.02)) {
+             msg = mainName + " Tagliato a " + (isSelfie ? "DESTRA" : "SINISTRA") + "! " + txtLeft;
+        }
+        else if (xMax > (imgW * 0.98)) {
+             msg = mainName + " Tagliato a " + (isSelfie ? "SINISTRA" : "DESTRA") + "! " + txtRight;
+        }
+        // 3. Controlla Distanza
+        else if (widthPct < 0.25) { // Aumentato un po' per sicurezza
+             msg = mainName + " lontano. Avvicinati."; 
+        }
+        // 4. Controlla Centratura Orizzontale
         else {
             if (cx < LIMIT_LEFT) msg = txtLeft; 
             else if (cx > LIMIT_RIGHT) msg = txtRight; 
             else {
-                msg = mainName + " Centrato. Ferma.";
-                if(navigator.vibrate) navigator.vibrate([50, 50, 50]); 
+                msg = mainName + " Perfetto. Ferma.";
+                if(navigator.vibrate) navigator.vibrate([50, 100, 50]); 
             }
         }
         announce(msg); 
