@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V15 Ultimate Voice</title>
+<title>Visione AI Fusion - V19 Manual Target</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -37,14 +37,16 @@ button:active{background:#555;transform:scale(.98)}
 .small-btn{flex:1;font-size:.9rem;background:#111;border:1px solid #444;color:#ccc}
 
 /* COLORI */
-#btn-voice{background:#00008B;border-color:#4169E1} /* Blu per comandi vocali */
+#btn-voice{background:#00008B;border-color:#4169E1} 
 #btn-guide{border: 2px solid #fff; background: #002200; font-size: 1.1rem;}
+#btn-find{background:#2F4F4F;border-color:#008080;color:#fff} /* Verde acqua scuro per Cerca */
 #btn-custom{background:#4B0082;border-color:#DA70D6}
 #btn-social{background:#E1306C;border-color:#fff;color:#fff} 
 #btn-scene{background:#D4AF37;color:#000}
 #btn-text{background:#fff;color:#000}
 .active-tool{background:#006400!important;border-color:#0f0!important}
 .guiding{background:#8B0000!important;border-color:#f00!important}
+.searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important} /* Oro per modalità ricerca attiva */
 .active-discrete{border-color:#f00;color:#f00}
 
 /* OVERLAY AVVIO */
@@ -67,8 +69,9 @@ input{background:#333;color:#fff;border:1px solid #777}
 
 <div id="main-interface" class="hidden" aria-hidden="true">
   <div id="camera-controls">
-    <button class="full-width" id="btn-voice" onclick="toggleVoiceControl()" aria-label="Attiva o disattiva Comandi Vocali. Dici Scatta, Social, o Selfie.">🎙️ COMANDI VOCALI: OFF</button>
     
+    <button class="full-width" id="btn-find" onclick="manualFind()" aria-label="Cerca un oggetto specifico ignorando gli altri.">🔍 CERCA OGGETTO (MANUALE)</button>
+
     <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
 
     <button class="full-width" id="btn-guide" onclick="toggleGuidance()" aria-label="Attiva guida scena live.">GUIDA SCENA LIVE</button>
@@ -98,6 +101,7 @@ input{background:#333;color:#fff;border:1px solid #777}
 
     <div class="top-bar full-width" style="margin-top:10px">
       <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()" aria-label="Modo discreto">MODO DISCRETO</button>
+      <button class="small-btn" id="btn-voice" onclick="toggleVoiceControl()" aria-label="Comandi vocali opzionali">COMANDI VOCALI (OPZ)</button>
       <button class="small-btn" onclick="openSettings()" aria-label="Impostazioni">IMPOSTAZIONI</button>
     </div>
   </div>
@@ -137,49 +141,11 @@ const tempCanvas=document.createElement('canvas');let tempCtx=null;
 let mode='idle',lightActive=false,colorActive=false,levelActive=false,discreteMode=false;
 let lastSpeak=0,centeredCount=0,lastGuideMessage="",lastGuideMessageTime=0;
 let lastLowLightWarning=0; 
+let lastLightAnnounce=0; 
 let currentFacingMode='environment'; 
 const video=document.getElementById('webcam'),canvas=document.getElementById('overlay'),ctx=canvas.getContext('2d');
 let lastShotB64=null;
-
-// GESTIONE VOCALE
-let recognition=null, voiceActive=false;
-if('webkitSpeechRecognition' in window){
-    recognition=new webkitSpeechRecognition();
-    recognition.continuous=true;recognition.interimResults=false;recognition.lang='it-IT';
-    recognition.onresult=(e)=>{
-        const t=e.results[e.results.length-1][0].transcript.trim().toLowerCase();
-        console.log("Comando:",t);
-        if(t.includes("scatta")||t.includes("foto")) startCountdown();
-        else if(t.includes("social")) describeWithMode('social');
-        else if(t.includes("selfie")) describeWithMode('selfie');
-        else if(t.includes("scena")||t.includes("descrivi")) describeWithMode('scene');
-        else if(t.includes("testo")||t.includes("leggi")) describeWithMode('text');
-        else if(t.includes("stop")||t.includes("basta")) {
-             if(mode==='guiding') toggleGuidance();
-             announce("Stop.");
-        }
-    };
-    recognition.onerror=(e)=>{console.log("Err voce",e);if(voiceActive)setTimeout(()=>recognition.start(),1000);};
-}
-
-function toggleVoiceControl(){
-    if(!recognition){announce("Comandi vocali non supportati.");return;}
-    voiceActive=!voiceActive;
-    const b=document.getElementById('btn-voice');
-    const s=document.getElementById('voice-status');
-    if(voiceActive){
-        recognition.start();
-        b.classList.add('active-tool');b.innerText="🎙️ ASCOLTO ATTIVO (Dì: Scatta, Social, Selfie)";
-        s.style.display='block';s.classList.add('listening');
-        announce("Comandi vocali attivi. Dici Social o Selfie.");
-    }else{
-        recognition.stop();
-        b.classList.remove('active-tool');b.innerText="🎙️ COMANDI VOCALI: OFF";
-        s.style.display='none';s.classList.remove('listening');
-        announce("Comandi vocali spenti.");
-    }
-}
-
+let targetClass = null; // Variabile per la ricerca specifica
 
 const objectDict = {
     'person': 'Persona', 'cup': 'Tazza', 'chair': 'Sedia', 'bottle': 'Bottiglia', 
@@ -200,6 +166,84 @@ const objectDict = {
     'vase': 'Vaso', 'scissors': 'Forbici', 'teddy bear': 'Orsacchiotto',
     'hair drier': 'Phon', 'toothbrush': 'Spazzolino'
 };
+
+// GESTIONE VOCALE (Mantenuta opzionale, ma non necessaria)
+let recognition=null, voiceActive=false;
+if('webkitSpeechRecognition' in window){
+    recognition=new webkitSpeechRecognition();
+    recognition.continuous=true;recognition.interimResults=false;recognition.lang='it-IT';
+    recognition.onresult=(e)=>{
+        const t=e.results[e.results.length-1][0].transcript.trim().toLowerCase();
+        if(t.includes("scatta")) startCountdown();
+        else if(t.includes("social")) describeWithMode('social');
+        else if(t.includes("stop")||t.includes("basta")) {
+             if(targetClass) manualFind(); // Toggle off
+             else if(mode==='guiding') toggleGuidance();
+             announce("Stop.");
+        }
+    };
+    recognition.onerror=(e)=>{if(voiceActive)setTimeout(()=>recognition.start(),1000);};
+}
+
+function toggleVoiceControl(){
+    if(!recognition){announce("Non supportato.");return;}
+    voiceActive=!voiceActive;
+    const b=document.getElementById('btn-voice');
+    if(voiceActive){
+        recognition.start();
+        b.classList.add('active-tool');b.innerText="🎙️ VOCE: ON";
+        announce("Voce attiva.");
+    }else{
+        recognition.stop();
+        b.classList.remove('active-tool');b.innerText="COMANDI VOCALI (OPZ)";
+        announce("Voce spenta.");
+    }
+}
+
+// NUOVA FUNZIONE: RICERCA MANUALE
+function manualFind(){
+    const b = document.getElementById('btn-find');
+    
+    // Se stiamo già cercando, fermiamo la ricerca
+    if(targetClass){
+        targetClass = null;
+        b.innerText = "🔍 CERCA OGGETTO (MANUALE)";
+        b.classList.remove('searching');
+        announce("Ricerca terminata. Torno in modalità automatica.");
+        return;
+    }
+
+    // Altrimenti chiediamo cosa cercare
+    const input = prompt("Scrivi cosa cercare (es. tazza, penna, chiavi):");
+    if(!input) return; // Utente ha annullato
+    
+    const query = input.trim().toLowerCase();
+    
+    // Cerchiamo nel dizionario
+    let foundKey = null;
+    let foundName = "";
+    
+    // Controllo diretto o tradotto
+    for(let [eng, ita] of Object.entries(objectDict)){
+        if(ita.toLowerCase() === query || eng === query){ 
+            foundKey = eng; 
+            foundName = ita;
+            break; 
+        }
+    }
+
+    if(foundKey){
+        targetClass = foundKey;
+        b.innerText = "❌ STOP RICERCA: " + foundName.toUpperCase();
+        b.classList.add('searching');
+        announce("Ok, cerco solo: " + foundName);
+        
+        // Attiva la guida se è spenta
+        if(mode !== 'guiding') toggleGuidance();
+    } else {
+        announce("Oggetto non riconosciuto. Prova con: tazza, penna, cellulare, computer.");
+    }
+}
 
 function announce(t){if(!discreteMode){const e=document.getElementById('sr-announcer');e.textContent="";setTimeout(()=>e.textContent=t,50);}}
 function vibrate(p){if(navigator.vibrate)navigator.vibrate(p);}
@@ -269,6 +313,8 @@ function toggleGuidance(){
   if(mode==='guiding'){
     mode='idle';b.classList.remove('guiding');b.innerText="GUIDA SCENA LIVE";
     ctx.clearRect(0,0,canvas.width,canvas.height);announce("Guida spenta.");
+    // Reset target quando si spegne la guida
+    if(targetClass) manualFind(); 
   }else{
     mode='guiding';centeredCount=0;lastGuideMessage="";
     b.classList.add('guiding');b.innerText="GUIDA ATTIVA";announce("Guida attiva.");
@@ -276,46 +322,95 @@ function toggleGuidance(){
 }
 
 function processGuidance(){
+  // 1. CONTROLLO LUCE
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
-      const p=tempCtx.getImageData(tempCanvas.width/2,tempCanvas.height/2,10,10).data;
-      let s=0; for(let i=0;i<p.length;i+=4)s+=(p[i]+p[i+1]+p[i+2])/3;
-      if(s/(p.length/4) < 40) { announce("Troppo buio."); lastLowLightWarning = Date.now(); }
+      const size = 100; 
+      const startX = Math.max(0, tempCanvas.width/2 - size/2);
+      const startY = Math.max(0, tempCanvas.height/2 - size/2);
+      const p = tempCtx.getImageData(startX, startY, size, size).data;
+      let total = 0, count = 0;
+      for(let i=0; i<p.length; i+=40) { total += (p[i] + p[i+1] + p[i+2]) / 3; count++; }
+      if((total / count) < 40) { announce("Luce insufficiente."); lastLowLightWarning = Date.now(); }
   }
 
   if(!objectDetector||video.readyState<2)return;
+
   try{
     const r=objectDetector.detectForVideo(video,performance.now()),d=r?r.detections:[];
     ctx.clearRect(0,0,canvas.width,canvas.height);
+    
+    // FILTRAGGIO
+    let relevantObjects = [];
+    if(targetClass) {
+        relevantObjects = d.filter(o => o.categories[0].categoryName === targetClass);
+        // Feedback se non trova l'oggetto cercato
+        if(relevantObjects.length === 0 && d.length > 0 && Date.now() - lastGuideMessageTime > 3000) {
+             const visible = d.slice(0,2).map(o=> objectDict[o.categories[0].categoryName] || o.categories[0].categoryName).join(", ");
+             announce("Cerco " + objectDict[targetClass] + " ma vedo solo: " + visible);
+             lastGuideMessageTime = Date.now();
+             return;
+        } else if(relevantObjects.length === 0) return;
+    } else {
+        relevantObjects = d;
+    }
+
+    if(!relevantObjects.length){
+        if(Date.now()-lastGuideMessageTime>4000){announce("Scena vuota.");lastGuideMessageTime=Date.now();}
+        return;
+    }
+
+    // DISEGNO
     const rx=canvas.width/video.videoWidth, ry=canvas.height/video.videoHeight;
-    d.forEach(obj => {
+    relevantObjects.forEach(obj => {
         const b = obj.boundingBox;
-        ctx.strokeStyle="#0f0";ctx.lineWidth=3;
+        ctx.strokeStyle = targetClass ? "#FFD700" : "#0f0"; 
+        ctx.lineWidth=4;
         ctx.strokeRect(b.originX*rx, b.originY*ry, b.width*rx, b.height*ry);
     });
 
-    if(!d.length){
-        if(Date.now()-lastGuideMessageTime>4000){announce("Nulla.");lastGuideMessageTime=Date.now();}
-        return;
-    }
     const now=Date.now();
-    if (now - lastGuideMessageTime > 4000) {
-        const sorted = d.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height);
-        let details = []; let seenTypes = {};
-        for(let i=0; i<Math.min(sorted.length, 4); i++){
-            const obj = sorted[i];
-            const rawName = obj.categories[0].categoryName;
-            const name = objectDict[rawName] || rawName;
-            const cx = (obj.boundingBox.originX + obj.boundingBox.width/2) / video.videoWidth;
-            let pos = "centro";
-            if(cx < 0.35) pos = "sinistra";
-            else if(cx > 0.65) pos = "destra";
-            const key = name+pos;
-            if(!seenTypes[key]){ details.push(`${name} a ${pos}`); seenTypes[key] = true; }
+    if (now - lastGuideMessageTime > 2500) { 
+        
+        // Ordina per grandezza
+        const sorted = relevantObjects.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height);
+        const mainObj = sorted[0]; 
+        
+        const box = mainObj.boundingBox;
+        const imgW = video.videoWidth;
+        const xMin = box.originX;
+        const xMax = box.originX + box.width;
+        const cx = (xMin + xMax) / 2 / imgW; 
+        const widthPct = box.width / imgW; 
+        
+        const rawName = mainObj.categories[0].categoryName;
+        const mainName = objectDict[rawName] || rawName;
+
+        let msg = "";
+
+        // GUIDA DIREZIONALE
+        if (xMin < (imgW * 0.01)) msg = mainName + " tagliato a sinistra! Ruota sinistra.";
+        else if (xMax > (imgW * 0.99)) msg = mainName + " tagliato a destra! Ruota destra.";
+        else if (widthPct < 0.25) msg = mainName + " troppo lontano. Avvicinati.";
+        else {
+            if (cx < 0.42) msg = "Ruota leggermente a sinistra"; 
+            else if (cx > 0.58) msg = "Ruota leggermente a destra"; 
+            else msg = mainName + " centrato.";
         }
-        if(sorted.length > 4) details.push("e altro");
-        const msg = "Vedo: " + details.join(", ");
-        announce(msg); vibrate(30);
-        lastGuideMessageTime = now; lastGuideMessage = msg;
+
+        // ELENCO SECONDARI (Solo se non siamo in modalità target)
+        if(!targetClass && sorted.length > 1){
+            const others = sorted.slice(1, 3).map(o => {
+                const n = o.categories[0].categoryName;
+                return objectDict[n] || n;
+            }).join(", ");
+            if(msg.includes("centrato") || msg.includes("leggermente")) {
+                msg += " Vedo anche: " + others;
+            }
+        }
+
+        announce(msg); 
+        vibrate(msg.includes("centrato") ? 100 : 30);
+        lastGuideMessageTime = now;
     }
   }catch(e){ console.error(e); }
 }
@@ -327,18 +422,29 @@ function toggleLight(){
     lightOsc=audioCtx.createOscillator();lightGain=audioCtx.createGain();
     lightOsc.connect(lightGain);lightGain.connect(audioCtx.destination);
     lightGain.gain.value=0;lightOsc.start();
+    lastLightAnnounce = Date.now(); // Reset timer
     b.classList.add('active-tool');b.innerText="LUCE: ON";announce("Luce on.");
   }else{
     if(lightOsc){lightOsc.stop();lightOsc.disconnect();}
     b.classList.remove('active-tool');b.innerText="SONDA LUCE";announce("Luce off.");
   }
 }
+
 function processLight(){
   if(!tempCtx)return;
-  const p=tempCtx.getImageData(tempCanvas.width/2-5,tempCanvas.height/2-5,10,10).data;
+  const p=tempCtx.getImageData(tempCanvas.width/2-10,tempCanvas.height/2-10,20,20).data;
   let s=0; for(let i=0;i<p.length;i+=4)s+=(p[i]+p[i+1]+p[i+2])/3;
-  const level=s/(p.length/4);
-  if(lightOsc){lightGain.gain.setTargetAtTime(0.02+(level/255)*0.1,audioCtx.currentTime,0.1);lightOsc.frequency.setTargetAtTime(100+level*4,audioCtx.currentTime,0.1);}
+  const level=s/(p.length/4); 
+  
+  if(lightOsc){
+      lightGain.gain.setTargetAtTime(0.02+(level/255)*0.1,audioCtx.currentTime,0.1);
+      lightOsc.frequency.setTargetAtTime(100+level*4,audioCtx.currentTime,0.1);
+      if(Date.now() - lastLightAnnounce > 3000) {
+          const percent = Math.round((level/255)*100);
+          announce("Luce " + percent + " percento");
+          lastLightAnnounce = Date.now();
+      }
+  }
 }
 
 function toggleColor(){
@@ -346,10 +452,15 @@ function toggleColor(){
   if(colorActive){b.classList.add('active-tool');b.innerText="COLORE: ON";announce("Colore on.");}
   else{b.classList.remove('active-tool');b.innerText="SONDA COLORE";announce("Colore off.");}
 }
+
 function processColor(){
   if(Date.now()-lastSpeak<2000)return;
-  const p=tempCtx.getImageData(tempCanvas.width/2,tempCanvas.height/2,1,1).data;
-  const r=p[0],g=p[1],b=p[2];
+  const size = 20;
+  const p = tempCtx.getImageData(tempCanvas.width/2 - size/2, tempCanvas.height/2 - size/2, size, size).data;
+  let rT=0, gT=0, bT=0;
+  for(let i=0; i<p.length; i+=4) { rT += p[i]; gT += p[i+1]; bT += p[i+2]; }
+  const count = p.length/4; const r = rT/count; const g = gT/count; const b = bT/count;
+
   if(r<30&&g<30&&b<30){announce("Nero");lastSpeak=Date.now();return;}
   if(r>220&&g>220&&b>220){announce("Bianco");lastSpeak=Date.now();return;}
   const colors={'Rosso':[255,0,0],'Verde':[0,255,0],'Blu':[0,0,255],'Giallo':[255,255,0],'Arancione':[255,165,0],'Grigio':[128,128,128]};
@@ -357,6 +468,7 @@ function processColor(){
   for(let k in colors){const c=colors[k],d=Math.sqrt((r-c[0])**2+(g-c[1])**2+(b-c[2])**2);if(d<min){min=d;res=k;}}
   announce(res);lastSpeak=Date.now();
 }
+
 function toggleLevel(){
   const b=document.getElementById('btn-level');vibrate(50);
   if(levelActive){
@@ -386,7 +498,6 @@ async function callGemini(prompt,b64){
 
 // *** LOGICA V14+15: SECURITY + VOICE ***
 function buildPrompt(mode){
-  
   let basePrompt = `
   Agisci come un Supervisore Tecnico e di Immagine per un utente non vedente.
   Devi essere ESTREMAMENTE PRECISO e CRITICO. Nessuna pietà, voglio la verità.
@@ -467,7 +578,7 @@ async function captureNewShot(){
 async function startApp(){
   document.getElementById('main-interface').classList.remove('hidden');document.getElementById('main-interface').removeAttribute('aria-hidden');
   document.getElementById('start-screen').classList.add('hidden');document.getElementById('start-screen').setAttribute('aria-hidden','true');
-  document.getElementById('btn-voice').focus();
+  document.getElementById('btn-find').focus();
   announce("Visione AI Avviata.");
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   await setupCamera(currentFacingMode);
