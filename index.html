@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V19 Manual Target</title>
+<title>Visione AI Fusion - V23 Final</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -29,25 +29,28 @@ canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none
 /* RISULTATO */
 #result-screen{height:100%;width:100%;display:flex;flex-direction:column;padding:15px;box-sizing:border-box;background:#111;position:absolute;top:0;left:0;z-index:50}
 #result-content{flex-grow:1;overflow-y:auto;margin-bottom:15px;padding:15px;border:1px solid #555;border-radius:8px;background:#000;font-size:1.3rem;line-height:1.5;color:#fff;white-space:pre-wrap}
-.result-actions{display:flex;gap:10px;flex-shrink:0;min-height:70px}
+.result-actions{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0;min-height:70px}
 
 /* PULSANTI */
 button{border:2px solid #555;border-radius:12px;font-size:1rem;font-weight:bold;text-transform:uppercase;color:#fff;background:#222;cursor:pointer;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;touch-action:manipulation}
 button:active{background:#555;transform:scale(.98)}
-.small-btn{flex:1;font-size:.9rem;background:#111;border:1px solid #444;color:#ccc}
+.small-btn{flex:1;font-size:.9rem;background:#111;border:1px solid #444;color:#ccc;min-width: 80px;}
 
 /* COLORI */
 #btn-voice{background:#00008B;border-color:#4169E1} 
 #btn-guide{border: 2px solid #fff; background: #002200; font-size: 1.1rem;}
-#btn-find{background:#2F4F4F;border-color:#008080;color:#fff} /* Verde acqua scuro per Cerca */
+#btn-find{background:#2F4F4F;border-color:#008080;color:#fff}
 #btn-custom{background:#4B0082;border-color:#DA70D6}
-#btn-social{background:#E1306C;border-color:#fff;color:#fff} 
 #btn-scene{background:#D4AF37;color:#000}
 #btn-text{background:#fff;color:#000}
 .active-tool{background:#006400!important;border-color:#0f0!important}
 .guiding{background:#8B0000!important;border-color:#f00!important}
-.searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important} /* Oro per modalità ricerca attiva */
+.searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
 .active-discrete{border-color:#f00;color:#f00}
+
+/* STILE SOCIAL */
+.btn-social-check { background: #E1306C !important; border-color: #fff !important; color: #fff !important; width: 100%; margin-bottom: 5px; }
+.btn-add-text { background: #833AB4 !important; border-color: #fff !important; width: 100%; margin-bottom: 5px; }
 
 /* OVERLAY AVVIO */
 .overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:100;display:flex;flex-direction:column;justify-content:center;align-items:center}
@@ -83,12 +86,10 @@ input{background:#333;color:#fff;border:1px solid #777}
 
     <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
     
-    <button id="btn-social" class="full-width" onclick="describeWithMode('social')" aria-label="Social Validator Sicuro.">SOCIAL VALIDATOR (SECURE)</button>
-    
     <button id="btn-scene"  onclick="describeWithMode('scene')"  aria-label="Scena">SCENA GENERALE</button>
-    <button id="btn-selfie" onclick="describeWithMode('selfie')" aria-label="Selfie">SELFIE</button>
     <button id="btn-text"   onclick="describeWithMode('text')"   aria-label="Testo">TESTO</button>
     <button id="btn-object" onclick="describeWithMode('object')" aria-label="Oggetto">OGGETTO</button>
+    <button id="btn-selfie" onclick="describeWithMode('selfie')" aria-label="Selfie">SELFIE</button>
     
     <button id="btn-custom" class="full-width" onclick="askCustomDetail()" aria-label="Chiedi dettaglio">CHIEDI DETTAGLIO</button>
 
@@ -110,11 +111,9 @@ input{background:#333;color:#fff;border:1px solid #777}
     <h2 style="margin:0 0 10px;color:#D4AF37;font-size:1.1rem">Risultato Analisi</h2>
     <div id="result-content" tabindex="0">In attesa...</div>
     <a id="download-link" href="#" class="hidden">Scarica foto</a>
-    <div class="result-actions">
-      <button class="small-btn" onclick="usePhoto()" style="background:#004080">USA</button>
-      <button class="small-btn" onclick="editAndReviewPhoto()">CHIEDI ANCORA</button>
-      <button class="small-btn" onclick="deletePhoto()" style="background:#8B0000">CHIUDI</button>
-    </div>
+    
+    <div class="result-actions" id="action-buttons">
+      </div>
   </div>
 </div>
 
@@ -145,29 +144,20 @@ let lastLightAnnounce=0;
 let currentFacingMode='environment'; 
 const video=document.getElementById('webcam'),canvas=document.getElementById('overlay'),ctx=canvas.getContext('2d');
 let lastShotB64=null;
-let targetClass = null; // Variabile per la ricerca specifica
+let targetClass = null;
+let hasPerformedSocialCheck = false;
 
 const objectDict = {
     'person': 'Persona', 'cup': 'Tazza', 'chair': 'Sedia', 'bottle': 'Bottiglia', 
     'cell phone': 'Cellulare', 'laptop': 'Computer', 'book': 'Libro', 
     'tv': 'TV', 'potted plant': 'Pianta', 'keyboard': 'Tastiera', 
     'mouse': 'Mouse', 'remote': 'Telecomando', 'dining table': 'Tavolo',
-    'refrigerator': 'Frigo', 'microwave': 'Microonde', 'sink': 'Lavandino',
     'cat': 'Gatto', 'dog': 'Cane', 'bowl': 'Ciotola', 'car': 'Auto', 
-    'bicycle': 'Bici', 'motorcycle': 'Moto', 'airplane': 'Aereo', 'bus': 'Bus',
-    'train': 'Treno', 'truck': 'Camion', 'boat': 'Barca', 'traffic light': 'Semaforo',
-    'fire hydrant': 'Idrante', 'stop sign': 'Stop', 'bench': 'Panchina',
-    'backpack': 'Zaino', 'umbrella': 'Ombrello', 'handbag': 'Borsa', 'tie': 'Cravatta',
-    'suitcase': 'Valigia', 'frisbee': 'Frisbee', 'skis': 'Sci', 'snowboard': 'Snowboard',
-    'sports ball': 'Palla', 'kite': 'Aquilone', 'baseball bat': 'Mazza da baseball',
-    'baseball glove': 'Guanto', 'skateboard': 'Skateboard', 'surfboard': 'Tavola surf',
-    'tennis racket': 'Racchetta', 'fork': 'Forchetta', 'knife': 'Coltello', 'spoon': 'Cucchiaio',
-    'toilet': 'WC', 'bed': 'Letto', 'couch': 'Divano', 'clock': 'Orologio',
-    'vase': 'Vaso', 'scissors': 'Forbici', 'teddy bear': 'Orsacchiotto',
-    'hair drier': 'Phon', 'toothbrush': 'Spazzolino'
+    'bicycle': 'Bici', 'motorcycle': 'Moto', 'bed': 'Letto', 'couch': 'Divano', 
+    'toilet': 'WC', 'vase': 'Vaso', 'suitcase': 'Valigia', 'backpack': 'Zaino'
 };
 
-// GESTIONE VOCALE (Mantenuta opzionale, ma non necessaria)
+// GESTIONE VOCALE
 let recognition=null, voiceActive=false;
 if('webkitSpeechRecognition' in window){
     recognition=new webkitSpeechRecognition();
@@ -175,9 +165,8 @@ if('webkitSpeechRecognition' in window){
     recognition.onresult=(e)=>{
         const t=e.results[e.results.length-1][0].transcript.trim().toLowerCase();
         if(t.includes("scatta")) startCountdown();
-        else if(t.includes("social")) describeWithMode('social');
         else if(t.includes("stop")||t.includes("basta")) {
-             if(targetClass) manualFind(); // Toggle off
+             if(targetClass) manualFind(); 
              else if(mode==='guiding') toggleGuidance();
              announce("Stop.");
         }
@@ -200,62 +189,89 @@ function toggleVoiceControl(){
     }
 }
 
-// NUOVA FUNZIONE: RICERCA MANUALE
 function manualFind(){
     const b = document.getElementById('btn-find');
-    
-    // Se stiamo già cercando, fermiamo la ricerca
     if(targetClass){
         targetClass = null;
         b.innerText = "🔍 CERCA OGGETTO (MANUALE)";
         b.classList.remove('searching');
-        announce("Ricerca terminata. Torno in modalità automatica.");
+        announce("Ricerca terminata.");
         return;
     }
-
-    // Altrimenti chiediamo cosa cercare
-    const input = prompt("Scrivi cosa cercare (es. tazza, penna, chiavi):");
-    if(!input) return; // Utente ha annullato
-    
+    const input = prompt("Scrivi cosa cercare:");
+    if(!input) return;
     const query = input.trim().toLowerCase();
-    
-    // Cerchiamo nel dizionario
-    let foundKey = null;
-    let foundName = "";
-    
-    // Controllo diretto o tradotto
+    let foundKey = null; let foundName = "";
     for(let [eng, ita] of Object.entries(objectDict)){
-        if(ita.toLowerCase() === query || eng === query){ 
-            foundKey = eng; 
-            foundName = ita;
-            break; 
-        }
+        if(ita.toLowerCase() === query || eng === query){ foundKey = eng; foundName = ita; break; }
     }
-
     if(foundKey){
         targetClass = foundKey;
         b.innerText = "❌ STOP RICERCA: " + foundName.toUpperCase();
         b.classList.add('searching');
-        announce("Ok, cerco solo: " + foundName);
-        
-        // Attiva la guida se è spenta
+        announce("Ok, cerco: " + foundName);
         if(mode !== 'guiding') toggleGuidance();
     } else {
-        announce("Oggetto non riconosciuto. Prova con: tazza, penna, cellulare, computer.");
+        announce("Oggetto non riconosciuto.");
     }
 }
 
 function announce(t){if(!discreteMode){const e=document.getElementById('sr-announcer');e.textContent="";setTimeout(()=>e.textContent=t,50);}}
 function vibrate(p){if(navigator.vibrate)navigator.vibrate(p);}
+
 function showCameraOnly(){
   document.getElementById('result-screen').classList.add('hidden');document.getElementById('result-screen').setAttribute('aria-hidden','true');document.getElementById('result-screen').setAttribute('inert','');
   document.getElementById('camera-controls').classList.remove('hidden');document.getElementById('camera-controls').removeAttribute('aria-hidden');document.getElementById('camera-controls').removeAttribute('inert');
-  setTimeout(()=>document.getElementById('btn-guide').focus(),200);
+  setTimeout(()=>document.getElementById('btn-scene').focus(),200);
 }
 function showResultOnly(text){
   document.getElementById('camera-controls').classList.add('hidden');document.getElementById('camera-controls').setAttribute('aria-hidden','true');document.getElementById('camera-controls').setAttribute('inert','');
   document.getElementById('result-screen').classList.remove('hidden');document.getElementById('result-screen').removeAttribute('aria-hidden');document.getElementById('result-screen').removeAttribute('inert');
   const c=document.getElementById('result-content');c.textContent=text||"";setTimeout(()=>c.focus(),200);
+  renderResultButtons(); 
+}
+
+// GESTIONE PULSANTI DINAMICI
+function renderResultButtons(){
+    const container = document.getElementById('action-buttons');
+    container.innerHTML = ''; 
+
+    // 1. Social Validator
+    if(!hasPerformedSocialCheck){
+        const btnSocial = document.createElement('button');
+        btnSocial.className = 'btn-social-check';
+        btnSocial.innerText = '🔍 VALIDATOR SOCIAL DETTAGLIATO';
+        btnSocial.onclick = performSocialCheck;
+        container.appendChild(btnSocial);
+    } 
+    // 2. Aggiungi Testo
+    else {
+        const btnText = document.createElement('button');
+        btnText.className = 'btn-add-text';
+        btnText.innerText = '✏️ AGGIUNGI SCRITTA AI';
+        btnText.onclick = startTextAddition;
+        container.appendChild(btnText);
+    }
+
+    const btnUse = document.createElement('button');
+    btnUse.className = 'small-btn';
+    btnUse.style.background = '#004080';
+    btnUse.innerText = 'USA / SALVA';
+    btnUse.onclick = usePhoto;
+    container.appendChild(btnUse);
+
+    const btnReview = document.createElement('button');
+    btnReview.className = 'small-btn';
+    btnReview.innerText = 'CHIEDI ANCORA';
+    btnReview.onclick = editAndReviewPhoto;
+    container.appendChild(btnReview);
+
+    const btnDel = document.createElement('button');
+    btnDel.className = 'small-btn';
+    btnDel.style.background = '#8B0000';
+    btnDel.innerText = 'ELIMINA';
+    btnDel.onclick = deletePhoto;
+    container.appendChild(btnDel);
 }
 
 async function setupCamera(facing){
@@ -287,6 +303,7 @@ async function startCountdown(andAnalyzeMode = null) {
     announce("1"); vibrate(50); await new Promise(r => setTimeout(r, 1000));
     announce("Click"); playShutter(); vibrate(200);
     lastShotB64 = captureFrame();
+    hasPerformedSocialCheck = false; 
     
     const dLink = document.getElementById('download-link');
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
@@ -313,7 +330,6 @@ function toggleGuidance(){
   if(mode==='guiding'){
     mode='idle';b.classList.remove('guiding');b.innerText="GUIDA SCENA LIVE";
     ctx.clearRect(0,0,canvas.width,canvas.height);announce("Guida spenta.");
-    // Reset target quando si spegne la guida
     if(targetClass) manualFind(); 
   }else{
     mode='guiding';centeredCount=0;lastGuideMessage="";
@@ -322,7 +338,6 @@ function toggleGuidance(){
 }
 
 function processGuidance(){
-  // 1. CONTROLLO LUCE
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
       const size = 100; 
       const startX = Math.max(0, tempCanvas.width/2 - size/2);
@@ -339,11 +354,9 @@ function processGuidance(){
     const r=objectDetector.detectForVideo(video,performance.now()),d=r?r.detections:[];
     ctx.clearRect(0,0,canvas.width,canvas.height);
     
-    // FILTRAGGIO
     let relevantObjects = [];
     if(targetClass) {
         relevantObjects = d.filter(o => o.categories[0].categoryName === targetClass);
-        // Feedback se non trova l'oggetto cercato
         if(relevantObjects.length === 0 && d.length > 0 && Date.now() - lastGuideMessageTime > 3000) {
              const visible = d.slice(0,2).map(o=> objectDict[o.categories[0].categoryName] || o.categories[0].categoryName).join(", ");
              announce("Cerco " + objectDict[targetClass] + " ma vedo solo: " + visible);
@@ -359,7 +372,6 @@ function processGuidance(){
         return;
     }
 
-    // DISEGNO
     const rx=canvas.width/video.videoWidth, ry=canvas.height/video.videoHeight;
     relevantObjects.forEach(obj => {
         const b = obj.boundingBox;
@@ -369,16 +381,12 @@ function processGuidance(){
     });
 
     const now=Date.now();
-    if (now - lastGuideMessageTime > 2500) { 
-        
-        // Ordina per grandezza
+    if (now - lastGuideMessageTime > 2000) { 
         const sorted = relevantObjects.sort((a,b)=>b.boundingBox.width*b.boundingBox.height - a.boundingBox.width*a.boundingBox.height);
         const mainObj = sorted[0]; 
-        
         const box = mainObj.boundingBox;
         const imgW = video.videoWidth;
-        const xMin = box.originX;
-        const xMax = box.originX + box.width;
+        const xMin = box.originX; const xMax = box.originX + box.width;
         const cx = (xMin + xMax) / 2 / imgW; 
         const widthPct = box.width / imgW; 
         
@@ -386,30 +394,23 @@ function processGuidance(){
         const mainName = objectDict[rawName] || rawName;
 
         let msg = "";
+        const LIMIT_LEFT = 0.35; const LIMIT_RIGHT = 0.65;
+        const isSelfie = (currentFacingMode === 'user');
+        const txtLeft = isSelfie ? "Sposta a Destra" : "Ruota a Sinistra";
+        const txtRight = isSelfie ? "Sposta a Sinistra" : "Ruota a Destra";
 
-        // GUIDA DIREZIONALE
-        if (xMin < (imgW * 0.01)) msg = mainName + " tagliato a sinistra! Ruota sinistra.";
-        else if (xMax > (imgW * 0.99)) msg = mainName + " tagliato a destra! Ruota destra.";
-        else if (widthPct < 0.25) msg = mainName + " troppo lontano. Avvicinati.";
+        if (xMin < (imgW * 0.01)) msg = mainName + " tagliato! " + txtLeft;
+        else if (xMax > (imgW * 0.99)) msg = mainName + " tagliato! " + txtRight;
+        else if (widthPct < 0.20) msg = mainName + " lontano. Avvicinati."; 
         else {
-            if (cx < 0.42) msg = "Ruota leggermente a sinistra"; 
-            else if (cx > 0.58) msg = "Ruota leggermente a destra"; 
-            else msg = mainName + " centrato.";
-        }
-
-        // ELENCO SECONDARI (Solo se non siamo in modalità target)
-        if(!targetClass && sorted.length > 1){
-            const others = sorted.slice(1, 3).map(o => {
-                const n = o.categories[0].categoryName;
-                return objectDict[n] || n;
-            }).join(", ");
-            if(msg.includes("centrato") || msg.includes("leggermente")) {
-                msg += " Vedo anche: " + others;
+            if (cx < LIMIT_LEFT) msg = txtLeft; 
+            else if (cx > LIMIT_RIGHT) msg = txtRight; 
+            else {
+                msg = mainName + " Centrato. Ferma.";
+                if(navigator.vibrate) navigator.vibrate([50, 50, 50]); 
             }
         }
-
         announce(msg); 
-        vibrate(msg.includes("centrato") ? 100 : 30);
         lastGuideMessageTime = now;
     }
   }catch(e){ console.error(e); }
@@ -422,20 +423,18 @@ function toggleLight(){
     lightOsc=audioCtx.createOscillator();lightGain=audioCtx.createGain();
     lightOsc.connect(lightGain);lightGain.connect(audioCtx.destination);
     lightGain.gain.value=0;lightOsc.start();
-    lastLightAnnounce = Date.now(); // Reset timer
+    lastLightAnnounce = Date.now();
     b.classList.add('active-tool');b.innerText="LUCE: ON";announce("Luce on.");
   }else{
     if(lightOsc){lightOsc.stop();lightOsc.disconnect();}
     b.classList.remove('active-tool');b.innerText="SONDA LUCE";announce("Luce off.");
   }
 }
-
 function processLight(){
   if(!tempCtx)return;
   const p=tempCtx.getImageData(tempCanvas.width/2-10,tempCanvas.height/2-10,20,20).data;
   let s=0; for(let i=0;i<p.length;i+=4)s+=(p[i]+p[i+1]+p[i+2])/3;
   const level=s/(p.length/4); 
-  
   if(lightOsc){
       lightGain.gain.setTargetAtTime(0.02+(level/255)*0.1,audioCtx.currentTime,0.1);
       lightOsc.frequency.setTargetAtTime(100+level*4,audioCtx.currentTime,0.1);
@@ -446,13 +445,11 @@ function processLight(){
       }
   }
 }
-
 function toggleColor(){
   colorActive=!colorActive;const b=document.getElementById('btn-color');vibrate(50);
   if(colorActive){b.classList.add('active-tool');b.innerText="COLORE: ON";announce("Colore on.");}
   else{b.classList.remove('active-tool');b.innerText="SONDA COLORE";announce("Colore off.");}
 }
-
 function processColor(){
   if(Date.now()-lastSpeak<2000)return;
   const size = 20;
@@ -460,7 +457,6 @@ function processColor(){
   let rT=0, gT=0, bT=0;
   for(let i=0; i<p.length; i+=4) { rT += p[i]; gT += p[i+1]; bT += p[i+2]; }
   const count = p.length/4; const r = rT/count; const g = gT/count; const b = bT/count;
-
   if(r<30&&g<30&&b<30){announce("Nero");lastSpeak=Date.now();return;}
   if(r>220&&g>220&&b>220){announce("Bianco");lastSpeak=Date.now();return;}
   const colors={'Rosso':[255,0,0],'Verde':[0,255,0],'Blu':[0,0,255],'Giallo':[255,255,0],'Arancione':[255,165,0],'Grigio':[128,128,128]};
@@ -468,7 +464,6 @@ function processColor(){
   for(let k in colors){const c=colors[k],d=Math.sqrt((r-c[0])**2+(g-c[1])**2+(b-c[2])**2);if(d<min){min=d;res=k;}}
   announce(res);lastSpeak=Date.now();
 }
-
 function toggleLevel(){
   const b=document.getElementById('btn-level');vibrate(50);
   if(levelActive){
@@ -496,58 +491,164 @@ async function callGemini(prompt,b64){
   }catch(e){return null;}
 }
 
-// *** LOGICA V14+15: SECURITY + VOICE ***
+// ----------------------------------------------------
+// LOGICA SOCIAL & AI DIRECTOR
+// ----------------------------------------------------
+
 function buildPrompt(mode){
   let basePrompt = `
-  Agisci come un Supervisore Tecnico e di Immagine per un utente non vedente.
-  Devi essere ESTREMAMENTE PRECISO e CRITICO. Nessuna pietà, voglio la verità.
-
-  STRUTTURA DELLA RISPOSTA:
+  Sei un assistente visivo per un non vedente.
+  PRIMA di tutto, valida la foto.
   
-  1. VERDETTO DI PUBBLICABILITÀ (Urla la verità):
-     - Scrivi: "✅ FOTO PUBBLICABILE" oppure "❌ NON PUBBLICABILE".
-     - Se NO, spiega subito il difetto fatale (Es. "Sei tagliata", "È sfocata", "Hai gli occhi chiusi").
-     
-  2. ANALISI DEI 3 PIANI (Profondità):
-     - PRIMO PIANO: Cosa tocca l'obiettivo?
-     - SOGGETTO (Media distanza): Chi/cosa è? È centrato?
-     - SFONDO (Lontano): Cosa c'è dietro?
+  1. VERDETTO RAPIDO (Obbligatorio):
+  - "✅ FOTO VALIDA" (Se soggetto intero, anche se decentrato).
+  - "❌ FOTO NON VALIDA: [Motivo]" (Se tagliato, sfocato, disordine grave).
+
+  2. DESCRIZIONE:
   `;
-
-  if(mode === 'social' || mode === 'selfie') {
-      basePrompt += `
-      3. PROTOCOLLI DI SICUREZZA E PRIVACY (Cruciale):
-      - 👀 CONTROLLO "VANITY":
-          * Occhi: Aperti o chiusi?
-          * Viso: Espressione strana? Cibo tra i denti? Capelli disordinati?
-          * Vestiti: Macchie? Disordine evidente?
-      
-      - 🛡️ CONTROLLO PRIVACY & SFONDO:
-          * C'è disordine imbarazzante dietro (letti sfatti, spazzatura, biancheria)?
-          * Ci sono dati sensibili visibili (indirizzi, documenti, carte)?
-          * Ci sono persone non desiderate?
-      
-      4. SIMULAZIONE SOCIAL (Technical UI):
-      - Simulando l'interfaccia di TikTok/Instagram, ci sono elementi che coprono il volto?
-      - C'è spazio libero (Safe Zone) per aggiungere scritte? Dove?
-      
-      5. ISTRUZIONI DI CORREZIONE (Se la foto non va bene):
-      - Dici: "Ruota il telefono leggermente a destra/sinistra/su/giù".
-      `;
-  } 
-  
-  else if(mode === 'scene') basePrompt += `- Descrivi azione e atmosfera. Disordine?`;
-  else if(mode === 'text') basePrompt += `- LEGGI TUTTO. Se il testo è tagliato o illeggibile, dillo subito.`;
-  else if(mode === 'food') basePrompt += `- Cibo: Sembra appetitoso? Colori vivi?`;
-  else if(mode === 'outdoor') basePrompt += `- Esterno: Meteo? Architettura? Ostacoli pericolosi?`;
-  else if(mode === 'object') basePrompt += `- Oggetto: È intero?`;
-  else basePrompt += `- Descrizione generale.`;
-
+  if(mode === 'text') basePrompt += `- Leggi tutto il testo visibile.`;
+  else if(mode === 'object') basePrompt += `- Descrivi l'oggetto principale.`;
+  else if(mode === 'selfie') basePrompt += `- Descrivi espressione e vestiti.`;
+  else basePrompt += `- Descrivi la scena.`;
   return basePrompt;
+}
+
+// 1. ANALISI SOCIAL
+async function performSocialCheck(){
+    announce("Analisi Social in corso...");
+    const prompt = `
+    Analizza questa foto per i Social Media (Instagram/TikTok).
+    Considera le zone di interfaccia (pulsanti in basso, nome profilo in alto).
+
+    1. VERDETTO STORIE (9:16): 
+       - Ci sono elementi importanti ai bordi che verrebbero coperti dall'interfaccia?
+    
+    2. VERDETTO POST (4:5 o 1:1):
+       - Se la foto viene ritagliata quadrata, il soggetto si salva?
+    
+    3. SPAZI SICURI ("Safe Zones"):
+       - Dove c'è spazio vuoto per aggiungere testo senza coprire il volto? (Es. "C'è spazio in alto a destra").
+    `;
+    
+    showResultOnly("Analisi Social...");
+    const text = await callGemini(prompt, lastShotB64);
+    
+    document.getElementById('result-content').textContent = "--- ANALISI SOCIAL ---\n" + text;
+    hasPerformedSocialCheck = true; 
+    renderResultButtons(); 
+    announce("Report Social pronto. Puoi aggiungere testo.");
+}
+
+// 2. AGGIUNTA TESTO CON AI DIRECTOR E WORD WRAP
+async function startTextAddition(){
+    const textToAdd = prompt("Cosa vuoi scrivere sulla foto?");
+    if(!textToAdd) return;
+
+    announce("Chiedo all'AI dove metterlo...");
+    
+    const placementPrompt = `
+    L'utente vuole scrivere: "${textToAdd}".
+    Guarda la foto. Devi decidere la posizione MIGLIORE per questo testo in modo che:
+    1. NON copra il volto o dettagli importanti.
+    2. Sia ben leggibile (su sfondo uniforme).
+    3. Sia esteticamente bilanciato.
+
+    Rispondi SOLO con uno di questi codici:
+    - TOP_CENTER (Alto centro)
+    - BOTTOM_CENTER (Basso centro)
+    - TOP_LEFT (Alto sinistra)
+    - TOP_RIGHT (Alto destra)
+    - CENTER (Centro esatto)
+    `;
+
+    const positionCode = await callGemini(placementPrompt, lastShotB64);
+    if(!positionCode) { announce("Errore AI."); return; }
+    
+    const cleanCode = positionCode.trim().toUpperCase();
+    let pos = 'BOTTOM_CENTER'; 
+    if(cleanCode.includes('TOP_CENTER')) pos = 'TOP_CENTER';
+    else if(cleanCode.includes('TOP_LEFT')) pos = 'TOP_LEFT';
+    else if(cleanCode.includes('TOP_RIGHT')) pos = 'TOP_RIGHT';
+    else if(cleanCode.includes('BOTTOM')) pos = 'BOTTOM_CENTER';
+    else if(cleanCode.includes('CENTER')) pos = 'CENTER';
+
+    drawTextOnCanvas(textToAdd, pos);
+}
+
+// NUOVA FUNZIONE DI DISEGNO CON WORD WRAP (V23)
+function drawTextOnCanvas(text, position){
+    const img = new Image();
+    img.onload = function(){
+        const c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        
+        // Setup Font
+        const fontSize = c.width * 0.06; // 6% width
+        ctx.font = `bold ${fontSize}px Arial`;
+        ctx.fillStyle = "white";
+        ctx.textAlign = "center";
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 4;
+        
+        // WORD WRAP LOGIC
+        const maxWidth = c.width * 0.8; // Max 80% larghezza foto
+        const words = text.split(' ');
+        let line = '';
+        let lines = [];
+        
+        for(let n = 0; n < words.length; n++) {
+          let testLine = line + words[n] + ' ';
+          let metrics = ctx.measureText(testLine);
+          let testWidth = metrics.width;
+          if (testWidth > maxWidth && n > 0) {
+            lines.push(line);
+            line = words[n] + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+
+        // Calcolo coordinate Y
+        let x = c.width / 2;
+        let startY = c.height - (lines.length * fontSize * 1.5) - 50; // Default bottom
+
+        if(position === 'TOP_CENTER') { startY = 100 + fontSize; }
+        else if(position === 'TOP_LEFT') { x = c.width * 0.25; startY = 100 + fontSize; }
+        else if(position === 'TOP_RIGHT') { x = c.width * 0.75; startY = 100 + fontSize; }
+        else if(position === 'CENTER') { startY = (c.height/2) - ((lines.length * fontSize)/2); }
+        
+        // Disegno righe
+        for(let i = 0; i<lines.length; i++){
+            ctx.strokeText(lines[i], x, startY + (i * fontSize * 1.2));
+            ctx.fillText(lines[i], x, startY + (i * fontSize * 1.2));
+        }
+
+        lastShotB64 = c.toDataURL('image/jpeg', 0.9).split(',')[1];
+        
+        const dLink = document.getElementById('download-link');
+        dLink.href = "data:image/jpeg;base64,"+lastShotB64;
+        
+        reAnalyzeAfterEdit(position);
+    };
+    img.src = "data:image/jpeg;base64," + lastShotB64;
+}
+
+async function reAnalyzeAfterEdit(posName){
+    announce("Testo aggiunto. Controllo finale...");
+    const prompt = `Ho aggiunto il testo alla foto. Conferma che sia leggibile e non copra nulla. Descrivi il risultato finale.`;
+    const text = await callGemini(prompt, lastShotB64);
+    document.getElementById('result-content').textContent = "--- FOTO MODIFICATA ---\n" + text;
+    announce("Foto modificata pronta.");
 }
 
 async function describeWithMode(c){
   if(!GEMINI_KEY){announce("Manca chiave.");openSettings();return;}
+  if(c === 'selfie' && currentFacingMode !== 'user') {
+      await flipCamera(); setTimeout(() => startCountdown(c), 1000); return;
+  }
   await startCountdown(c); 
 }
 async function processAnalysis(c){
@@ -560,12 +661,12 @@ async function askCustomDetail(){
   await captureNewShot(); 
   const q=prompt("Domanda sulla scena?");if(!q){announce("Annullato.");return;}
   showResultOnly("Cerco...");announce("Analizzo...");
-  const t=await callGemini("L'utente chiede: \""+q+"\". Rispondi considerando la profondità e la qualità tecnica.",lastShotB64);
+  const t=await callGemini("Domanda: \""+q+"\". Valida foto poi rispondi.",lastShotB64);
   document.getElementById('result-content').textContent="D: "+q+"\n\nR: "+(t||"Errore.");vibrate(200);announce("Risultato pronto.");
 }
 async function editAndReviewPhoto(){
    if(!lastShotB64)return;const q=prompt("Altra domanda?");if(!q)return;
-   announce("Analizzo...");const t=await callGemini("Domanda successiva: \""+q+"\".",lastShotB64);
+   announce("Analizzo...");const t=await callGemini("Domanda: \""+q+"\".",lastShotB64);
    document.getElementById('result-content').textContent+="\n\n================\nD: "+q+"\nR: "+(t||"Errore");vibrate(200);announce("Aggiornato.");
 }
 async function usePhoto(){if(!lastShotB64)return;const b=await(await fetch("data:image/jpeg;base64,"+lastShotB64)).blob();const f=new File([b],"foto_visione.jpg",{type:"image/jpeg"});if(navigator.share)navigator.share({files:[f]});}
@@ -578,7 +679,7 @@ async function captureNewShot(){
 async function startApp(){
   document.getElementById('main-interface').classList.remove('hidden');document.getElementById('main-interface').removeAttribute('aria-hidden');
   document.getElementById('start-screen').classList.add('hidden');document.getElementById('start-screen').setAttribute('aria-hidden','true');
-  document.getElementById('btn-find').focus();
+  document.getElementById('btn-scene').focus();
   announce("Visione AI Avviata.");
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   await setupCamera(currentFacingMode);
