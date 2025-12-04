@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Visione AI Fusion - V23 Final</title>
+<title>Visione AI Fusion - V24 Windows Fix</title>
 <style>
 /* STILE GENERALE */
 body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -305,10 +305,14 @@ async function startCountdown(andAnalyzeMode = null) {
     lastShotB64 = captureFrame();
     hasPerformedSocialCheck = false; 
     
+    // --- MODIFICA WINDOWS: Salvataggio automatico ---
+    const filename = "foto_visione_" + Date.now() + ".jpg";
     const dLink = document.getElementById('download-link');
     dLink.href = "data:image/jpeg;base64,"+lastShotB64;
-    dLink.download = "foto_visione_ai.jpg";
+    dLink.download = filename;
     dLink.classList.remove('hidden');
+    dLink.click(); // Questo forza il download sul PC
+    // ------------------------------------------------
 
     if(andAnalyzeMode) processAnalysis(andAnalyzeMode);
     else announce("Foto salvata.");
@@ -575,7 +579,6 @@ async function startTextAddition(){
     drawTextOnCanvas(textToAdd, pos);
 }
 
-// NUOVA FUNZIONE DI DISEGNO CON WORD WRAP (V23)
 function drawTextOnCanvas(text, position){
     const img = new Image();
     img.onload = function(){
@@ -628,8 +631,12 @@ function drawTextOnCanvas(text, position){
 
         lastShotB64 = c.toDataURL('image/jpeg', 0.9).split(',')[1];
         
+        // MODIFICA WINDOWS: Forziamo download anche dopo modifica testo
         const dLink = document.getElementById('download-link');
+        const filename = "foto_visione_edit_" + Date.now() + ".jpg";
         dLink.href = "data:image/jpeg;base64,"+lastShotB64;
+        dLink.download = filename;
+        dLink.click(); // Scarica subito la versione modificata
         
         reAnalyzeAfterEdit(position);
     };
@@ -669,7 +676,27 @@ async function editAndReviewPhoto(){
    announce("Analizzo...");const t=await callGemini("Domanda: \""+q+"\".",lastShotB64);
    document.getElementById('result-content').textContent+="\n\n================\nD: "+q+"\nR: "+(t||"Errore");vibrate(200);announce("Aggiornato.");
 }
-async function usePhoto(){if(!lastShotB64)return;const b=await(await fetch("data:image/jpeg;base64,"+lastShotB64)).blob();const f=new File([b],"foto_visione.jpg",{type:"image/jpeg"});if(navigator.share)navigator.share({files:[f]});}
+async function usePhoto(){
+    if(!lastShotB64)return;
+    const filename = "foto_visione_" + Date.now() + ".jpg";
+    
+    // Tentativo condivisione mobile (Share Sheet)
+    if(navigator.share && navigator.canShare){
+        try {
+            const b=await(await fetch("data:image/jpeg;base64,"+lastShotB64)).blob();
+            const f=new File([b], filename ,{type:"image/jpeg"});
+            await navigator.share({files:[f]});
+            return;
+        } catch(e) { console.log("Share fallito o annullato, passo al download"); }
+    }
+    
+    // Fallback Desktop: Download forzato se Share non va
+    const dLink = document.getElementById('download-link');
+    dLink.href = "data:image/jpeg;base64,"+lastShotB64;
+    dLink.download = filename;
+    dLink.click();
+    announce("Foto scaricata.");
+}
 function deletePhoto(){lastShotB64=null;showCameraOnly();announce("Camera attiva.");}
 async function captureNewShot(){
   if(mode==='guiding')toggleGuidance();
