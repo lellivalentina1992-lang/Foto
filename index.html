@@ -60,6 +60,10 @@ button:active{background:#555;transform:scale(.98)}
 @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
 input{background:#333;color:#fff;border:1px solid #777}
 #download-link{text-align:center;font-size:.9rem;color:#D4AF37;text-decoration:underline;margin-bottom:10px}
+
+/* AREA SCELTA OGGETTI */
+#object-choice{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:0.9rem}
+#object-choice-label{margin-right:6px}
 </style>
 </head>
 <body>
@@ -86,6 +90,12 @@ input{background:#333;color:#fff;border:1px solid #777}
     </div>
 
     <button id="btn-custom" class="full-width" onclick="askCustomDetail()" aria-label="Scatta e poni una domanda specifica sulla scena">CHIEDI DETTAGLIO</button>
+
+    <!-- Descrizione rapida di cosa vede la camera -->
+    <button id="btn-describe" class="full-width" onclick="quickDescribeScene()" aria-label="Descrizione rapida di cosa vede la fotocamera, persone o oggetti">COSA VEDE LA CAMERA</button>
+
+    <!-- SCELTA OGGETTO CON PULSANTI (NESSUNA VOCE, NESSUNA SCRITTURA) -->
+    <div id="object-choice" class="full-width" aria-live="polite"></div>
 
     <div class="full-width" style="height:1px;background:#333;margin:5px 0"></div>
     <div class="top-bar full-width">
@@ -154,7 +164,7 @@ let lastGuidancePublishable = false;
 
 let isRunning = false, stream = null;
 const tempCanvas = document.createElement('canvas');
-let tempCtx = tempCanvas.getContext('2d',{willReadFrequently:true}); // <-- inizializzato subito
+let tempCtx = tempCanvas.getContext('2d',{willReadFrequently:true});
 let mode = 'idle', lightActive = false, colorActive = false, levelActive = false, discreteMode = false;
 let lastSpeak = 0, centeredFrames = 0, lastGuideMessageTime = 0;
 let lastLowLightWarning = 0; 
@@ -180,10 +190,10 @@ const objectDict = {
 };
 
 // Costanti guida / bounding box
-const BOUND_MARGIN = 0.02;      // margine per "tagliato"
-const CENTER_LEFT = 0.35;       // centro "quasi preciso"
+const BOUND_MARGIN = 0.02;
+const CENTER_LEFT = 0.35;
 const CENTER_RIGHT = 0.65;
-const LOOSE_LEFT = 0.25;        // centro "pubblicabile" ma più spostato
+const LOOSE_LEFT = 0.25;
 const LOOSE_RIGHT = 0.75;
 const LARGE_OBJ_SIZE = 0.6;
 const MIN_CENTER_FRAMES = 8;
@@ -195,7 +205,7 @@ function smoothCenter(cx) {
   return smoothCx;
 }
 
-// GESTIONE VOCALE
+// GESTIONE VOCALE (solo per SCATTA/STOP, NON per scegliere oggetti)
 let recognition = null, voiceActive = false;
 const voiceStatus = document.getElementById('voice-status');
 
@@ -206,8 +216,9 @@ if ('webkitSpeechRecognition' in window) {
   recognition.lang = 'it-IT';
   recognition.onresult = (e) => {
     const t = e.results[e.results.length-1][0].transcript.trim().toLowerCase();
-    if (t.includes("scatta")) startCountdown();
-    else if (t.includes("stop") || t.includes("basta")) {
+    if (t.includes("scatta")) {
+      startCountdown();
+    } else if (t.includes("stop") || t.includes("basta")) {
       if (targetClass) manualFind(); 
       else if (mode === 'guiding') toggleGuidance();
       announce("Stop.");
@@ -246,6 +257,8 @@ function manualFind(){
     targetClass = null;
     b.innerText = "🔍 CERCA OGGETTO (MANUALE)";
     b.classList.remove('searching');
+    const choiceDiv = document.getElementById('object-choice');
+    if(choiceDiv) choiceDiv.innerHTML = "";
     announce("Ricerca oggetto terminata.");
     return;
   }
@@ -320,14 +333,14 @@ function guideSpeak(type, fullMsg){
 
 // autoscatto dalla guida
 function scheduleAutoShot(modeName, msgPrefix){
-  if(autoShotTimer) return; // già in corso
+  if(autoShotTimer) return;
   autoShotMode = modeName || null;
   const prefix = msgPrefix || "";
   guideSpeak('ok', (prefix ? prefix + " " : "") + "Scatto tra 3 secondi, resta ferma.");
   autoShotTimer = setTimeout(()=>{
     autoShotTimer = null;
     autoShotMode = null;
-    if(mode !== 'guiding') return; // guida disattivata nel frattempo
+    if(mode !== 'guiding') return;
     playShutter();
     vibrate(200);
     lastShotB64 = captureFrame();
@@ -371,7 +384,7 @@ function showResultOnly(text){
   renderResultButtons(); 
 }
 
-// quando una foto è stata catturata (manuale o auto)
+// quando una foto è stata catturata
 function onPhotoCaptured(origin){
   if(!lastShotB64){
     announce("Errore nello scatto.");
@@ -393,14 +406,12 @@ function renderResultButtons(){
   container.innerHTML = ''; 
   if(!lastShotB64) return;
 
-  // 1) Usa foto senza analisi
   const btnUse = document.createElement('button');
   btnUse.className = 'btn-primary-wide';
   btnUse.innerText = '📷 USA FOTO SENZA ANALISI';
   btnUse.onclick = usePhoto;
   container.appendChild(btnUse);
 
-  // 2) Analisi base (sempre disponibili)
   const btnScene = document.createElement('button');
   btnScene.className = 'btn-analyze';
   btnScene.innerText = 'SCENA GENERALE';
@@ -431,7 +442,6 @@ function renderResultButtons(){
   btnObject.onclick = ()=>processAnalysis('object');
   container.appendChild(btnObject);
 
-  // 3) Analisi social / scritta
   if(!hasPerformedSocialCheck){
     const btnSocial = document.createElement('button');
     btnSocial.className = 'btn-social-check';
@@ -446,14 +456,12 @@ function renderResultButtons(){
     container.appendChild(btnTextAI);
   }
 
-  // 4) Domanda sulla stessa foto
   const btnReview = document.createElement('button');
   btnReview.className = 'btn-analyze';
   btnReview.innerText = 'DOMANDA SU QUESTA FOTO';
   btnReview.onclick = editAndReviewPhoto;
   container.appendChild(btnReview);
 
-  // 5) Elimina
   const btnDel = document.createElement('button');
   btnDel.className = 'btn-danger';
   btnDel.innerText = 'ELIMINA FOTO';
@@ -461,7 +469,8 @@ function renderResultButtons(){
   container.appendChild(btnDel);
 }
 
-async function setupCamera(facing){
+// setupCamera con fallback & messaggi chiari
+async function setupCamera(facing, isRetry=false){
   if(stream) stream.getTracks().forEach(t=>t.stop());
   try {
     stream = await navigator.mediaDevices.getUserMedia({ 
@@ -473,9 +482,26 @@ async function setupCamera(facing){
     canvas.height = video.videoHeight;
     tempCanvas.width = video.videoWidth; 
     tempCanvas.height = video.videoHeight;
+    if(!isRetry){
+      if(facing === 'environment'){
+        announce("Sto usando la fotocamera posteriore o quella principale.");
+      }else{
+        announce("Sto usando la fotocamera frontale.");
+      }
+    }
   } catch(e) { 
     console.error(e);
-    announce("Errore nell'accesso alla fotocamera.");
+    if(!isRetry && facing === 'environment'){
+      announce("Fotocamera posteriore non disponibile, passo a quella frontale.");
+      currentFacingMode = 'user';
+      await setupCamera('user', true);
+    } else if(!isRetry && facing === 'user'){
+      announce("Fotocamera frontale non disponibile, provo quella posteriore.");
+      currentFacingMode = 'environment';
+      await setupCamera('environment', true);
+    } else {
+      announce("Errore nell'accesso alla fotocamera.");
+    }
   }
 }
 
@@ -502,7 +528,7 @@ function captureFrame(){
   return parts[1];
 }
 
-// SCATTO MANUALE (5s) – sempre sotto il tuo controllo
+// SCATTO MANUALE
 async function startCountdown() {
   if(mode === 'guiding') toggleGuidance(); 
   cancelAutoShot();
@@ -546,7 +572,6 @@ function toggleGuidance(){
     ctx.clearRect(0,0,canvas.width,canvas.height);
     cancelAutoShot();
     announce("Guida disattivata.");
-    if(targetClass) manualFind(); 
   }else{
     mode = 'guiding';
     centeredFrames = 0;
@@ -556,13 +581,12 @@ function toggleGuidance(){
     lastGuidancePublishable = false;
     b.classList.add('guiding');
     b.innerText = "GUIDA ATTIVA";
-    announce("Guida attivata. Quando selfie o oggetto saranno pubblicabili, scatto automatico tra 3 secondi.");
+    announce("Guida attivata. Cerco selfie e oggetti pubblicabili; se va bene, scatto io dopo un breve conto alla rovescia.");
   }
 }
 
-// GUIDA LIVE (selfie + oggetti)
+// GUIDA LIVE
 function processGuidance(){
-  // Avviso luce insufficiente ogni tanto
   if(tempCtx && Date.now() - lastLowLightWarning > 8000) {
     const size = 100; 
     const startX = Math.max(0, tempCanvas.width/2 - size/2);
@@ -590,7 +614,7 @@ function processGuidance(){
 
   const now = Date.now();
 
-  // SELFIE: usa Pose/Face se disponibili e nessun targetClass
+  // SELFIE: camera frontale, niente targetClass
   if(currentFacingMode === 'user' && (poseLandmarker || faceLandmarker) && !targetClass){
     try{
       let poseResult = null;
@@ -648,19 +672,15 @@ function processGuidance(){
         }
       }
 
-      // se non vedo né corpo né volto: messaggio generale
       if(!box && !faceBox){
         if(now - lastGuideMessageTime > 3000){
           guideSpeak('warn',"Non ti vedo nel riquadro. Avvicinati o entra meglio nella camera.");
           lastGuideMessageTime = now;
         }
-        if(lastGuidancePublishable){
-          cancelAutoShot();
-        }
+        if(lastGuidancePublishable) cancelAutoShot();
         return;
       }
 
-      // box "generale" per disegnare (se manca pose, uso il volto)
       if(!box && faceBox){
         box = {
           originX: faceBox.originX - faceBox.width,
@@ -670,11 +690,10 @@ function processGuidance(){
         };
       }
 
-      // qui decidiamo automaticamente se è volto o corpo intero
       let dynamicSelfieMode = 'face';
       if(box){
         const hRatio = box.height / imgH;
-        if(hRatio > 0.5){           // più di metà schermata = consideralo corpo intero
+        if(hRatio > 0.5){
           dynamicSelfieMode = 'full';
         }
       }
@@ -702,30 +721,34 @@ function processGuidance(){
         let type = 'warn';
         let publishable = false;
 
-        // 1) errori veri: testa/corpo tagliati => NON pubblicabile
-        if(faceBox && faceBox.originY < imgH * BOUND_MARGIN){
-          msg = "Testa tagliata in alto. Abbassa la camera: così il selfie non sarebbe pubblicabile.";
+        const severeHeadCut = faceBox && faceBox.originY < imgH * BOUND_MARGIN;
+        const severeBodyCut =
+          (dynamicSelfieMode === 'full') &&
+          yMaxPx > imgH * (1 - BOUND_MARGIN) &&
+          box && box.height > imgH * 0.6;
+
+        if(severeHeadCut){
+          msg = "Testa tagliata in alto. Così il selfie non è pubblicabile. Abbassa la camera.";
           type = 'down';
           publishable = false;
         }
-        else if(dynamicSelfieMode === 'full' && yMaxPx > imgH * (1 - BOUND_MARGIN) && box && box.height > imgH * 0.5){
-          msg = "Corpo tagliato in basso. Allontana o alza la camera, così il selfie non sarebbe pubblicabile.";
+        else if(severeBodyCut){
+          msg = "Corpo molto tagliato in basso. Così il selfie corpo intero non è pubblicabile. Alza o allontana la camera.";
           type = 'up';
           publishable = false;
         }
         else {
-          // 2) selfie tecnicamente pubblicabile (volto o corpo intero)
-          if(faceBox && faceBox.originY > imgH * 0.35){
-            msg = "Selfie pubblicabile, ma il volto è piuttosto in basso. Alza un po' la camera per un effetto migliore.";
+          if(faceBox && faceBox.originY > imgH * 0.4){
+            msg = "Selfie pubblicabile ma migliorabile: il volto è piuttosto in basso, puoi alzare un po' la camera.";
             type = 'up';
             publishable = true;
           } else {
             if(cxNorm < LOOSE_LEFT){
-              msg = "Selfie pubblicabile, ma sei molto a sinistra. Spostati un po' a destra per un selfie più classico.";
+              msg = "Selfie pubblicabile ma molto a sinistra. Se vuoi un effetto più classico, spostati un po' a destra.";
               type = 'right';
               publishable = true;
             } else if(cxNorm > LOOSE_RIGHT){
-              msg = "Selfie pubblicabile, ma sei molto a destra. Spostati un po' a sinistra.";
+              msg = "Selfie pubblicabile ma molto a destra. Puoi spostarti un po' a sinistra se preferisci.";
               type = 'left';
               publishable = true;
             } else if(cxNorm < CENTER_LEFT){
@@ -738,8 +761,8 @@ function processGuidance(){
               publishable = true;
             } else {
               msg = (dynamicSelfieMode === 'full')
-                ? "Selfie corpo intero ok e pubblicabile. Sei ben centrata."
-                : "Selfie volto ok e pubblicabile. Sei ben centrata.";
+                ? "Selfie corpo intero pubblicabile. Sei ben centrata."
+                : "Selfie volto pubblicabile. Sei ben centrata.";
               type = 'ok';
               publishable = true;
               if(navigator.vibrate) navigator.vibrate([50,100,50]);
@@ -750,7 +773,6 @@ function processGuidance(){
         guideSpeak(type, msg);
         lastGuideMessageTime = now;
 
-        // gestisci autoscatto in base alla pubblicabilità
         if(publishable){
           if(!lastGuidancePublishable){
             scheduleAutoShot(
@@ -772,7 +794,7 @@ function processGuidance(){
     }
   }
 
-  // OGGETTI / GENERALE: objectDetector
+  // OGGETTI / GENERALE
   if(!objectDetector) return;
 
   try{
@@ -783,7 +805,7 @@ function processGuidance(){
     if(targetClass) {
       relevantObjects = d.filter(o => o.categories[0].categoryName === targetClass);
       if(relevantObjects.length === 0 && d.length > 0 && now - lastGuideMessageTime > 3000) {
-        const visible = d.slice(0,2).map(o=> objectDict[o.categories[0].categoryName] || o.categories[0].categoryName).join(", ");
+        const visible = d.slice(0,3).map(o=> objectDict[o.categories[0].categoryName] || o.categories[0].categoryName).join(", ");
         guideSpeak('warn',"Cerco " + (objectDict[targetClass] || targetClass) + " ma vedo solo: " + visible);
         lastGuideMessageTime = now;
         if(lastGuidancePublishable) cancelAutoShot();
@@ -859,60 +881,63 @@ function processGuidance(){
       const txtLeft  = isSelfie ? "Sposta a destra." : "Ruota a sinistra.";
       const txtRight = isSelfie ? "Sposta a sinistra." : "Ruota a destra.";
 
-      if (yMin < (imgH * BOUND_MARGIN)) {
-        msg = mainName + " tagliato in alto. Abbassa un po' la camera.";
+      const severelyCutTop = yMin < (imgH * BOUND_MARGIN));
+      const severelyCutBottom = yMax > (imgH * (1 - BOUND_MARGIN));
+
+      if (severelyCutTop) {
+        msg = mainName + " tagliato in alto. Così la foto non è ideale. Abbassa un po' la camera.";
         type = 'down';
         centeredFrames = 0;
         publishable = false;
       } 
-      else if (yMax > (imgH * (1 - BOUND_MARGIN)) && !isPerson && !isSelfie) {
-        msg = mainName + " tagliato in basso. Alza un po' la camera.";
+      else if (severelyCutBottom && !isPerson && !isSelfie) {
+        msg = mainName + " molto tagliato in basso. Per una foto migliore, alza la camera.";
         type = 'up';
         centeredFrames = 0;
         publishable = false;
       }
       else if (xMin < (imgW * BOUND_MARGIN)) {
-        msg = mainName + " tagliato in un lato. " + txtLeft;
+        msg = mainName + " quasi fuori da un lato. " + txtLeft;
         type = isSelfie ? 'right' : 'left';
         centeredFrames = 0;
         publishable = false;
       }
       else if (xMax > (imgW * (1 - BOUND_MARGIN))) {
-        msg = mainName + " tagliato dall'altro lato. " + txtRight;
+        msg = mainName + " quasi fuori dall'altro lato. " + txtRight;
         type = isSelfie ? 'left' : 'right';
         centeredFrames = 0;
         publishable = false;
       }
       else {
         if (cx < LIMIT_LEFT){
-          msg = txtLeft;
+          msg = mainName + " visibile ma spostato. " + txtLeft;
           type = isSelfie ? 'right' : 'left';
           centeredFrames = Math.max(0, centeredFrames - 2);
-          publishable = false;
+          publishable = true; // pubblicabile ma migliorabile
         }
         else if (cx > LIMIT_RIGHT){
-          msg = txtRight;
+          msg = mainName + " visibile ma spostato. " + txtRight;
           type = isSelfie ? 'left' : 'right';
           centeredFrames = Math.max(0, centeredFrames - 2);
-          publishable = false;
+          publishable = true;
         }
         else {
           if (isPerson && yMin > (imgH * 0.20)) {
-            msg = "Persona troppo in basso. Alza la camera.";
+            msg = "Persona un po' bassa nell'inquadratura. Pubblicabile ma puoi alzare la camera per migliorare.";
             type = 'up';
             centeredFrames = 0;
-            publishable = false;
+            publishable = true;
           } else {
             centeredFrames++;
             if(centeredFrames >= MIN_CENTER_FRAMES){
-              msg = mainName + " centrato. Ferma.";
+              msg = mainName + " centrato, foto ben messa. Pubblicabile.";
               type = 'ok';
               publishable = true;
               if(navigator.vibrate) navigator.vibrate([50,100,50]); 
             } else {
-              msg = "Quasi centrato, piccole regolazioni.";
+              msg = mainName + " quasi centrato, piccole regolazioni se vuoi.";
               type = 'ok';
-              publishable = false;
+              publishable = true;
             }
           }
         }
@@ -922,7 +947,7 @@ function processGuidance(){
 
       if(publishable){
         if(!lastGuidancePublishable){
-          scheduleAutoShot('object', "Oggetto centrato.");
+          scheduleAutoShot('object', mainName + " pubblicabile.");
         }
         lastGuidancePublishable = true;
       } else {
@@ -988,7 +1013,7 @@ function toggleColor(){
   }
 }
 
-// conversione colore più robusta (HSV)
+// conversione colore (HSV)
 function rgbToHsv(r, g, b){
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r,g,b), min = Math.min(r,g,b);
@@ -1118,19 +1143,17 @@ Devi essere molto chiaro e pratico.
   - Indica se il volto è spostato a sinistra, a destra, troppo in alto o troppo in basso.
   - Distingui chiaramente:
     - "✅ SELFIE PUBBLICABILE": volto intero, occhi visibili, luce sufficiente, anche se il viso è un po' decentrato.
-    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": i tratti sono visibili ma suggerisci cosa migliorare (es. un po' troppo in basso, luce un po' debole).
-    - "❌ SELFIE NON PUBBLICABILE": testa seriamente tagliata, volto quasi invisibile, luce pessima.
-  - Se è pubblicabile ma non perfettamente centrato, dillo esplicitamente (es. "volto leggermente a destra ma selfie pubblicabile").`;
+    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": i tratti sono visibili ma suggerisci cosa migliorare.
+    - "❌ SELFIE NON PUBBLICABILE": testa seriamente tagliata, volto quasi invisibile, luce pessima.`;
   } else if(mode === 'selfie_full'){
     basePrompt += `
 - SELFIE CORPO INTERO:
   - Controlla se testa, busto e gambe sono nel riquadro (specifica se manca una parte: testa, piedi, ginocchia ecc.).
   - Indica se il corpo è molto decentrato a sinistra/destra o solo leggermente.
   - Distingui chiaramente:
-    - "✅ SELFIE PUBBLICABILE": corpo sufficientemente completo (testa e gran parte delle gambe visibili) e luce sufficiente, anche se leggermente decentrato.
-    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": tecnicamente ok ma suggerisci correzioni (es. un po' troppo tagliato ai piedi, corpo molto a sinistra).
-    - "❌ SELFIE NON PUBBLICABILE": testa o gran parte del corpo tagliata in modo pesante.
-  - Se è pubblicabile ma non perfetto, spiegalo (es. "sei un po' spostata a sinistra ma la foto è comunque pubblicabile").`;
+    - "✅ SELFIE PUBBLICABILE": corpo abbastanza completo e luce sufficiente, anche se non perfettamente centrato.
+    - "⚠️ SELFIE PUBBLICABILE MA MIGLIORABILE": tecnicamente ok ma con qualche difetto.
+    - "❌ SELFIE NON PUBBLICABILE": grosse parti del corpo tagliate o quasi invisibili.`;
   } else {
     basePrompt += `- Descrivi la scena generale in modo chiaro, indicando cosa sembra al centro dell'inquadratura.`;
   }
@@ -1138,7 +1161,7 @@ Devi essere molto chiaro e pratico.
   basePrompt += `
 
 3. SE NECESSARIO, UN BREVE CONSIGLIO:
-- Una frase molto pratica su cosa correggere nel prossimo scatto (es. "alza leggermente la camera", "ti conviene spostarti un po' a destra").`;
+- Una frase molto pratica su cosa correggere nel prossimo scatto.`;
 
   return basePrompt;
 }
@@ -1155,17 +1178,11 @@ async function performSocialCheck(){
   announce("Analisi Social in corso...");
   const prompt = `
 Analizza questa foto per i Social Media (Instagram/TikTok).
-Considera le zone di interfaccia (pulsanti in basso, nome profilo in alto).
+Considera le zone di interfaccia.
 
-1. VERDETTO STORIE (9:16): 
-   - Ci sono elementi importanti ai bordi che verrebbero coperti dall'interfaccia?
-
-2. VERDETTO POST (4:5 o 1:1):
-   - Se la foto viene ritagliata quadrata, il soggetto si salva?
-
-3. SPAZI SICURI ("Safe Zones"):
-   - Dove c'è spazio vuoto per aggiungere testo senza coprire il volto? (Es. "C'è spazio in alto a destra").
-`;
+1. VERDETTO STORIE (9:16). 
+2. VERDETTO POST (4:5 o 1:1).
+3. Zone dove è sicuro mettere testo.`;
   showResultOnly("Analisi Social...");
   const text = await callGemini(prompt, lastShotB64);
   if(!text){
@@ -1200,22 +1217,13 @@ async function startTextAddition(){
   
   const placementPrompt = `
 L'utente vuole scrivere: "${textToAdd}".
-Guarda la foto. Devi decidere la posizione MIGLIORE per questo testo in modo che:
-1. NON copra il volto o dettagli importanti.
-2. Sia ben leggibile (su sfondo uniforme).
-3. Sia esteticamente bilanciato.
-
-Rispondi SOLO con uno di questi codici:
-- TOP_CENTER (Alto centro)
-- BOTTOM_CENTER (Basso centro)
-- TOP_LEFT (Alto sinistra)
-- TOP_RIGHT (Alto destra)
-- CENTER (Centro esatto)
-`;
+Decidi dove metterlo senza coprire volto o dettagli importanti.
+Rispondi SOLO con:
+TOP_CENTER, BOTTOM_CENTER, TOP_LEFT, TOP_RIGHT o CENTER.`;
 
   const positionCode = await callGemini(placementPrompt, lastShotB64);
   if(!positionCode){
-    announce("Non sono riuscita a decidere la posizione del testo. Controlla connessione o chiave.");
+    announce("Non sono riuscita a decidere la posizione del testo.");
     return;
   }
   
@@ -1400,6 +1408,169 @@ function deletePhoto(){
   announce("Foto scartata. Torno alla camera.");
 }
 
+/* ===========================
+   SCELTA OGGETTO SENZA VOCE
+   =========================== */
+
+function selectObjectFromChoice(eng, ita){
+  if(!objectDetector){
+    announce("Riconoscimento oggetti non disponibile.");
+    return;
+  }
+  targetClass = eng;
+  const b = document.getElementById('btn-find');
+  if(b){
+    b.innerText = "❌ STOP RICERCA: " + ita.toUpperCase();
+    b.classList.add('searching');
+  }
+  const choiceDiv = document.getElementById('object-choice');
+  if(choiceDiv) choiceDiv.innerHTML = "";
+  if(mode !== 'guiding') toggleGuidance();
+  announce("Ok, mi concentro su " + ita + ".");
+}
+
+// DESCRIZIONE RAPIDA: COSA VEDE LA CAMERA
+function quickDescribeScene(){
+  if(!tempCtx || video.readyState < 2){
+    announce("La fotocamera non è pronta.");
+    return;
+  }
+
+  if(tempCanvas.width!==video.videoWidth){
+    tempCanvas.width = video.videoWidth;
+    tempCanvas.height = video.videoHeight;
+  }
+  tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
+
+  if(!objectDetector && !poseLandmarker && !faceLandmarker){
+    announce("I modelli di riconoscimento non sono disponibili.");
+    return;
+  }
+
+  const choiceDiv = document.getElementById('object-choice');
+  if(choiceDiv) choiceDiv.innerHTML = "";
+
+  let parts = [];
+  let personSeen = false;
+
+  try{
+    // persona davanti alla camera
+    if(currentFacingMode === 'user' && (poseLandmarker || faceLandmarker)){
+      let hasPose = false;
+      if(poseLandmarker){
+        const poseRes = poseLandmarker.detectForVideo(video, performance.now());
+        if(poseRes && poseRes.landmarks && poseRes.landmarks.length){
+          hasPose = true;
+        }
+      }
+      let hasFace = false;
+      if(!hasPose && faceLandmarker){
+        const faceRes = faceLandmarker.detectForVideo(video, performance.now());
+        if(faceRes && faceRes.faceLandmarks && faceRes.faceLandmarks.length){
+          hasFace = true;
+        }
+      }
+      if(hasPose || hasFace){
+        parts.push("Vedo una persona davanti alla camera.");
+        personSeen = true;
+      }
+    }
+
+    let labels = [];
+    let options = [];
+
+    if(objectDetector){
+      const r = objectDetector.detectForVideo(video, performance.now());
+      const d = r ? r.detections : [];
+      if(d && d.length){
+        const sorted = d.slice().sort((a,b)=>{
+          const aa = a.boundingBox.width*a.boundingBox.height;
+          const bb = b.boundingBox.width*b.boundingBox.height;
+          return bb-aa;
+        });
+
+        const counts = {};
+        const order = [];
+        for(const det of sorted){
+          const raw = det.categories[0].categoryName;
+          const nice = objectDict[raw] || raw;
+          if(!counts[nice]) {
+            counts[nice] = 0;
+            order.push(nice);
+          }
+          counts[nice]++;
+        }
+
+        // NESSUN LIMITE: TUTTI GLI OGGETTI
+        labels = [];
+        for(const name of order){
+          const c = counts[name];
+          if(c > 1) labels.push(name + " ripetuto " + c + " volte");
+          else labels.push(name);
+        }
+
+        // opzioni per pulsanti: uno per ogni tipo di oggetto rilevato
+        options = [];
+        for(const name of order){
+          let foundEng = null;
+          for(const [eng, ita] of Object.entries(objectDict)){
+            if(ita === name || eng === name){
+              foundEng = eng;
+              break;
+            }
+          }
+          if(foundEng){
+            options.push({eng:foundEng, ita:name});
+          }
+        }
+
+        if(labels.length){
+          const list = labels.join(", ");
+          if(personSeen){
+            parts.push("In più vedo: " + list + ".");
+          }else{
+            parts.push("Vedo: " + list + ".");
+          }
+        }
+      }
+    }
+
+    // Se ho opzioni, creo i pulsanti sotto "Cosa vede la camera"
+    if(options.length){
+      const labelEl = document.createElement('div');
+      labelEl.id = 'object-choice-label';
+      labelEl.textContent = options.length > 1
+        ? "Scegli cosa seguire:"
+        : "Vuoi seguire questo oggetto?";
+      choiceDiv.appendChild(labelEl);
+
+      for(const opt of options){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'small-btn';
+        btn.textContent = opt.ita.toUpperCase();
+        btn.onclick = ()=>selectObjectFromChoice(opt.eng, opt.ita);
+        choiceDiv.appendChild(btn);
+      }
+
+      if(options.length > 1){
+        parts.push("Puoi scegliere l'oggetto da seguire con i pulsanti sotto.");
+      } else {
+        parts.push("Puoi seguire questo oggetto con il pulsante sotto.");
+      }
+    }
+
+  }catch(e){
+    console.error("Errore quickDescribeScene", e);
+  }
+
+  if(!parts.length){
+    announce("Al momento non riconosco persone o oggetti chiari nell'inquadratura.");
+  }else{
+    announce(parts.join(" "));
+  }
+}
+
 async function startApp(){
   document.getElementById('main-interface').classList.remove('hidden');
   document.getElementById('main-interface').removeAttribute('aria-hidden');
@@ -1421,7 +1592,6 @@ async function startApp(){
     
     const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
     
-    // Oggetti
     try{
       objectDetector = await ObjectDetector.createFromOptions(vision,{
         baseOptions:{
@@ -1437,7 +1607,6 @@ async function startApp(){
       announce("Riconoscimento oggetti non disponibile. Guida oggetti limitata.");
     }
 
-    // Pose
     try{
       poseLandmarker = await PoseLandmarker.createFromOptions(vision,{
         baseOptions:{
@@ -1453,7 +1622,6 @@ async function startApp(){
       announce("Riconoscimento posa corpo non disponibile. Selfie avanzato limitato.");
     }
 
-    // Face
     try{
       faceLandmarker = await FaceLandmarker.createFromOptions(vision,{
         baseOptions:{
