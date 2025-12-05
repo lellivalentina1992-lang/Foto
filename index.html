@@ -175,942 +175,936 @@ let objectDetector = null;
 let poseLandmarker = null;
 let faceLandmarker = null;
 
-let modelsReady = { detector:false, pose:false, face:false };
-let guideVerbosity = 'standard';
+let modelsReady = {detector:false, pose:false, face:false};
 
-// SISTEMA SELEZIONE OGGETTI
-let selectedObjects = []; // Array di oggetti selezionati per la foto
-let detectedObjectsCache = []; // Cache degli oggetti rilevati
-let isSelectingObjects = false;
+const video = document.getElementById('webcam');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+const tempCanvas = document.createElement('canvas');
+const tempCtx = tempCanvas.getContext('2d');
 
-// SISTEMA GUIDA LIVE INTELLIGENTE
-let liveGuidanceActive = false;
-let guidanceInterval = null;
-let guidanceTimeout = null;
-let guidanceStartTime = 0;
-const GUIDANCE_DURATION = 30000; // 30 secondi
-const GUIDANCE_CHECK_INTERVAL = 2500; // Controllo ogni 2.5 secondi
-
-// CRITERI QUALITÀ FOTOGRAFICA
-let photoQualityCriteria = {
-  allObjectsVisible: false,
-  wellLit: false,
-  centered: false,
-  notTooClose: false,
-  notTooFar: false,
-  straightAngle: false,
-  goodMargins: false
-};
-
-// STATO FOTO
-let currentPhotoAnalysis = null;
-let currentPhotoType = null; // 'scene', 'text', 'selfie', 'environment', 'social'
-
-// Stato camera
 let stream = null;
-let video = document.getElementById('webcam');
-let canvas = document.getElementById('overlay');
-let ctx = canvas.getContext('2d');
-let tempCanvas = document.createElement('canvas');
-let tempCtx = tempCanvas.getContext('2d');
-let facing = 'user';
+let currentFacingMode = 'user';
 let isRunning = false;
-let mode = 'idle';
 
-// Sonde attive
+// STATI
 let lightActive = false;
 let colorActive = false;
 let levelActive = false;
-
-// Ultima foto
-let lastShotB64 = null;
-let savedPhotos = [];
-let currentPhotoIndex = -1;
-
-// Riconoscimento vocale
-let recognition = null;
 let voiceActive = false;
+let countdown = 0;
+let countdownInterval = null;
 
+let currentDetections = [];
+let selectedObjects = [];
+let isGuiding = false;
+let guidanceInterval = null;
+let lastGuidanceTime = 0;
+
+let recognition = null;
+let guideVerbosity = 'standard';
+
+let photoStorage = [];
+let currentPhotoData = null;
+
+// ============================================
+// ANNUNCIO SCREEN READER (NO SINTESI VOCALE)
+// ============================================
 function announce(text){
-  const sr = document.getElementById('sr-announcer');
-  sr.textContent = text;
-  setTimeout(()=>sr.textContent="",100);
-  try{
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'it-IT';
-    u.rate = 1.1;
-    speechSynthesis.speak(u);
-  }catch(e){}
+  const ann = document.getElementById('sr-announcer');
+  ann.textContent = '';
+  setTimeout(() => {ann.textContent = text;}, 50);
 }
 
-async function setupCamera(facingMode){
-  if(stream){
-    stream.getTracks().forEach(t=>t.stop());
-  }
+// ============================================
+// GESTIONE CAMERA
+// ============================================
+async function setupCamera(mode){
   try{
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{facingMode},
+    if(stream){
+      stream.getTracks().forEach(t => t.stop());
+    }
+    
+    const constraints = {
+      video:{
+        facingMode:mode,
+        width:{ideal:1920},
+        height:{ideal:1080}
+      },
       audio:false
-    });
+    };
+    
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
     video.srcObject = stream;
-    await video.play();
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    tempCanvas.width = video.videoWidth;
-    tempCanvas.height = video.videoHeight;
-  }catch(e){
-    announce("Errore accesso camera: "+e.message);
+    
+    await new Promise(resolve => {
+      video.onloadedmetadata = () => resolve();
+    });
+    
+    currentFacingMode = mode;
+    announce(`Camera ${mode === 'user' ? 'frontale' : 'posteriore'} attivata`);
+    
+  }catch(err){
+    console.error("setupCamera error", err);
+    if(err.name === 'NotAllowedError'){
+      announce("Permesso fotocamera negato. Abilita i permessi dalle impostazioni del browser");
+    }else if(err.name === 'NotFoundError'){
+      announce("Nessuna fotocamera trovata sul dispositivo");
+    }else{
+      announce("Errore accesso fotocamera: " + err.message);
+    }
   }
 }
 
 function flipCamera(){
-  facing = facing==='user'?'environment':'user';
-  setupCamera(facing);
-  announce("Camera "+(facing==='user'?'frontale':'posteriore'));
+  const newMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  setupCamera(newMode);
 }
 
 // ============================================
-// SELEZIONE OGGETTI E GUIDA LIVE
+// LUCE/COLORE/LIVELLA
 // ============================================
+function toggleLight(){
+  lightActive = !lightActive;
+  const btn = document.getElementById('btn-light');
+  if(lightActive){
+    btn.classList.add('active-tool');
+    announce("Sonda luce attiva");
+    if(!lightOsc){
+      lightOsc = audioCtx.createOscillator();
+      lightGain = audioCtx.createGain();
+      lightOsc.connect(lightGain);
+      lightGain.connect(audioCtx.destination);
+      lightOsc.start();
+      lightGain.gain.value = 0;
+    }
+  }else{
+    btn.classList.remove('active-tool');
+    announce("Sonda luce disattivata");
+    if(lightGain) lightGain.gain.value = 0;
+  }
+}
 
-async function startObjectSelection(){
-  if(isSelectingObjects){
-    // Stop selezione
-    isSelectingObjects = false;
-    selectedObjects = [];
-    document.getElementById('selected-objects-container').style.display = 'none';
-    document.getElementById('detected-objects-list').innerHTML = '';
-    document.getElementById('btn-guide').textContent = 'SELEZIONA E FOTOGRAFA';
-    announce("Selezione annullata");
+function processLight(){
+  if(!tempCanvas.width) return;
+  const data = tempCtx.getImageData(0,0,tempCanvas.width,tempCanvas.height).data;
+  let sum = 0;
+  for(let i=0; i<data.length; i+=4){
+    sum += (data[i] + data[i+1] + data[i+2])/3;
+  }
+  const brightness = sum / (data.length/4);
+  const freq = 200 + brightness*2;
+  if(lightOsc) lightOsc.frequency.value = freq;
+  if(lightGain) lightGain.gain.value = 0.1;
+}
+
+function toggleColor(){
+  colorActive = !colorActive;
+  const btn = document.getElementById('btn-color');
+  if(colorActive){
+    btn.classList.add('active-tool');
+    announce("Analisi colore attiva");
+  }else{
+    btn.classList.remove('active-tool');
+    announce("Analisi colore disattivata");
+  }
+}
+
+function processColor(){
+  if(!tempCanvas.width) return;
+  const data = tempCtx.getImageData(tempCanvas.width/2-50, tempCanvas.height/2-50, 100, 100).data;
+  let r=0, g=0, b=0, count=0;
+  for(let i=0; i<data.length; i+=4){
+    r += data[i];
+    g += data[i+1];
+    b += data[i+2];
+    count++;
+  }
+  r = Math.round(r/count);
+  g = Math.round(g/count);
+  b = Math.round(b/count);
+  
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(canvas.width/2-60, canvas.height/2-60, 120, 120);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(canvas.width/2-60, canvas.height/2-60, 120, 120);
+  
+  const name = getColorName(r,g,b);
+  announce(`Colore centro: ${name}`);
+}
+
+function getColorName(r,g,b){
+  if(r>200 && g>200 && b>200) return 'bianco';
+  if(r<50 && g<50 && b<50) return 'nero';
+  if(r>150 && g<100 && b<100) return 'rosso';
+  if(r<100 && g>150 && b<100) return 'verde';
+  if(r<100 && g<100 && b>150) return 'blu';
+  if(r>150 && g>150 && b<100) return 'giallo';
+  if(r>150 && g<100 && b>150) return 'magenta';
+  if(r<100 && g>150 && b>150) return 'ciano';
+  if(r>150 && g>100 && b<100) return 'arancione';
+  return 'colore misto';
+}
+
+function toggleLevel(){
+  levelActive = !levelActive;
+  const btn = document.getElementById('btn-level');
+  if(levelActive){
+    btn.classList.add('active-tool');
+    announce("Livella attiva");
+    if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+      DeviceOrientationEvent.requestPermission().then(perm => {
+        if(perm === 'granted'){
+          window.addEventListener('deviceorientation', handleOrientation);
+        }else{
+          announce("Permesso orientamento negato");
+          levelActive = false;
+          btn.classList.remove('active-tool');
+        }
+      });
+    }else{
+      window.addEventListener('deviceorientation', handleOrientation);
+    }
+  }else{
+    btn.classList.remove('active-tool');
+    announce("Livella disattivata");
+    window.removeEventListener('deviceorientation', handleOrientation);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+}
+
+function handleOrientation(e){
+  if(!levelActive) return;
+  const beta = e.beta || 0;
+  const gamma = e.gamma || 0;
+  
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  
+  const cx = canvas.width/2;
+  const cy = canvas.height/2;
+  const offsetX = gamma*3;
+  const offsetY = beta*3;
+  
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx-50, cy);
+  ctx.lineTo(cx+50, cy);
+  ctx.moveTo(cx, cy-50);
+  ctx.lineTo(cx, cy+50);
+  ctx.stroke();
+  
+  ctx.fillStyle = '#0f0';
+  ctx.beginPath();
+  ctx.arc(cx+offsetX, cy+offsetY, 20, 0, Math.PI*2);
+  ctx.fill();
+  
+  if(Math.abs(beta)<5 && Math.abs(gamma)<5){
+    announce("Dispositivo in piano");
+  }
+}
+
+// ============================================
+// SCATTO FOTO
+// ============================================
+function startCountdown(){
+  if(countdown > 0) return;
+  countdown = 5;
+  announce("Conto alla rovescia: 5 secondi");
+  
+  countdownInterval = setInterval(() => {
+    countdown--;
+    if(countdown > 0){
+      announce(countdown + " secondi");
+    }else{
+      clearInterval(countdownInterval);
+      capturePhoto();
+    }
+  }, 1000);
+}
+
+function capturePhoto(){
+  if(!video.videoWidth) return;
+  
+  const photoCanvas = document.createElement('canvas');
+  photoCanvas.width = video.videoWidth;
+  photoCanvas.height = video.videoHeight;
+  const photoCtx = photoCanvas.getContext('2d');
+  photoCtx.drawImage(video, 0, 0);
+  
+  currentPhotoData = photoCanvas.toDataURL('image/jpeg', 0.9);
+  
+  savePhotoToGallery(currentPhotoData);
+  
+  announce("Foto scattata. Caricamento risultato...");
+  
+  showResult("Foto acquisita. Premi 'Analizza Qualità' per valutazione AI.");
+  
+  const actionBtns = document.getElementById('action-buttons');
+  actionBtns.innerHTML = `
+    <button class="btn-analyze" onclick="analyzePhoto()">ANALIZZA QUALITA'</button>
+    <button class="btn-danger" onclick="deleteCurrentPhoto()">ELIMINA FOTO</button>
+    <button class="btn-use-photo" onclick="usePhoto()">USA QUESTA FOTO</button>
+    <button class="btn-view-gallery" onclick="toggleGallery()">VEDI GALLERIA</button>
+  `;
+}
+
+function savePhotoToGallery(dataUrl){
+  const stored = localStorage.getItem('photo_gallery');
+  photoStorage = stored ? JSON.parse(stored) : [];
+  
+  photoStorage.push({
+    data: dataUrl,
+    timestamp: Date.now(),
+    quality: null
+  });
+  
+  // PULIZIA MEMORIA: mantieni solo ultime 50 foto
+  if(photoStorage.length > 50){
+    photoStorage = photoStorage.slice(-50);
+    announce("Galleria ripulita, mantenute ultime 50 foto");
+  }
+  
+  localStorage.setItem('photo_gallery', JSON.stringify(photoStorage));
+}
+
+function loadGallery(){
+  const stored = localStorage.getItem('photo_gallery');
+  photoStorage = stored ? JSON.parse(stored) : [];
+}
+
+function toggleGallery(){
+  const gallery = document.getElementById('photo-gallery');
+  if(gallery.style.display === 'none' || !gallery.style.display){
+    gallery.style.display = 'flex';
+    renderGallery();
+    announce("Galleria aperta con " + photoStorage.length + " foto");
+  }else{
+    gallery.style.display = 'none';
+    announce("Galleria chiusa");
+  }
+}
+
+function renderGallery(){
+  const gallery = document.getElementById('photo-gallery');
+  gallery.innerHTML = '';
+  
+  if(photoStorage.length === 0){
+    gallery.innerHTML = '<p style="color:#ccc">Nessuna foto salvata</p>';
     return;
   }
   
-  isSelectingObjects = true;
-  selectedObjects = [];
-  document.getElementById('btn-guide').textContent = 'ANNULLA SELEZIONE';
-  document.getElementById('selected-objects-container').style.display = 'none';
-  
-  announce("Analizzo cosa vede la camera. Attendi...");
-  
-  // Cattura frame e analizza
-  const frame = captureFrame();
-  if(!frame){
-    announce("Errore cattura frame");
-    isSelectingObjects = false;
-    return;
-  }
-  
-  try{
-    const detectedObjects = await analyzeFrameForObjects(frame);
+  photoStorage.forEach((photo, idx) => {
+    const item = document.createElement('div');
+    item.className = 'gallery-item';
     
-    if(detectedObjects.length === 0){
-      announce("Nessun oggetto rilevato. Riprova o avvicina la camera.");
-      isSelectingObjects = false;
-      document.getElementById('btn-guide').textContent = 'SELEZIONA E FOTOGRAFA';
+    const img = document.createElement('img');
+    img.src = photo.data;
+    img.className = 'gallery-thumbnail';
+    img.alt = `Foto ${idx+1}`;
+    
+    const info = document.createElement('div');
+    info.className = 'gallery-info';
+    const date = new Date(photo.timestamp);
+    info.innerHTML = `
+      <div style="font-weight:bold">Foto ${idx+1}</div>
+      <div style="font-size:0.85rem;color:#ccc">${date.toLocaleString('it-IT')}</div>
+      ${photo.quality ? `<div style="font-size:0.85rem;color:#0f0">Qualità: ${photo.quality}</div>` : ''}
+    `;
+    
+    const controls = document.createElement('div');
+    controls.className = 'gallery-controls';
+    controls.innerHTML = `
+      <button class="small-btn" onclick="viewGalleryPhoto(${idx})" style="min-height:40px">VEDI</button>
+      <button class="small-btn" onclick="deleteGalleryPhoto(${idx})" style="min-height:40px;background:#8B0000">ELIMINA</button>
+    `;
+    
+    item.appendChild(img);
+    item.appendChild(info);
+    item.appendChild(controls);
+    gallery.appendChild(item);
+  });
+}
+
+function viewGalleryPhoto(idx){
+  const photo = photoStorage[idx];
+  if(!photo) return;
+  
+  currentPhotoData = photo.data;
+  showResult(`Foto ${idx+1} dalla galleria.`);
+  
+  const actionBtns = document.getElementById('action-buttons');
+  actionBtns.innerHTML = `
+    <button class="btn-analyze" onclick="analyzePhoto()">ANALIZZA QUALITA'</button>
+    <button class="btn-danger" onclick="deleteCurrentPhoto()">ELIMINA FOTO</button>
+    <button class="btn-use-photo" onclick="usePhoto()">USA QUESTA FOTO</button>
+    <button class="btn-view-gallery" onclick="toggleGallery()">VEDI GALLERIA</button>
+  `;
+  
+  announce(`Visualizzata foto ${idx+1} dalla galleria`);
+}
+
+function deleteGalleryPhoto(idx){
+  if(confirm(`Eliminare la foto ${idx+1}?`)){
+    photoStorage.splice(idx, 1);
+    localStorage.setItem('photo_gallery', JSON.stringify(photoStorage));
+    renderGallery();
+    announce(`Foto ${idx+1} eliminata`);
+  }
+}
+
+function deleteCurrentPhoto(){
+  if(confirm("Eliminare questa foto?")){
+    currentPhotoData = null;
+    hideResult();
+    announce("Foto eliminata");
+  }
+}
+
+function usePhoto(){
+  if(!currentPhotoData) return;
+  
+  const link = document.getElementById('download-link');
+  link.href = currentPhotoData;
+  link.download = `photo_${Date.now()}.jpg`;
+  link.classList.remove('hidden');
+  link.textContent = 'Scarica foto sul dispositivo';
+  announce("Link download disponibile. Premi per scaricare la foto.");
+}
+
+// ============================================
+// ANALISI AI CON GEMINI
+// ============================================
+async function analyzePhoto(){
+  if(!GEMINI_KEY){
+    announce("Nessuna chiave API configurata. Vai in Impostazioni.");
+    return;
+  }
+  
+  if(!currentPhotoData){
+    announce("Nessuna foto da analizzare");
+    return;
+  }
+  
+  announce("Analisi in corso...");
+  
+  const base64 = currentPhotoData.split(',')[1];
+  
+  const prompt = `Analizza questa foto e fornisci:
+1. Valutazione qualità (Eccellente/Buona/Accettabile/Scarsa)
+2. Composizione e inquadratura
+3. Illuminazione e esposizione
+4. Messa a fuoco e nitidezza
+5. Se adatta per social media
+6. Suggerimenti miglioramento
+
+Rispondi in italiano, in modo conciso e pratico.`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            {text: prompt},
+            {inline_data: {mime_type: 'image/jpeg', data: base64}}
+          ]
+        }]
+      })
+    });
+    
+    clearTimeout(timeout);
+    
+    if(!response.ok){
+      const errText = await response.text();
+      throw new Error(`API Error ${response.status}: ${errText}`);
+    }
+    
+    const data = await response.json();
+    
+    if(!data.candidates || !data.candidates[0] || !data.candidates[0].content){
+      throw new Error("Risposta API non valida");
+    }
+    
+    const text = data.candidates[0].content.parts[0].text;
+    
+    const qualityMatch = text.match(/qualità[:\s]*(eccellente|buona|accettabile|scarsa)/i);
+    let quality = 'accettabile';
+    if(qualityMatch){
+      quality = qualityMatch[1].toLowerCase();
+    }
+    
+    let badge = '';
+    if(quality.includes('eccellente')){
+      badge = '<span class="quality-badge badge-excellent">ECCELLENTE</span>';
+    }else if(quality.includes('buona')){
+      badge = '<span class="quality-badge badge-good">BUONA</span>';
+    }else if(quality.includes('accettabile')){
+      badge = '<span class="quality-badge badge-acceptable">ACCETTABILE</span>';
+    }else{
+      badge = '<span class="quality-badge badge-poor">SCARSA</span>';
+    }
+    
+    showResult(badge + '\n\n' + text);
+    
+    const idx = photoStorage.findIndex(p => p.data === currentPhotoData);
+    if(idx !== -1){
+      photoStorage[idx].quality = quality;
+      localStorage.setItem('photo_gallery', JSON.stringify(photoStorage));
+    }
+    
+    announce("Analisi completata. Qualità: " + quality);
+    
+  } catch(err) {
+    console.error("analyzePhoto error", err);
+    if(err.name === 'AbortError'){
+      announce("Timeout: richiesta troppo lunga. Riprova.");
+    }else{
+      announce("Errore analisi: " + err.message);
+    }
+    showResult("Errore durante l'analisi: " + err.message);
+  }
+}
+
+// ============================================
+// CHIEDI DETTAGLIO
+// ============================================
+async function askCustomDetail(){
+  const question = prompt("Cosa vuoi sapere sulla scena?");
+  if(!question) return;
+  
+  announce("Acquisizione immagine...");
+  
+  if(!video.videoWidth) return;
+  
+  const photoCanvas = document.createElement('canvas');
+  photoCanvas.width = video.videoWidth;
+  photoCanvas.height = video.videoHeight;
+  const photoCtx = photoCanvas.getContext('2d');
+  photoCtx.drawImage(video, 0, 0);
+  
+  currentPhotoData = photoCanvas.toDataURL('image/jpeg', 0.9);
+  
+  if(!GEMINI_KEY){
+    announce("Nessuna chiave API configurata");
+    return;
+  }
+  
+  announce("Elaborazione domanda in corso...");
+  
+  const base64 = currentPhotoData.split(',')[1];
+  
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            {text: question},
+            {inline_data: {mime_type: 'image/jpeg', data: base64}}
+          ]
+        }]
+      })
+    });
+    
+    clearTimeout(timeout);
+    
+    if(!response.ok){
+      throw new Error(`API Error ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    
+    showResult(`Domanda: ${question}\n\nRisposta:\n${text}`);
+    announce("Risposta ricevuta");
+    
+    const actionBtns = document.getElementById('action-buttons');
+    actionBtns.innerHTML = `
+      <button class="btn-primary-wide" onclick="hideResult()">CHIUDI</button>
+    `;
+    
+  } catch(err) {
+    console.error("askCustomDetail error", err);
+    if(err.name === 'AbortError'){
+      announce("Timeout richiesta");
+    }else{
+      announce("Errore: " + err.message);
+    }
+  }
+}
+
+// ============================================
+// DESCRIZIONE RAPIDA
+// ============================================
+async function quickDescribeScene(){
+  if(!GEMINI_KEY){
+    announce("Nessuna chiave API configurata");
+    return;
+  }
+  
+  announce("Acquisizione frame...");
+  
+  if(!video.videoWidth) return;
+  
+  const photoCanvas = document.createElement('canvas');
+  photoCanvas.width = video.videoWidth;
+  photoCanvas.height = video.videoHeight;
+  const photoCtx = photoCanvas.getContext('2d');
+  photoCtx.drawImage(video, 0, 0);
+  
+  const dataUrl = photoCanvas.toDataURL('image/jpeg', 0.7);
+  const base64 = dataUrl.split(',')[1];
+  
+  announce("Elaborazione in corso...");
+  
+  const prompt = "Descrivi brevemente cosa vedi in questa immagine in massimo 3 frasi. Rispondi in italiano.";
+  
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            {text: prompt},
+            {inline_data: {mime_type: 'image/jpeg', data: base64}}
+          ]
+        }]
+      })
+    });
+    
+    clearTimeout(timeout);
+    
+    if(!response.ok){
+      throw new Error(`API Error ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    
+    announce("Descrizione ricevuta: " + text);
+    
+  } catch(err) {
+    console.error("quickDescribeScene error", err);
+    if(err.name === 'AbortError'){
+      announce("Timeout richiesta");
+    }else{
+      announce("Errore: " + err.message);
+    }
+  }
+}
+
+// ============================================
+// CERCA OGGETTO
+// ============================================
+async function manualFind(){
+  const target = prompt("Quale oggetto vuoi cercare?");
+  if(!target) return;
+  
+  const btnFind = document.getElementById('btn-find');
+  btnFind.classList.add('searching');
+  
+  announce(`Ricerca ${target} in corso...`);
+  
+  let found = false;
+  const startTime = Date.now();
+  
+  const searchInterval = setInterval(() => {
+    if(!objectDetector || !modelsReady.detector){
+      clearInterval(searchInterval);
+      btnFind.classList.remove('searching');
+      announce("Riconoscimento oggetti non disponibile");
       return;
     }
     
-    detectedObjectsCache = detectedObjects;
-    displayDetectedObjects(detectedObjects);
-    announce(`Rilevati ${detectedObjects.length} elementi. Tocca per selezionarli.`);
+    if(Date.now() - startTime > 30000){
+      clearInterval(searchInterval);
+      btnFind.classList.remove('searching');
+      announce(`${target} non trovato dopo 30 secondi`);
+      return;
+    }
     
-  }catch(e){
-    announce("Errore analisi: " + e.message);
-    isSelectingObjects = false;
-    document.getElementById('btn-guide').textContent = 'SELEZIONA E FOTOGRAFA';
-  }
+    if(video.readyState !== 4) return;
+    
+    try{
+      const detections = objectDetector.detectForVideo(video, performance.now());
+      
+      for(const det of detections.detections){
+        const label = det.categories[0].categoryName.toLowerCase();
+        if(label.includes(target.toLowerCase())){
+          found = true;
+          clearInterval(searchInterval);
+          btnFind.classList.remove('searching');
+          
+          const beep = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          beep.connect(gain);
+          gain.connect(audioCtx.destination);
+          beep.frequency.value = 800;
+          gain.gain.value = 0.3;
+          beep.start();
+          setTimeout(() => beep.stop(), 200);
+          
+          announce(`${target} trovato!`);
+          return;
+        }
+      }
+    }catch(e){
+      console.error("Detection error", e);
+    }
+    
+  }, 500);
 }
 
-async function analyzeFrameForObjects(base64Image){
-  if(!GEMINI_KEY){
-    announce("Inserisci la chiave Gemini nelle impostazioni");
-    throw new Error("Chiave mancante");
+// ============================================
+// SELEZIONE E GUIDA MULTIPLA
+// ============================================
+function startObjectSelection(){
+  if(!objectDetector || !modelsReady.detector){
+    announce("Riconoscimento oggetti non disponibile");
+    return;
   }
   
-  const payload = {
-    contents:[{
-      parts:[
-        {text: "Analizza questa immagine e elenca TUTTI gli oggetti, persone, animali e elementi visibili. Per ogni elemento fornisci: nome breve e descrittivo. Formato: ogni elemento su una riga, solo il nome. Esempi: 'Persona', 'Computer portatile', 'Finestra', 'Tavolo', 'Cellulare', 'Lampada', 'Pianta', 'Gatto'. Sii specifico ma conciso."},
-        {inline_data:{mime_type:"image/jpeg",data:base64Image.split(',')[1]}}
-      ]
-    }]
-  };
+  selectedObjects = [];
+  document.getElementById('selected-objects-container').style.display = 'flex';
+  document.getElementById('detected-objects-list').style.display = 'flex';
   
-  const resp = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
+  announce("Modalità selezione oggetti attiva. Rilevamento in corso...");
   
-  if(!resp.ok){
-    const err = await resp.text();
-    throw new Error("Errore API: "+err);
-  }
-  
-  const data = await resp.json();
-  const text = data.candidates[0].content.parts[0].text;
-  
-  // Parse risultati
-  const lines = text.split('\n').filter(l => l.trim().length > 0);
-  const objects = lines.map(line => {
-    // Rimuovi numerazione, trattini, asterischi
-    return line.replace(/^\d+[\.\)]\s*/, '').replace(/^[-*]\s*/, '').trim();
-  }).filter(obj => obj.length > 0 && obj.length < 50);
-  
-  return objects;
+  const detectionInterval = setInterval(() => {
+    if(document.getElementById('detected-objects-list').style.display === 'none'){
+      clearInterval(detectionInterval);
+      return;
+    }
+    
+    if(video.readyState !== 4) return;
+    
+    try{
+      const detections = objectDetector.detectForVideo(video, performance.now());
+      currentDetections = detections.detections;
+      
+      const uniqueObjects = [...new Set(detections.detections.map(d => d.categories[0].categoryName))];
+      
+      const listEl = document.getElementById('detected-objects-list');
+      listEl.innerHTML = '';
+      
+      if(uniqueObjects.length === 0){
+        listEl.innerHTML = '<p style="color:#ccc;padding:10px">Nessun oggetto rilevato</p>';
+        return;
+      }
+      
+      uniqueObjects.forEach(obj => {
+        const btn = document.createElement('button');
+        btn.className = 'object-item-btn';
+        btn.textContent = obj;
+        btn.onclick = () => toggleObjectSelection(obj);
+        
+        if(selectedObjects.includes(obj)){
+          btn.style.background = '#004400';
+          btn.style.borderColor = '#0f0';
+          btn.style.color = '#0f0';
+        }
+        
+        listEl.appendChild(btn);
+      });
+      
+    }catch(e){
+      console.error("Detection error", e);
+    }
+    
+  }, 1000);
 }
 
-function displayDetectedObjects(objects){
-  const container = document.getElementById('detected-objects-list');
+function toggleObjectSelection(objName){
+  const idx = selectedObjects.indexOf(objName);
+  if(idx === -1){
+    selectedObjects.push(objName);
+    announce(`Aggiunto ${objName}`);
+  }else{
+    selectedObjects.splice(idx, 1);
+    announce(`Rimosso ${objName}`);
+  }
+  
+  updateSelectedObjectsList();
+}
+
+function updateSelectedObjectsList(){
+  const container = document.getElementById('selected-objects-list');
   container.innerHTML = '';
   
-  objects.forEach(obj => {
-    const btn = document.createElement('button');
-    btn.className = 'object-item-btn';
-    btn.textContent = obj;
-    btn.setAttribute('aria-label', `Seleziona ${obj}`);
-    btn.onclick = () => addObjectToSelection(obj);
-    container.appendChild(btn);
-  });
-}
-
-function addObjectToSelection(objectName){
-  if(selectedObjects.includes(objectName)){
-    announce(`${objectName} già selezionato`);
+  if(selectedObjects.length === 0){
+    container.innerHTML = '<p style="color:#888">Nessuno</p>';
     return;
   }
-  
-  selectedObjects.push(objectName);
-  updateSelectedObjectsDisplay();
-  announce(`${objectName} aggiunto. Totale: ${selectedObjects.length} elementi`);
-}
-
-function removeObjectFromSelection(objectName){
-  selectedObjects = selectedObjects.filter(o => o !== objectName);
-  updateSelectedObjectsDisplay();
-  announce(`${objectName} rimosso. Totale: ${selectedObjects.length} elementi`);
-  
-  if(selectedObjects.length === 0){
-    document.getElementById('selected-objects-container').style.display = 'none';
-  }
-}
-
-function updateSelectedObjectsDisplay(){
-  const container = document.getElementById('selected-objects-container');
-  const list = document.getElementById('selected-objects-list');
-  
-  if(selectedObjects.length === 0){
-    container.style.display = 'none';
-    return;
-  }
-  
-  container.style.display = 'flex';
-  list.innerHTML = '';
   
   selectedObjects.forEach(obj => {
     const tag = document.createElement('div');
     tag.className = 'selected-object-tag';
     tag.innerHTML = `
-      <span>${obj}</span>
-      <button class="remove-object-btn" onclick="removeObjectFromSelection('${obj}')" aria-label="Rimuovi ${obj}">✕</button>
+      ${obj}
+      <button class="remove-object-btn" onclick="toggleObjectSelection('${obj}')" aria-label="Rimuovi ${obj}">X</button>
     `;
-    list.appendChild(tag);
+    container.appendChild(tag);
   });
 }
 
-async function startLiveGuidance(){
+function startLiveGuidance(){
   if(selectedObjects.length === 0){
-    announce("Seleziona almeno un elemento prima di avviare la guida");
+    announce("Seleziona almeno un oggetto");
     return;
   }
   
-  // Nascondi selezione e avvia guida
-  isSelectingObjects = false;
-  document.getElementById('detected-objects-list').innerHTML = '';
-  document.getElementById('btn-guide').textContent = 'SELEZIONA E FOTOGRAFA';
+  document.getElementById('detected-objects-list').style.display = 'none';
   
-  liveGuidanceActive = true;
-  guidanceStartTime = Date.now();
+  isGuiding = true;
+  const btnGuide = document.getElementById('btn-guide');
+  btnGuide.classList.add('guiding');
+  btnGuide.textContent = 'STOP GUIDA';
+  btnGuide.onclick = stopLiveGuidance;
   
-  announce(`Guida attivata. Hai 30 secondi. Ti aiuto a fotografare: ${selectedObjects.join(', ')}`);
+  announce(`Guida attiva per: ${selectedObjects.join(', ')}`);
   
-  // Prima verifica immediata
-  await checkGuidanceQuality();
-  
-  // Verifica periodica ogni 2.5 secondi
-  guidanceInterval = setInterval(async () => {
-    if(liveGuidanceActive){
-      await checkGuidanceQuality();
+  guidanceInterval = setInterval(() => {
+    if(!isGuiding) return;
+    
+    const now = Date.now();
+    if(now - lastGuidanceTime < (guideVerbosity === 'minimo' ? 5000 : guideVerbosity === 'standard' ? 3000 : 2000)){
+      return;
     }
-  }, GUIDANCE_CHECK_INTERVAL);
-  
-  // Timeout 30 secondi - scatto automatico
-  guidanceTimeout = setTimeout(async () => {
-    if(liveGuidanceActive){
-      announce("Tempo scaduto. Scatto!");
-      await finalizeLiveGuidance();
+    
+    if(video.readyState !== 4) return;
+    
+    try{
+      const detections = objectDetector.detectForVideo(video, performance.now());
+      
+      const found = [];
+      const missing = [];
+      
+      selectedObjects.forEach(target => {
+        const det = detections.detections.find(d => d.categories[0].categoryName === target);
+        if(det){
+          found.push({name: target, box: det.boundingBox});
+        }else{
+          missing.push(target);
+        }
+      });
+      
+      if(missing.length > 0){
+        announce(`Mancano: ${missing.join(', ')}`);
+      }else{
+        const allCentered = found.every(obj => {
+          const cx = obj.box.originX + obj.box.width/2;
+          const cy = obj.box.originY + obj.box.height/2;
+          const vcx = video.videoWidth/2;
+          const vcy = video.videoHeight/2;
+          return Math.abs(cx - vcx) < video.videoWidth*0.2 && Math.abs(cy - vcy) < video.videoHeight*0.2;
+        });
+        
+        if(allCentered){
+          announce("Composizione ottimale! Scatta ora.");
+          if(modelsReady.face && modelsReady.pose){
+            setTimeout(() => capturePhoto(), 1000);
+            stopLiveGuidance();
+          }
+        }else{
+          announce("Inquadra meglio gli oggetti al centro");
+        }
+      }
+      
+      lastGuidanceTime = now;
+      
+    }catch(e){
+      console.error("Guidance error", e);
     }
-  }, GUIDANCE_DURATION);
+    
+  }, 500);
 }
 
-async function checkGuidanceQuality(){
-  const frame = captureFrame();
-  if(!frame) return;
-  
-  try{
-    const analysis = await analyzePhotoQuality(frame, selectedObjects);
-    provideGuidanceFeedback(analysis);
-  }catch(e){
-    console.error("Errore verifica qualità:", e);
-  }
-}
-
-async function analyzePhotoQuality(base64Image, targetObjects){
-  if(!GEMINI_KEY) return null;
-  
-  const objectsList = targetObjects.join(', ');
-  
-  const prompt = `Analizza questa foto per guidare una persona cieca a scattare una buona foto.
-
-ELEMENTI DA FOTOGRAFARE: ${objectsList}
-
-Valuta questi criteri e rispondi in formato JSON:
-{
-  "allObjectsVisible": true/false,
-  "missingObjects": ["lista oggetti mancanti"],
-  "visibleObjects": ["lista oggetti visibili"],
-  "lighting": "buona/scarsa/controluce",
-  "framing": "centrato/spostato a sinistra/spostato a destra/troppo alto/troppo basso",
-  "distance": "perfetta/troppo vicino/troppo lontano",
-  "angle": "dritto/storto",
-  "margins": "buoni/stretti/tagliati",
-  "mainIssue": "descrizione problema principale se presente",
-  "nextInstruction": "istruzione vocale chiara e concisa (es: 'Spostati a destra', 'Allontanati', 'Alza la fotocamera')"
-}
-
-Regole:
-- Se mancano oggetti, priorità assoluta a trovarli
-- Se tutti gli oggetti ci sono, ottimizza composizione
-- Istruzioni brevi e chiare (max 5-6 parole)
-- Se tutto è perfetto: nextInstruction = "Perfetto così"`;
-
-  const payload = {
-    contents:[{
-      parts:[
-        {text: prompt},
-        {inline_data:{mime_type:"image/jpeg",data:base64Image.split(',')[1]}}
-      ]
-    }]
-  };
-  
-  const resp = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
-  
-  if(!resp.ok) return null;
-  
-  const data = await resp.json();
-  let text = data.candidates[0].content.parts[0].text;
-  
-  // Estrai JSON
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if(jsonMatch){
-    return JSON.parse(jsonMatch[0]);
-  }
-  
-  return null;
-}
-
-function provideGuidanceFeedback(analysis){
-  if(!analysis) return;
-  
-  const elapsed = Date.now() - guidanceStartTime;
-  const remaining = Math.ceil((GUIDANCE_DURATION - elapsed) / 1000);
-  
-  let feedback = analysis.nextInstruction;
-  
-  // Aggiungi contesto oggetti
-  if(!analysis.allObjectsVisible && analysis.missingObjects.length > 0){
-    const missing = analysis.missingObjects.join(', ');
-    feedback = `Mancano: ${missing}. ${feedback}`;
-  } else if(analysis.allObjectsVisible){
-    feedback = `Tutti gli elementi presenti. ${feedback}`;
-  }
-  
-  // Aggiungi tempo rimanente ogni tanto
-  if(remaining <= 10 || remaining % 10 === 0){
-    feedback += `. ${remaining} secondi rimasti`;
-  }
-  
-  announce(feedback);
-}
-
-async function finalizeLiveGuidance(){
-  liveGuidanceActive = false;
-  
+function stopLiveGuidance(){
+  isGuiding = false;
   if(guidanceInterval){
     clearInterval(guidanceInterval);
     guidanceInterval = null;
   }
   
-  if(guidanceTimeout){
-    clearTimeout(guidanceTimeout);
-    guidanceTimeout = null;
-  }
+  const btnGuide = document.getElementById('btn-guide');
+  btnGuide.classList.remove('guiding');
+  btnGuide.textContent = 'SELEZIONA E FOTOGRAFA';
+  btnGuide.onclick = startObjectSelection;
   
-  // Scatta foto
-  const photo = captureFrame();
-  if(photo){
-    lastShotB64 = photo;
-    showPhotoAnalysisOptions();
-  }
+  document.getElementById('selected-objects-container').style.display = 'none';
+  document.getElementById('detected-objects-list').style.display = 'none';
   
-  // Reset selezione
-  selectedObjects = [];
-  updateSelectedObjectsDisplay();
+  announce("Guida disattivata");
 }
 
 // ============================================
-// CATTURA FOTO E ANALISI POST-SCATTO
+// SHOW/HIDE RESULT
 // ============================================
-
-function captureFrame(){
-  if(!video || video.readyState !== 4) return null;
-  const c = document.createElement('canvas');
-  c.width = video.videoWidth;
-  c.height = video.videoHeight;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(video,0,0);
-  return c.toDataURL('image/jpeg',0.9);
+function showResult(text){
+  const resultScreen = document.getElementById('result-screen');
+  const resultContent = document.getElementById('result-content');
+  
+  resultContent.innerHTML = text;
+  
+  resultScreen.classList.remove('hidden');
+  resultScreen.removeAttribute('aria-hidden');
+  resultScreen.removeAttribute('inert');
+  
+  setTimeout(() => resultContent.focus(), 100);
 }
 
-function showPhotoAnalysisOptions(){
-  const rs = document.getElementById('result-screen');
-  const rc = document.getElementById('result-content');
-  const ab = document.getElementById('action-buttons');
+function hideResult(){
+  const resultScreen = document.getElementById('result-screen');
+  resultScreen.classList.add('hidden');
+  resultScreen.setAttribute('aria-hidden', 'true');
+  resultScreen.setAttribute('inert', '');
   
-  rs.classList.remove('hidden');
-  rs.removeAttribute('aria-hidden');
-  rs.removeAttribute('inert');
-  
-  rc.textContent = "Foto acquisita. Scegli come analizzarla:";
-  
-  // Reset stato
-  currentPhotoAnalysis = null;
-  currentPhotoType = null;
-  
-  // Pulsanti analisi contenuto
-  ab.innerHTML = `
-    <button class="btn-analyze" onclick="analyzePhoto('scene')">📷 DESCRIZIONE SCENA</button>
-    <button class="btn-analyze" onclick="analyzePhoto('text')">📝 RILEVA TESTO</button>
-    <button class="btn-analyze" onclick="analyzePhoto('selfie')">👤 ANALISI SELFIE</button>
-    <button class="btn-analyze" onclick="analyzePhoto('environment')">🏞️ ANALISI AMBIENTE</button>
-  `;
-  
-  announce("Foto acquisita. Scegli tipo di analisi: descrizione scena, rileva testo, analisi selfie, o analisi ambiente");
-}
-
-async function analyzePhoto(type){
-  if(!lastShotB64){
-    announce("Nessuna foto da analizzare");
-    return;
-  }
-  
-  if(!GEMINI_KEY){
-    announce("Inserisci la chiave Gemini nelle impostazioni");
-    return;
-  }
-  
-  currentPhotoType = type;
-  const rc = document.getElementById('result-content');
-  rc.textContent = "Analisi in corso...";
-  announce("Analisi in corso");
-  
-  let prompt = "";
-  
-  switch(type){
-    case 'scene':
-      prompt = `Descrivi questa scena in modo molto dettagliato come se parlassi a una persona cieca. Includi:
-- Cosa c'è nell'immagine (persone, oggetti, ambiente)
-- Posizione e disposizione degli elementi
-- Colori dominanti
-- Illuminazione e atmosfera
-- Qualsiasi dettaglio rilevante
-Rispondi in italiano, in modo naturale e completo.`;
-      break;
-      
-    case 'text':
-      prompt = `Estrai e trascrivi TUTTO il testo presente in questa immagine. Includi:
-- Testo principale (titoli, paragrafi)
-- Testo piccolo (note, didascalie)
-- Testo su oggetti (etichette, scritte)
-- Numeri, date, orari
-Mantieni la formattazione quando possibile. Se non c'è testo, dillo chiaramente.`;
-      break;
-      
-    case 'selfie':
-      prompt = `Analizza questo selfie in modo dettagliato per una persona cieca:
-
-TIPO DI SELFIE:
-- È un primo piano (solo volto) o corpo intero?
-
-DETTAGLI VOLTO (se visibile):
-- Espressione facciale
-- Posizione dello sguardo
-- Capelli (stile, colore)
-- Trucco o accessori sul viso
-
-DETTAGLI CORPO INTERO (se presente):
-- Postura
-- Abbigliamento (descrizione completa)
-- Posizione delle braccia/mani
-- Background visibile
-
-QUALITÀ TECNICA:
-- Inquadratura (centrato, tagliato, margini)
-- Illuminazione del soggetto
-- Nitidezza
-
-Rispondi in italiano, in modo naturale e dettagliato.`;
-      break;
-      
-    case 'environment':
-      prompt = `Analizza l'ambiente e il contesto di questa foto per una persona cieca:
-- Tipo di location (interno/esterno, pubblico/privato)
-- Arredamento o elementi architettonici
-- Atmosfera e mood
-- Ora del giorno stimata dalla luce
-- Condizioni meteo (se esterno)
-- Oggetti e dettagli ambientali
-- Persone presenti e loro attività
-Rispondi in italiano, in modo narrativo e immersivo.`;
-      break;
-  }
-  
-  try{
-    const analysis = await callGeminiVision(prompt, lastShotB64);
-    currentPhotoAnalysis = analysis;
-    rc.textContent = analysis;
-    
-    // Mostra pulsanti post-analisi
-    showPostAnalysisOptions();
-    
-    announce("Analisi completata");
-    
-  }catch(e){
-    rc.textContent = "Errore: " + e.message;
-    announce("Errore durante l'analisi");
-  }
-}
-
-function showPostAnalysisOptions(){
-  const ab = document.getElementById('action-buttons');
-  
-  ab.innerHTML = `
-    <button class="btn-use-photo" onclick="usePhoto()">✅ USA FOTO</button>
-    <button class="btn-social-check" onclick="analyzeSocialMedia()">📱 ANALISI SOCIAL</button>
-    <button class="btn-danger" onclick="deletePhoto()">🗑️ ELIMINA</button>
-  `;
-}
-
-async function analyzeSocialMedia(){
-  if(!lastShotB64 || !currentPhotoAnalysis){
-    announce("Effettua prima un'analisi della foto");
-    return;
-  }
-  
-  const rc = document.getElementById('result-content');
-  rc.textContent = "Analisi social in corso...";
-  announce("Analisi pubblicabilità social in corso");
-  
-  const prompt = `Analizza questa foto per determinare la pubblicabilità sui social media.
-
-CONTESTO FOTO:
-${currentPhotoAnalysis.substring(0, 500)}
-
-Valuta e rispondi in italiano:
-
-📸 QUALITÀ TECNICA (0-10):
-- Nitidezza
-- Illuminazione
-- Composizione
-- Punteggio totale
-
-📱 INSTAGRAM STORIES:
-- Pubblicabile: SÌ/NO
-- Motivo
-- Orientamento ideale (verticale/quadrato)
-- Dove aggiungere testo/sticker
-
-📷 POST INSTAGRAM:
-- Pubblicabile: SÌ/NO
-- Motivo
-- Orientamento migliore
-- Suggerimenti caption
-
-👥 FACEBOOK:
-- Pubblicabile: SÌ/NO
-- Motivo
-- Tipo di post consigliato
-
-🎵 TIKTOK:
-- Pubblicabile: SÌ/NO
-- Motivo
-- Considerazioni per video/clip
-
-✍️ SPAZIO PER TESTO:
-- Dove si può aggiungere testo senza coprire elementi importanti
-- Zone libere per sticker/grafiche
-
-💡 SUGGERIMENTI:
-- Se non è ottimale, cosa migliorare
-- Alternative o modifiche consigliate
-
-Rispondi in modo chiaro e pratico.`;
-
-  try{
-    const analysis = await callGeminiVision(prompt, lastShotB64);
-    rc.textContent = analysis;
-    
-    // Mostra pulsanti finali
-    const ab = document.getElementById('action-buttons');
-    ab.innerHTML = `
-      <button class="btn-use-photo" onclick="usePhoto()">✅ USA FOTO</button>
-      <button class="btn-danger" onclick="deletePhoto()">🗑️ ELIMINA</button>
-    `;
-    
-    announce("Analisi social completata");
-    
-  }catch(e){
-    rc.textContent = "Errore: " + e.message;
-    announce("Errore durante l'analisi social");
-  }
-}
-
-async function callGeminiVision(prompt, base64Image){
-  const payload = {
-    contents:[{
-      parts:[
-        {text: prompt},
-        {inline_data:{mime_type:"image/jpeg",data:base64Image.split(',')[1]}}
-      ]
-    }]
-  };
-  
-  const resp = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
-  });
-  
-  if(!resp.ok){
-    const err = await resp.text();
-    throw new Error("Errore API: "+err);
-  }
-  
-  const data = await resp.json();
-  return data.candidates[0].content.parts[0].text;
+  document.getElementById('download-link').classList.add('hidden');
+  document.getElementById('photo-gallery').style.display = 'none';
 }
 
 // ============================================
-// USA FOTO - SALVATAGGIO E CONDIVISIONE
+// COMANDI VOCALI
 // ============================================
-
-async function usePhoto(){
-  if(!lastShotB64){
-    announce("Nessuna foto da usare");
-    return;
-  }
-  
-  // Converti base64 in blob
-  const blob = await (await fetch(lastShotB64)).blob();
-  const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-  
-  // Controlla se il browser supporta Web Share API
-  if(navigator.canShare && navigator.canShare({ files: [file] })){
-    // Mostra opzioni
-    showUsePhotoOptions(file);
-  } else {
-    // Fallback: solo download
-    downloadPhoto();
-  }
-}
-
-function showUsePhotoOptions(file){
-  const ab = document.getElementById('action-buttons');
-  
-  ab.innerHTML = `
-    <button class="btn-use-photo" onclick="downloadPhoto()">💾 SALVA IN GALLERIA</button>
-    <button class="btn-use-photo" onclick="sharePhoto()">📤 CONDIVIDI</button>
-    <button class="btn-danger" onclick="deletePhoto()">🗑️ ELIMINA</button>
-  `;
-  
-  announce("Scegli come usare la foto: salva in galleria o condividi");
-}
-
-function downloadPhoto(){
-  if(!lastShotB64){
-    announce("Nessuna foto da scaricare");
-    return;
-  }
-  
-  const link = document.createElement('a');
-  link.href = lastShotB64;
-  link.download = `photo_${Date.now()}.jpg`;
-  link.click();
-  
-  announce("Foto salvata nella galleria");
-}
-
-async function sharePhoto(){
-  if(!lastShotB64){
-    announce("Nessuna foto da condividere");
-    return;
-  }
-  
-  try{
-    const blob = await (await fetch(lastShotB64)).blob();
-    const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    
-    if(navigator.canShare && navigator.canShare({ files: [file] })){
-      await navigator.share({
-        files: [file],
-        title: 'Foto Smart Photo Assistant',
-        text: currentPhotoAnalysis ? currentPhotoAnalysis.substring(0, 200) : 'La mia foto'
-      });
-      announce("Foto condivisa");
-    } else {
-      announce("Condivisione non supportata su questo dispositivo. Usa salva in galleria.");
-      downloadPhoto();
-    }
-  }catch(e){
-    if(e.name !== 'AbortError'){
-      announce("Errore condivisione: " + e.message);
-    }
-  }
-}
-
-function deletePhoto(){
-  lastShotB64 = null;
-  currentPhotoAnalysis = null;
-  currentPhotoType = null;
-  
-  const rs = document.getElementById('result-screen');
-  rs.classList.add('hidden');
-  rs.setAttribute('aria-hidden','true');
-  rs.setAttribute('inert','');
-  
-  announce("Foto eliminata. Torno alla home");
-}
-
-// ============================================
-// FUNZIONI ORIGINALI (SEMPLICI)
-// ============================================
-
-function startCountdown(){
-  let count = 5;
-  announce(`Scatto in ${count} secondi`);
-  const iv = setInterval(()=>{
-    count--;
-    if(count>0){
-      announce(count.toString());
-    }else{
-      clearInterval(iv);
-      const photo = captureFrame();
-      if(photo){
-        lastShotB64 = photo;
-        showPhotoAnalysisOptions();
-      }
-    }
-  },1000);
-}
-
-async function manualFind(){
-  const q = prompt("Quale oggetto vuoi trovare?");
-  if(!q) return;
-  
-  announce(`Cerco ${q}`);
-  const frame = captureFrame();
-  if(!frame) return;
-  
-  try{
-    const prompt = `C'è "${q}" in questa immagine? Rispondi SÌ o NO e spiega brevemente dove si trova o perché non c'è.`;
-    const result = await callGeminiVision(prompt, frame);
-    announce(result);
-  }catch(e){
-    announce("Errore ricerca: " + e.message);
-  }
-}
-
-async function askCustomDetail(){
-  const q = prompt("Cosa vuoi sapere sulla scena?");
-  if(!q) return;
-  
-  announce("Scatto e analizzo");
-  const photo = captureFrame();
-  if(!photo) return;
-  
-  lastShotB64 = photo;
-  
-  try{
-    const result = await callGeminiVision(q, photo);
-    
-    const rs = document.getElementById('result-screen');
-    const rc = document.getElementById('result-content');
-    const ab = document.getElementById('action-buttons');
-    
-    rs.classList.remove('hidden');
-    rs.removeAttribute('aria-hidden');
-    rs.removeAttribute('inert');
-    
-    rc.textContent = result;
-    ab.innerHTML = `
-      <button class="btn-primary-wide" onclick="deletePhoto()">CHIUDI</button>
-    `;
-    
-    announce("Analisi completata");
-  }catch(e){
-    announce("Errore: " + e.message);
-  }
-}
-
-async function quickDescribeScene(){
-  announce("Analizzo cosa vede la camera");
-  const frame = captureFrame();
-  if(!frame) return;
-  
-  try{
-    const prompt = "Descrivi brevemente cosa c'è in questa immagine in 2-3 frasi.";
-    const result = await callGeminiVision(prompt, frame);
-    announce(result);
-  }catch(e){
-    announce("Errore: " + e.message);
-  }
-}
-
-// ============================================
-// SONDE (LUCE, COLORE, LIVELLA)
-// ============================================
-
-function toggleLight(){
-  lightActive = !lightActive;
-  document.getElementById('btn-light').classList.toggle('active-tool',lightActive);
-  if(lightActive){
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    lightOsc = audioCtx.createOscillator();
-    lightGain = audioCtx.createGain();
-    lightOsc.connect(lightGain);
-    lightGain.connect(audioCtx.destination);
-    lightGain.gain.value = 0.1;
-    lightOsc.start();
-    announce("Sonda luce attiva. Più acuto = più luminoso");
-  }else{
-    if(lightOsc){
-      lightOsc.stop();
-      lightOsc = null;
-    }
-    announce("Sonda luce disattivata");
-  }
-}
-
-function processLight(){
-  if(!tempCtx || !lightOsc) return;
-  const id = tempCtx.getImageData(0,0,tempCanvas.width,tempCanvas.height);
-  const d = id.data;
-  let sum = 0;
-  for(let i=0;i<d.length;i+=4){
-    sum += (d[i]+d[i+1]+d[i+2])/3;
-  }
-  const avg = sum/(d.length/4);
-  const freq = 200 + (avg/255)*600;
-  lightOsc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-}
-
-function toggleColor(){
-  colorActive = !colorActive;
-  document.getElementById('btn-color').classList.toggle('active-tool',colorActive);
-  announce(colorActive ? "Analisi colore attiva" : "Analisi colore disattivata");
-}
-
-function processColor(){
-  if(!tempCtx) return;
-  const id = tempCtx.getImageData(tempCanvas.width/2-50, tempCanvas.height/2-50, 100, 100);
-  const d = id.data;
-  let r=0,g=0,b=0;
-  for(let i=0;i<d.length;i+=4){
-    r+=d[i];g+=d[i+1];b+=d[i+2];
-  }
-  const n = d.length/4;
-  r=Math.round(r/n);g=Math.round(g/n);b=Math.round(b/n);
-  
-  let color = "grigio";
-  if(r>150&&g<100&&b<100) color="rosso";
-  else if(g>150&&r<100&&b<100) color="verde";
-  else if(b>150&&r<100&&g<100) color="blu";
-  else if(r>150&&g>150&&b<100) color="giallo";
-  else if(r>200&&g>200&&b>200) color="bianco";
-  else if(r<50&&g<50&&b<50) color="nero";
-  
-  announce(`Colore dominante: ${color}`);
-  colorActive = false;
-  document.getElementById('btn-color').classList.remove('active-tool');
-}
-
-function toggleLevel(){
-  levelActive = !levelActive;
-  document.getElementById('btn-level').classList.toggle('active-tool',levelActive);
-  if(levelActive){
-    if(window.DeviceOrientationEvent){
-      window.addEventListener('deviceorientation', handleOrientation);
-      announce("Livella attiva. Ti guido per raddrizzare");
-    }else{
-      announce("Livella non disponibile su questo dispositivo");
-      levelActive = false;
-    }
-  }else{
-    window.removeEventListener('deviceorientation', handleOrientation);
-    announce("Livella disattivata");
-  }
-}
-
-let lastOrientationAnnounce = 0;
-function handleOrientation(e){
-  if(!levelActive) return;
-  const now = Date.now();
-  if(now - lastOrientationAnnounce < 2000) return;
-  
-  const tilt = Math.abs(e.gamma || 0);
-  if(tilt < 5){
-    announce("Perfetto, dritto");
-    lastOrientationAnnounce = now;
-  }else if(tilt < 15){
-    announce(e.gamma > 0 ? "Leggermente inclinato a destra" : "Leggermente inclinato a sinistra");
-    lastOrientationAnnounce = now;
-  }else{
-    announce(e.gamma > 0 ? "Molto inclinato a destra" : "Molto inclinato a sinistra");
-    lastOrientationAnnounce = now;
-  }
-}
-
-// ============================================
-// CONTROLLI VOCALI
-// ============================================
-
 function toggleVoiceControl(){
-  if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
-    announce("Riconoscimento vocale non supportato");
-    return;
-  }
-  
   voiceActive = !voiceActive;
-  document.getElementById('btn-voice').classList.toggle('active-tool',voiceActive);
+  const btn = document.getElementById('btn-voice');
+  const status = document.getElementById('voice-status');
   
   if(voiceActive){
+    btn.classList.add('active-tool');
+    status.style.display = 'block';
+    status.classList.add('listening');
+    
     if(!recognition){
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SR();
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SpeechRecognition){
+        announce("Riconoscimento vocale non supportato");
+        voiceActive = false;
+        btn.classList.remove('active-tool');
+        status.style.display = 'none';
+        return;
+      }
+      
+      recognition = new SpeechRecognition();
       recognition.lang = 'it-IT';
       recognition.continuous = true;
       recognition.interimResults = false;
@@ -1128,6 +1122,9 @@ function toggleVoiceControl(){
     announce("Comandi vocali attivi. Di' 'scatta', 'ruota', 'luce', 'colore', 'livella'");
   }else{
     if(recognition) recognition.stop();
+    btn.classList.remove('active-tool');
+    status.style.display = 'none';
+    status.classList.remove('listening');
     announce("Comandi vocali disattivati");
   }
 }
@@ -1178,6 +1175,7 @@ async function startApp(){
   document.getElementById('start-screen').setAttribute('aria-hidden','true');
   document.getElementById('btn-shot').focus();
   updateGuideModeLabel();
+  loadGallery();
   announce("Smart Photo Assistant avviato.");
   audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   await setupCamera('user');
@@ -1284,10 +1282,18 @@ window.closeSettings=()=>{
 };
 
 window.saveKey=()=>{
-  GEMINI_KEY=document.getElementById('key-input').value.trim();
-  localStorage.setItem('gemini_key',GEMINI_KEY);
+  const key = document.getElementById('key-input').value.trim();
+  
+  // VALIDAZIONE CHIAVE API
+  if(!key || key.length < 20){
+    announce("Chiave non valida. Lunghezza minima 20 caratteri.");
+    return;
+  }
+  
+  GEMINI_KEY = key;
+  localStorage.setItem('gemini_key', GEMINI_KEY);
   closeSettings();
-  announce("Chiave Gemini salvata.");
+  announce("Chiave Gemini salvata correttamente.");
 };
 </script>
 </body>
