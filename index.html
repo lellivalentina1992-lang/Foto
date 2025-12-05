@@ -14,15 +14,7 @@ body{font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;padding:0
 video{width:100%;height:100%;object-fit:cover;opacity:.6}
 canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 
-/* INDICATORE QUALITÀ LIVE */
-#quality-indicator{position:absolute;top:10px;left:10px;padding:10px 15px;border-radius:12px;background:rgba(0,0,0,0.8);border:2px solid #555;font-size:1rem;font-weight:bold;z-index:60;display:none}
-.quality-excellent{border-color:#0f0!important;color:#0f0!important;background:rgba(0,100,0,0.3)!important}
-.quality-good{border-color:#FFD700!important;color:#FFD700!important;background:rgba(218,165,32,0.3)!important}
-.quality-poor{border-color:#f00!important;color:#f00!important;background:rgba(139,0,0,0.3)!important}
-
-/* COUNTDOWN VISIVO */
-#countdown-display{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:8rem;font-weight:bold;color:#FFD700;text-shadow:0 0 20px #000,0 0 40px #FFD700;z-index:70;display:none;animation:pulse 1s ease-in-out}
-@keyframes pulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.2)}}
+/* Elementi visivi rimossi - solo feedback vocale e screen reader */
 
 /* STATUS VOCALE */
 #voice-status{position:absolute;top:10px;right:10px;padding:5px 10px;border-radius:20px;background:rgba(0,0,0,0.7);border:1px solid #555;font-size:0.8rem;z-index:60;display:none}
@@ -69,7 +61,6 @@ button:active{background:#555;transform:scale(.98)}
 .active-tool{background:#006400!important;border-color:#0f0!important}
 .guiding{background:#8B0000!important;border-color:#f00!important}
 .searching{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
-.active-discrete{border-color:#f00;color:#f00}
 
 /* STILE SOCIAL / RISULTATO */
 .btn-primary-wide{flex:1 1 100%;font-size:1rem;background:#004080;border-color:#88b4ff}
@@ -99,8 +90,6 @@ input{background:#333;color:#fff;border:1px solid #777}
 <div id="cam-container">
   <video id="webcam" playsinline muted autoplay></video>
   <canvas id="overlay"></canvas>
-  <div id="quality-indicator">Valutando...</div>
-  <div id="countdown-display">3</div>
   <div id="voice-status">Ascolto in corso...</div>
 </div>
 
@@ -132,7 +121,6 @@ input{background:#333;color:#fff;border:1px solid #777}
     </div>
 
     <div class="top-bar full-width" style="margin-top:10px">
-      <button class="small-btn" id="btn-discrete" onclick="toggleDiscrete()" aria-label="Modo discreto senza voce">MODO DISCRETO</button>
       <button class="small-btn" id="btn-voice" onclick="toggleVoiceControl()" aria-label="Comandi vocali opzionali">COMANDI VOCALI</button>
       <button class="small-btn" id="btn-guide-mode" onclick="cycleGuideMode()" aria-label="Cambia livello di dettaglio">GUIDA: STANDARD</button>
       <button class="small-btn" onclick="openSettings()" aria-label="Impostazioni">IMPOSTAZIONI</button>
@@ -186,6 +174,7 @@ let currentQualityScore = 0; // 0-100
 let currentQualityLevel = 'poor'; // 'poor', 'acceptable', 'good', 'excellent'
 let qualityHistory = []; // ultimi 10 frame
 let bestQualityInSession = 0;
+let lastQualityAnnounce = 0; // per annunci vocali periodici
 
 // Stato autoscatto intelligente
 let autoShotTimer = null;
@@ -207,7 +196,7 @@ let lastGuidancePublishable = false;
 let isRunning = false, stream = null;
 const tempCanvas = document.createElement('canvas');
 let tempCtx = tempCanvas.getContext('2d',{willReadFrequently:true});
-let mode = 'idle', lightActive = false, colorActive = false, levelActive = false, discreteMode = false;
+let mode = 'idle', lightActive = false, colorActive = false, levelActive = false;
 let lastSpeak = 0, centeredFrames = 0, lastGuideMessageTime = 0;
 let lastLowLightWarning = 0; 
 let lastLightAnnounce = 0; 
@@ -239,20 +228,10 @@ const objectDict = {
 };
 
 function announce(text, urgent=false){
+  // Solo annunci per screen reader, NO sintesi vocale
   const el = document.getElementById('sr-announcer');
   el.textContent = '';
   setTimeout(()=>el.textContent = text, 50);
-  if(!discreteMode && 'speechSynthesis' in window){
-    const now = Date.now();
-    if(urgent || now - lastSpeak > 1000){
-      lastSpeak = now;
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'it-IT';
-      u.rate = 1.1;
-      window.speechSynthesis.speak(u);
-    }
-  }
 }
 
 // ========== SISTEMA VALUTAZIONE QUALITÀ INTELLIGENTE ==========
@@ -388,9 +367,8 @@ function calculateQualityScore(){
 }
 
 function updateQualityIndicator(){
-  const indicator = document.getElementById('quality-indicator');
+  // Solo feedback vocale, nessun display visivo
   if(mode !== 'guiding'){
-    indicator.style.display = 'none';
     return;
   }
   
@@ -405,34 +383,33 @@ function updateQualityIndicator(){
   const avgScore = qualityHistory.reduce((a,b)=>a+b,0) / qualityHistory.length;
   
   // Determina livello
-  let level, text, className;
+  let level, text;
   if(avgScore >= 75){
     level = 'excellent';
-    text = `ECCELLENTE (${Math.round(avgScore)})`;
-    className = 'quality-excellent';
+    text = `Qualità eccellente, punteggio ${Math.round(avgScore)}`;
     goodQualityFrames++;
   } else if(avgScore >= 60){
     level = 'good';
-    text = `BUONA (${Math.round(avgScore)})`;
-    className = 'quality-good';
+    text = `Qualità buona, punteggio ${Math.round(avgScore)}`;
     goodQualityFrames++;
   } else if(avgScore >= 40){
     level = 'acceptable';
-    text = `ACCETTABILE (${Math.round(avgScore)})`;
-    className = 'quality-acceptable';
+    text = `Qualità accettabile, punteggio ${Math.round(avgScore)}`;
     goodQualityFrames = Math.max(0, goodQualityFrames - 1);
   } else {
     level = 'poor';
-    text = `MIGLIORABILE (${Math.round(avgScore)})`;
-    className = 'quality-poor';
+    text = `Qualità migliorabile, punteggio ${Math.round(avgScore)}`;
     goodQualityFrames = 0;
   }
   
   currentQualityLevel = level;
   
-  indicator.textContent = text;
-  indicator.className = className;
-  indicator.style.display = 'block';
+  // Annuncio vocale periodico della qualità (ogni 5 secondi)
+  const now = Date.now();
+  if(now - lastQualityAnnounce > 5000){
+    announce(text);
+    lastQualityAnnounce = now;
+  }
   
   // Avvia autoscatto se qualità buona per abbastanza tempo
   if(goodQualityFrames >= REQUIRED_GOOD_FRAMES && !autoShotTimer && !autoShotCountdown){
@@ -449,9 +426,6 @@ function triggerAutoShot(){
   announce("Ottima inquadratura rilevata! Scatto tra 3 secondi.", true);
   
   let countdown = AUTO_SHOT_DELAY;
-  const countdownDisplay = document.getElementById('countdown-display');
-  countdownDisplay.textContent = countdown;
-  countdownDisplay.style.display = 'block';
   
   // Beep di countdown
   const beep = (freq) => {
@@ -470,11 +444,9 @@ function triggerAutoShot(){
   autoShotCountdown = setInterval(() => {
     countdown--;
     if(countdown > 0){
-      countdownDisplay.textContent = countdown;
       beep(800);
       announce(countdown.toString(), true);
     } else {
-      countdownDisplay.style.display = 'none';
       clearInterval(autoShotCountdown);
       autoShotCountdown = null;
       beep(1200); // beep finale diverso
@@ -487,7 +459,6 @@ function stopAutoShot(){
   if(autoShotCountdown){
     clearInterval(autoShotCountdown);
     autoShotCountdown = null;
-    document.getElementById('countdown-display').style.display = 'none';
   }
   if(autoShotTimer){
     clearTimeout(autoShotTimer);
@@ -679,12 +650,6 @@ function handleOrientation(e){
   }
 }
 
-function toggleDiscrete(){
-  discreteMode = !discreteMode;
-  document.getElementById('btn-discrete').classList.toggle('active-discrete', discreteMode);
-  announce(discreteMode ? "Modo discreto attivo. Voce disabilitata." : "Modo discreto disattivato. Voce attiva.");
-}
-
 let recognition = null;
 function toggleVoiceControl(){
   if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
@@ -758,7 +723,6 @@ function toggleGuidance(){
     mode = 'idle';
     stopAutoShot();
     document.getElementById('btn-guide').classList.remove('guiding');
-    document.getElementById('quality-indicator').style.display = 'none';
     announce("Guida scena disattivata.");
     qualityHistory = [];
     goodQualityFrames = 0;
