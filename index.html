@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - Fixed</title>
+<title>Smart Photo Assistant - Ultimate</title>
 <style>
 /* STILE BASE */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -20,23 +20,23 @@ canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none
 #countdown-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:8rem;color:#fff;font-weight:bold;text-shadow:0 0 15px #000;z-index:70;display:none}
 
 /* INTERFACCIA PRINCIPALE */
-#main-interface{height:60vh;width:100%;background:#000;border-top:2px solid #333;display:flex;flex-direction:column}
-#camera-controls{flex-grow:1;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:10px;padding:10px;overflow-y:auto}
+#main-interface{height:55vh;width:100%;background:#000;border-top:2px solid #333;display:flex;flex-direction:column}
+#camera-controls{flex-grow:1;display:grid;grid-template-columns:1fr;grid-auto-rows:min-content;gap:15px;padding:20px;overflow-y:auto}
 
 /* AREA SELEZIONE OGGETTI */
-#selection-panel{grid-column:1/-1;background:#111;border:1px solid #444;border-radius:8px;padding:10px;display:none;flex-direction:column;gap:5px}
+#selection-panel{background:#111;border:1px solid #444;border-radius:8px;padding:10px;display:none;flex-direction:column;gap:5px}
 #detected-list{display:flex;flex-wrap:wrap;gap:5px;max-height:100px;overflow-y:auto}
 .obj-btn{padding:8px 12px;border:1px solid #555;background:#222;color:#fff;border-radius:20px;font-size:0.9rem}
 .obj-btn.selected{background:#006400;border-color:#0f0;color:#0f0}
 
 /* PULSANTI */
-button{border:2px solid #555;border-radius:12px;font-size:1rem;font-weight:bold;text-transform:uppercase;color:#fff;background:#222;min-height:60px;touch-action:manipulation}
+button{border:2px solid #555;border-radius:12px;font-size:1.1rem;font-weight:bold;text-transform:uppercase;color:#fff;background:#222;min-height:65px;touch-action:manipulation}
 button:active{background:#555;transform:scale(.98)}
 .full-width{grid-column:1/-1}
 .btn-primary{background:#004080;border-color:#4a90e2}
 .btn-action{background:#006400;border-color:#0f0;color:#0f0}
 .btn-download{background:#4B0082;border-color:#9370DB;color:#fff}
-.btn-guide{background:#8B0000;border-color:#f00;font-size:1.1rem}
+.btn-guide{background:#8B0000;border-color:#f00;font-size:1.2rem}
 .active-tool{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
 
 /* MENU CONTESTO */
@@ -76,50 +76,56 @@ button:active{background:#555;transform:scale(.98)}
     <div id="selection-panel">
       <div style="font-size:0.9rem;color:#ccc;margin-bottom:5px">Oggetti visibili (clicca per selezionare):</div>
       <div id="detected-list">In attesa...</div>
-      <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:40px;margin-top:5px">CONFERMA E CHIUDI</button>
+      <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:50px;margin-top:5px">CONFERMA E CHIUDI</button>
     </div>
+    
     <button class="full-width btn-guide" id="btn-guide" onclick="toggleSmartGuide()">
       AVVIA GUIDA AUTO-SCATTO
     </button>
+    
     <div id="local-ai-status" class="full-width" style="text-align:center;padding:10px;background:#222;border:1px solid #444;border-radius:8px;color:#ccc" aria-live="polite">
       In attesa...
     </div>
-    <button onclick="toggleLight()" id="btn-light">SONDA LUCE</button>
-    <button onclick="toggleColor()" id="btn-color">COLORE</button>
-    <button class="full-width btn-action" onclick="startCountdown(5)">SCATTA MANUALE (5 SEC)</button>
-    <button onclick="flipCamera()">RUOTA CAMERA</button>
-    <button onclick="toggleVoiceControl()" id="btn-voice">COMANDI VOCALI</button>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+        <button onclick="startCountdown(5)" class="btn-action">SCATTA (5s)</button>
+        <button onclick="flipCamera()">RUOTA CAMERA</button>
+    </div>
+    
+    <button onclick="toggleVoiceControl()" id="btn-voice" style="min-height:50px">COMANDI VOCALI</button>
     <button class="full-width" onclick="openSettings()" style="min-height:50px;font-size:0.9rem;background:#333">IMPOSTAZIONI API</button>
   </div>
 </div>
 
 <div id="context-menu" class="hidden" aria-hidden="true" role="dialog" aria-label="Menu foto acquisita">
   <h2 class="context-title">Foto Acquisita</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">
-    <button class="btn-share-now" onclick="shareImageNative()">CONDIVIDI</button>
-    <button class="btn-download" onclick="downloadImage()">SCARICA</button>
-  </div>
-  <div style="height:1px;background:#555;margin:5px 0"></div>
-  <p style="text-align:center;color:#ccc;margin:5px">Scegli Analisi:</p>
+  <p style="text-align:center;color:#ccc;margin:5px 0 10px 0">Cosa hai fotografato?</p>
+  
   <button class="btn-primary" onclick="analyzeContext('selfie')">SELFIE / RITRATTO</button>
   <button class="btn-primary" onclick="analyzeContext('group')">GRUPPO</button>
   <button class="btn-primary" onclick="analyzeContext('environment')">AMBIENTE</button>
   <button class="btn-primary" onclick="analyzeContext('document')">LEGGI TESTO</button>
-  <button style="background:#E1306C;border-color:#fff;margin-top:10px" class="full-width" onclick="analyzeContext('social')">ANALISI TECNICA SOCIAL</button>
-  <div style="height:1px;background:#555;margin:10px 0"></div>
-  <button onclick="discardPhoto()" style="background:#8B0000;margin-top:5px">ELIMINA E TORNA</button>
+  
+  <div style="height:1px;background:#555;margin:15px 0"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <button class="btn-share-now" onclick="shareImageNative()">CONDIVIDI</button>
+    <button class="btn-download" onclick="downloadImage()">SCARICA</button>
+  </div>
+  
+  <button onclick="discardPhoto()" style="background:#8B0000;margin-top:10px" class="full-width">ELIMINA E TORNA</button>
 </div>
 
 <div id="result-screen" class="hidden" aria-hidden="true" role="dialog" aria-label="Risultato analisi">
   <h2 style="color:#D4AF37;text-align:center;margin:0 0 10px 0">Risultato</h2>
   <div id="result-text" tabindex="0">Elaborazione...</div>
   
-  <button onclick="analyzeContext('social')" class="full-width" style="background:#E1306C;margin-bottom:10px">VERIFICA IDONEITÀ SOCIAL</button>
+  <button onclick="analyzeContext('social')" class="full-width" style="background:#E1306C;margin-bottom:15px;border:1px solid #fff;font-size:1rem">
+    CHIEDI PARERE TECNICO "SOCIAL"
+  </button>
 
   <div id="after-analysis-buttons">
-    
     <button onclick="openTextEditor()" class="full-width btn-primary" style="background:#006400;border-color:#0f0;min-height:50px;margin-bottom:15px">AGGIUNGI TESTO (IA POSIZIONA)</button>
-    
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <button onclick="shareImageNative()" class="btn-action">CONDIVIDI</button>
         <button onclick="downloadImage()" class="btn-download">SCARICA</button>
@@ -149,11 +155,6 @@ let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
 const MODEL_NAME = "gemini-2.0-flash-exp"; 
 const API_ENDPOINT = "v1beta";
 
-// COSTANTI CENTERING
-const CENTERING_PERFECT_THRESHOLD = 0.05;
-const CENTERING_SAFE_THRESHOLD = 0.20;
-const CENTERING_WAYOFF_THRESHOLD = 0.30;
-
 // VARIABILI GLOBALI
 let video = document.getElementById('webcam');
 let canvas = document.getElementById('overlay');
@@ -164,15 +165,11 @@ let stream = null;
 let currentPhotoBase64 = null;
 let finalPhotoBase64 = null;
 
-// FRONT/BACK CAMERA
 let currentFacingMode = 'environment';
-
-// IA CONFIG PER TESTO
 let aiTextConfig = { pos: "bottom", color: "white", bg: "box" };
 
 // TOOLS
-let audioCtx, lightOsc, lightGain;
-let lightActive = false, colorActive = false;
+let audioCtx;
 let objectDetector = null;
 let faceLandmarker = null;
 let isGuiding = false;
@@ -183,179 +180,73 @@ let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
 let availableObjects = []; 
+let currentFramingMode = "closeup"; // "closeup" o "bust"
 
-// Speech recognition support check
 const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
 async function init(){
-  // Inizializza AudioContext solo dopo interazione utente (best practice)
   document.body.addEventListener('click', initAudioContext, {once: true});
   document.body.addEventListener('touchstart', initAudioContext, {once: true});
-
   await setupCamera();
   await loadLocalModels();
-  
-  // Setup keyboard navigation per modali
   setupModalKeyboardHandlers();
-  
-  announce("App pronta. Usa 'Seleziona cosa fotografare' oppure 'Avvia Guida Auto-Scatto'.");
-  loopTools();
+  announce("App pronta. Usa Avvia Guida Auto-Scatto.");
 }
 
 function initAudioContext(){
   try{
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended'){
-      audioCtx.resume();
-    }
-  }catch(e){
-    console.warn("AudioContext non disponibile:", e);
-  }
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){ console.warn(e); }
 }
 
 async function setupCamera(){
   try{
-    // Stop eventuale vecchio stream (utile su flip camera)
     if(stream){
       stream.getTracks().forEach(t => t.stop());
       stream = null;
     }
-
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode: currentFacingMode,
-        width:{ideal:1280},
-        height:{ideal:720}
-      }
+      video:{ facingMode: currentFacingMode, width:{ideal:1280}, height:{ideal:720} }
     });
-
     video.srcObject = stream;
-
-    // FIX: Race condition su metadata
     await new Promise((resolve) => {
-      if(video.readyState >= 2){
-        resolve();
-      } else {
-        const handler = () => {
-          video.removeEventListener('loadedmetadata', handler);
-          resolve();
-        };
-        video.addEventListener('loadedmetadata', handler);
-      }
+      if(video.readyState >= 2) resolve();
+      else video.addEventListener('loadedmetadata', () => resolve(), {once:true});
     });
-
-    // Assicura il play
-    try{
-      await video.play();
-    }catch(e){
-      // Autoplay bloccato - l'utente dovrà interagire
-      console.warn("Autoplay bloccato, richiede interazione utente");
-    }
-
-    canvas.width = video.videoWidth; 
-    canvas.height = video.videoHeight;
-    tempCanvas.width = video.videoWidth; 
-    tempCanvas.height = video.videoHeight;
+    try{ await video.play(); }catch(e){}
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
   }catch(e){
-    announce("Errore fotocamera. Controlla permessi o HTTPS.");
+    announce("Errore fotocamera.");
     document.getElementById('local-ai-status').innerText = "Errore fotocamera.";
-    console.error("Camera error:", e);
   }
 }
 
 async function flipCamera(){
   currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
-  announce(currentFacingMode === 'environment' ? "Uso camera posteriore." : "Uso camera frontale.");
+  announce(currentFacingMode === 'environment' ? "Camera posteriore." : "Camera frontale.");
   await setupCamera();
 }
 
 async function loadLocalModels(){
   try{
-    document.getElementById('local-ai-status').innerText = "Carico AI locale...";
+    document.getElementById('local-ai-status').innerText = "Carico AI...";
     const { ObjectDetector, FaceLandmarker, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js");
     const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
     objectDetector = await ObjectDetector.createFromOptions(vision, { 
       baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite" }, 
-      scoreThreshold: 0.4, 
-      runningMode: "VIDEO" 
+      scoreThreshold: 0.4, runningMode: "VIDEO" 
     });
     faceLandmarker = await FaceLandmarker.createFromOptions(vision, { 
       baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" }, 
-      runningMode: "VIDEO", 
-      numFaces: 1 
+      runningMode: "VIDEO", numFaces: 1 
     });
-    document.getElementById('local-ai-status').innerText = "AI locale pronta.";
+    document.getElementById('local-ai-status').innerText = "AI pronta.";
   }catch(e){
     announce("AI Locale non disponibile.");
-    document.getElementById('local-ai-status').innerText = "AI locale non disponibile.";
-    console.error("Model loading error:", e);
+    document.getElementById('local-ai-status').innerText = "AI KO.";
   }
-}
-
-function loopTools(){
-  if(video.readyState===4){
-    tempCtx.drawImage(video,0,0,tempCanvas.width,tempCanvas.height);
-    if(lightActive) processLight();
-  }
-  requestAnimationFrame(loopTools);
-}
-
-function toggleLight(){
-  lightActive=!lightActive;
-  document.getElementById('btn-light').classList.toggle('active-tool');
-  announce(lightActive?"Luce ON":"Luce OFF");
-  
-  if(lightActive){
-    // FIX: Verifica AudioContext prima di usarlo
-    if(!audioCtx || audioCtx.state === 'suspended'){
-      announce("Audio non disponibile. Interagisci prima con la pagina.");
-      lightActive = false;
-      document.getElementById('btn-light').classList.remove('active-tool');
-      return;
-    }
-    
-    if(!lightOsc){
-      lightOsc=audioCtx.createOscillator();
-      lightGain=audioCtx.createGain();
-      lightOsc.connect(lightGain);
-      lightGain.connect(audioCtx.destination);
-      lightOsc.start();
-      lightGain.gain.value=0;
-    }
-  }
-  
-  if(!lightActive && lightGain) lightGain.gain.value=0;
-}
-
-function processLight(){
-  const d=tempCtx.getImageData(0,0,tempCanvas.width,tempCanvas.height).data;
-  let s=0;
-  for(let i=0;i<d.length;i+=4)s+=(d[i]+d[i+1]+d[i+2])/3;
-  const b=s/(d.length/4);
-  if(lightOsc) lightOsc.frequency.value=200+b*2;
-  if(lightGain) lightGain.gain.value=0.1;
-}
-
-function toggleColor(){
-  colorActive=!colorActive;
-  document.getElementById('btn-color').classList.toggle('active-tool');
-  announce(colorActive?"Colore ON":"Colore OFF");
-  if(colorActive) processColor();
-}
-
-function processColor(){
-  const w=tempCanvas.width,h=tempCanvas.height;
-  const d=tempCtx.getImageData(w/2-10,h/2-10,20,20).data;
-  let r=0,g=0,b=0,c=0;
-  for(let i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2];c++;}
-  r=Math.round(r/c);g=Math.round(g/c);b=Math.round(b/c);
-  announce(`Colore: ${
-    r>200&&g>200&&b>200?'Bianco':
-    r<50&&g<50&&b<50?'Nero':
-    r>150&&g<100?'Rosso':
-    g>150&&r<100?'Verde':
-    b>150?'Blu':'Misto'
-  }`);
 }
 
 // --- SELEZIONE ---
@@ -368,11 +259,8 @@ function toggleSelectionMode(){
     panel.style.display = 'flex';
     btn.classList.add('active-tool');
     btn.textContent = "CHIUDI SELEZIONE";
-    announce("Modalità selezione. Esploro la scena...");
-    selectedTargets = []; 
-    updateSelectionUI();
-    
-    // FIX: Clear previous interval
+    announce("Modalità selezione.");
+    selectedTargets = []; updateSelectionUI();
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = setInterval(scanForSelection, 1000);
   } else {
@@ -393,16 +281,14 @@ async function scanForSelection(){
     detections.detections.forEach(d => currentSet.add(d.categories[0].categoryName));
     availableObjects = Array.from(currentSet);
     updateSelectionUI();
-  }catch(e){
-    console.error("Detection error:", e);
-  }
+  }catch(e){}
 }
 
 function updateSelectionUI(){
   const list = document.getElementById('detected-list');
   list.innerHTML = '';
   if(availableObjects.length === 0){
-    list.innerHTML = '<span style="color:#777">Nessun oggetto rilevato...</span>';
+    list.innerHTML = '<span style="color:#777">Nessun oggetto...</span>';
     return;
   }
   availableObjects.forEach(objName => {
@@ -410,13 +296,12 @@ function updateSelectionUI(){
     if(objName==='person') display='Persona';
     else if(objName==='cup') display='Tazza';
     else if(objName==='bottle') display='Bottiglia';
-    else display = objName;
     
     const btn = document.createElement('button');
     btn.className = 'obj-btn';
     btn.setAttribute('aria-pressed', selectedTargets.includes(objName) ? 'true' : 'false');
     if(selectedTargets.includes(objName)) btn.classList.add('selected');
-    btn.textContent = display + (selectedTargets.includes(objName) ? " (SCELTO)" : "");
+    btn.textContent = display + (selectedTargets.includes(objName) ? " (V)" : "");
     btn.onclick = () => {
       if(selectedTargets.includes(objName)){
         selectedTargets = selectedTargets.filter(t => t !== objName);
@@ -431,18 +316,9 @@ function updateSelectionUI(){
   });
 }
 
-function confirmSelection(){
-  toggleSelectionMode(); 
-  if(selectedTargets.length > 0){
-    announce(`Hai scelto: ${selectedTargets.length} oggetti. Premi Avvia Guida.`);
-    document.getElementById('btn-guide').textContent = "AVVIA GUIDA (SELEZIONE ATTIVA)";
-  } else {
-    announce("Nessuna selezione. Userò modalità automatica.");
-    document.getElementById('btn-guide').textContent = "AVVIA GUIDA AUTO-SCATTO";
-  }
-}
+function confirmSelection(){ toggleSelectionMode(); }
 
-// --- GUIDA ---
+// --- GUIDA PRINCIPALE ---
 function toggleSmartGuide(){
   isGuiding = !isGuiding;
   const btn = document.getElementById('btn-guide');
@@ -450,136 +326,199 @@ function toggleSmartGuide(){
     if(isSelectionMode) toggleSelectionMode();
     btn.textContent = "STOP GUIDA"; 
     btn.style.background = "#006400";
-    let msg = "Guida Automatica Attiva.";
-    if(selectedTargets.length > 0) msg = "Guida Selettiva Attiva. Cerco i tuoi oggetti.";
-    announce(msg);
+    announce(selectedTargets.length > 0 ? "Guida Selettiva Attiva." : "Guida Automatica Attiva.");
     isCountdownRunning = false;
-    
-    // FIX: Clear previous interval
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = setInterval(processLocalFrame, 200);
   }else{
-    btn.textContent = selectedTargets.length > 0 ? "AVVIA GUIDA (SELEZIONE ATTIVA)" : "AVVIA GUIDA AUTO-SCATTO";
+    btn.textContent = "AVVIA GUIDA AUTO-SCATTO";
     btn.style.background = "#8B0000";
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = null;
     cancelCountdown();
-    announce("Guida fermata.");
+    announce("Guida ferma.");
   }
 }
 
 async function processLocalFrame(){
   if(video.readyState !== 4) return;
   const now = Date.now();
-  if(!isCountdownRunning && now - lastGuideTime < 1800) return; 
+  if(!isCountdownRunning && now - lastGuideTime < 1200) return;
+
+  // 0. CONTROLLO LUCE (Soglia 60)
+  if(!isCountdownRunning){
+      tempCtx.drawImage(video, 0, 0, 50, 50);
+      const d = tempCtx.getImageData(0,0,50,50).data;
+      let b = 0; for(let i=0; i<d.length; i+=4) b+=(d[i]+d[i+1]+d[i+2])/3;
+      if((b/(d.length/4)) < 60){ 
+          announce("Troppo buio! Cerca luce.");
+          lastGuideTime = now;
+          return;
+      }
+  }
 
   let targetsFound = [];
-  
-  // Face detection
-  if(faceLandmarker){
+  let errorState = null;
+  let faceSizeRatio = 0; 
+  let isPersonMode = (selectedTargets.length === 0 || selectedTargets.includes('person'));
+
+  // 1. VISO
+  if(faceLandmarker && isPersonMode){
     try{
       const faces = faceLandmarker.detectForVideo(video, performance.now());
       if(faces.faceLandmarks && faces.faceLandmarks.length > 0){
-        if(selectedTargets.length === 0 || selectedTargets.includes('person')){
            let points = faces.faceLandmarks[0];
-           let cx=0, cy=0;
-           points.forEach(p => { cx += p.x; cy += p.y; });
-           targetsFound.push({x: cx/points.length, y: cy/points.length, name: "Volto"});
-        }
+           let minX=1, maxX=0, minY=1, maxY=0, cx=0, cy=0;
+           points.forEach(p => { 
+               if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+               if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+               cx+=p.x; cy+=p.y; 
+           });
+           faceSizeRatio = maxX - minX; 
+           targetsFound.push({ x: cx/points.length, y: cy/points.length, name: "Volto" });
+
+           let cutLeft = minX < 0.02, cutRight = maxX > 0.98;
+           let cutTop = minY < 0.02, cutBottom = maxY > 0.98;
+           if(cutLeft || cutRight || cutTop || cutBottom){
+               let cm = "Viso tagliato ";
+               if(cutLeft) cm+="a sinistra."; else if(cutRight) cm+="a destra.";
+               else if(cutTop) cm+="in alto."; else if(cutBottom) cm+="in basso.";
+               errorState = cm;
+           } else {
+               if(faceSizeRatio > 0.70) errorState = "Troppo vicino! Allontanati.";
+               else if(faceSizeRatio < 0.15) errorState = "Troppo lontano! Avvicinati.";
+           }
       }
-    }catch(e){
-      console.error("Face detection error:", e);
-    }
+    }catch(e){}
   }
 
-  // Object detection
-  if(objectDetector){
+  // 2. OGGETTI
+  if(objectDetector && !errorState){
     try{
-      const detections = objectDetector.detectForVideo(video, performance.now());
-      detections.detections.forEach(det => {
+      const dets = objectDetector.detectForVideo(video, performance.now());
+      dets.detections.forEach(det => {
         const cat = det.categories[0].categoryName;
-        const box = det.boundingBox;
-        const cx = (box.originX + box.width/2) / video.videoWidth;
-        const cy = (box.originY + box.height/2) / video.videoHeight;
-        if(selectedTargets.length > 0){
-          if(selectedTargets.includes(cat)) targetsFound.push({x: cx, y: cy, name: cat});
-        } else {
-          if(cat === 'person' || targetsFound.length === 0) targetsFound.push({x: cx, y: cy, name: cat}); 
+        let isRel = false;
+        if(selectedTargets.length>0){ if(selectedTargets.includes(cat)) isRel=true; } 
+        else if (!isPersonMode) { isRel=true; } 
+        else { if(cat !== 'person' && targetsFound.length === 0) isRel=true; }
+
+        if(isRel){
+            const box = det.boundingBox;
+            const nx = (box.originX + box.width/2) / video.videoWidth;
+            const ny = (box.originY + box.height/2) / video.videoHeight;
+            const nw = box.width / video.videoWidth;
+            const nh = box.height / video.videoHeight;
+            const oMinX=box.originX/video.videoWidth, oMaxX=(box.originX+box.width)/video.videoWidth;
+            const oMinY=box.originY/video.videoHeight, oMaxY=(box.originY+box.height)/video.videoHeight;
+
+            targetsFound.push({x: nx, y: ny, name: cat});
+
+            if(oMinX<0.01 || oMaxX>0.99 || oMinY<0.01 || oMaxY>0.99){
+                let cm = `${cat} tagliato.`;
+                errorState = cm;
+            } else {
+                if(nw>0.85 || nh>0.85) errorState = "Oggetto troppo vicino.";
+                else if(nw<0.10) errorState = "Oggetto troppo lontano.";
+            }
         }
       });
-    }catch(e){
-      console.error("Object detection error:", e);
-    }
+    }catch(e){}
+  }
+
+  // 3. LOGICA FINALE
+  if(errorState){
+      if(isCountdownRunning) cancelCountdown();
+      announce(errorState);
+      lastGuideTime = now;
+      return;
   }
 
   if(targetsFound.length > 0){
-    let avgX = 0, avgY = 0;
-    targetsFound.forEach(t => { avgX += t.x; avgY += t.y; });
-    avgX /= targetsFound.length;
-    avgY /= targetsFound.length;
-    let nameDisplay = targetsFound[0].name;
-    if(targetsFound.length > 1) nameDisplay = "Oggetti scelti";
-    if(nameDisplay==='person') nameDisplay='Persona';
-    handleCentering(avgX, avgY, nameDisplay, now);
+    let avgX=0, avgY=0;
+    targetsFound.forEach(t => { avgX+=t.x; avgY+=t.y; });
+    avgX /= targetsFound.length; avgY /= targetsFound.length;
+    
+    let dName = targetsFound[0].name;
+    if(dName==='person') dName='Persona';
+    if(targetsFound.length>1) dName='Soggetti';
+
+    let idealY = 0.5; 
+    if(dName==='Volto' || dName==='Persona'){
+        if(faceSizeRatio < 0.40 && currentFramingMode !== "bust"){
+            currentFramingMode = "bust"; announce("Mezzo Busto.");
+        } else if(faceSizeRatio > 0.50 && currentFramingMode !== "closeup"){
+            currentFramingMode = "closeup"; announce("Primo Piano.");
+        }
+        idealY = (currentFramingMode === "bust") ? 0.42 : 0.5;
+    }
+    handleCentering(avgX, avgY, dName, now, idealY);
   } else {
-    if(isCountdownRunning){
-      cancelCountdown();
-      announce("Perso il soggetto! Timer annullato.");
-    } else if (now - lastGuideTime > 3000) {
-      if(selectedTargets.length > 0) announce(`Non vedo: ${selectedTargets.join(', ')}`);
-      else document.getElementById('local-ai-status').innerText = "Scena vuota";
+    if(isCountdownRunning){ cancelCountdown(); announce("Soggetto perso."); }
+    else if (now - lastGuideTime > 3000) {
+       let msg = selectedTargets.length>0 ? `Cerco: ${selectedTargets.join(', ')}` : "Inquadra un volto o un oggetto.";
+       announce(msg); lastGuideTime = now; 
     }
   }
 }
 
-function handleCentering(x, y, label, now){
-  const distX = Math.abs(x - 0.5);
-  const distY = Math.abs(y - 0.5);
-  const isPerfect = (distX < CENTERING_PERFECT_THRESHOLD && distY < CENTERING_PERFECT_THRESHOLD);
-  const isSafe = (distX < CENTERING_SAFE_THRESHOLD && distY < CENTERING_SAFE_THRESHOLD);
-  const isWayOff = (distX > CENTERING_WAYOFF_THRESHOLD || distY > CENTERING_WAYOFF_THRESHOLD);
+function handleCentering(x, y, label, now, targetY = 0.5){
+  const th = 0.06; 
+  const dx = Math.abs(x - 0.5);      
+  const dy = Math.abs(y - targetY);  
   
+  const perfect = (dx < th && dy < th);
+  const safe = (dx < 0.2 && dy < 0.2); 
+
   if(isCountdownRunning){
-    if(isWayOff){ cancelCountdown(); announce("Spostata troppo! Fermo timer."); return; }
+    if(!safe){ cancelCountdown(); announce("Ti sei mosso! Timer fermato."); }
     return; 
   }
-  if(isPerfect){ announce(`Perfetto! ${label} centrato. Scatto in 3 secondi.`); startCountdown(3); return; }
-  if(isSafe){ announce(`${label} in posizione buona. Scatto in 3 secondi.`); startCountdown(3); return; }
-  
-  let hDir = x < 0.3 ? "Sinistra" : x > 0.7 ? "Destra" : ""; 
-  let vDir = y < 0.3 ? "Su" : y > 0.7 ? "Giù" : "";
-  if(hDir || vDir){
-    announce(`${label}: Sposta a ${hDir} ${vDir}`);
-    document.getElementById('local-ai-status').innerText = `${label}: ${hDir} ${vDir}`;
-    lastGuideTime = now;
+
+  if(perfect){ 
+      announce(`Eccellente! Scatto in 3 secondi.`); 
+      startCountdown(3); return; 
   }
+  
+  let msg = "";
+  if(x < 0.5 - th) msg += "Sposta a Sinistra. ";
+  else if(x > 0.5 + th) msg += "Sposta a Destra. ";
+  if(y < targetY - th) msg += "Sposta in Alto. "; 
+  else if(y > targetY + th) msg += "Sposta in Basso. ";
+
+  if(msg){ announce(msg.trim()); lastGuideTime = now; }
 }
 
 // --- SCATTO ---
-function startCountdown(seconds){
+function playShutterSound(){
+  if(audioCtx && audioCtx.state !== 'suspended'){
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type='square';
+    o.frequency.setValueAtTime(800, audioCtx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime+0.1);
+    g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+0.1);
+    o.start(audioCtx.currentTime); o.stop(audioCtx.currentTime+0.1);
+  }
+}
+
+function startCountdown(sec){
   if(isCountdownRunning) return;
   isCountdownRunning = true;
-  const overlay = document.getElementById('countdown-overlay');
-  overlay.style.display = 'block';
-  overlay.setAttribute('aria-live', 'assertive');
-  announce(seconds.toString());
-  overlay.innerText = seconds;
-  let count = seconds;
-  
-  // FIX: Clear previous timers
+  const ov = document.getElementById('countdown-overlay');
+  ov.style.display = 'block';
+  announce(sec.toString());
+  ov.innerText = sec;
   countdownTimerIds.forEach(id => clearTimeout(id));
   countdownTimerIds = [];
   
-  for(let i=1; i<=seconds; i++){
+  for(let i=1; i<=sec; i++){
     const id = setTimeout(() => {
-      count--;
-      if(count > 0){ 
-        overlay.innerText = count; 
-        announce(count.toString()); 
-      } else { 
-        overlay.style.display = 'none'; 
-        captureAndOpenMenu(); 
-      }
+      let c = sec - i;
+      if(c > 0){ ov.innerText = c; announce(c.toString()); } 
+      else { ov.style.display = 'none'; captureAndOpenMenu(); }
     }, i * 1000);
     countdownTimerIds.push(id);
   }
@@ -594,11 +533,11 @@ function cancelCountdown(){
 }
 
 function captureAndOpenMenu(){
+  playShutterSound(); // CLICK!
   isCountdownRunning = false; 
   countdownTimerIds = [];
   const c = document.createElement('canvas'); 
-  c.width = video.videoWidth; 
-  c.height = video.videoHeight;
+  c.width = video.videoWidth; c.height = video.videoHeight;
   c.getContext('2d').drawImage(video, 0, 0);
   currentPhotoBase64 = c.toDataURL('image/jpeg', 0.85); 
   finalPhotoBase64 = currentPhotoBase64;
@@ -606,381 +545,194 @@ function captureAndOpenMenu(){
   document.getElementById('context-menu').classList.remove('hidden');
   document.getElementById('context-menu').removeAttribute('aria-hidden');
   if(isGuiding) toggleSmartGuide();
-  announce("Foto scattata! Scegli azione. Premi Escape per tornare indietro.");
-  if(lightActive) toggleLight();
-  
-  // Focus primo pulsante
+  announce("Foto scattata! Scegli azione.");
   setTimeout(() => {
     const firstBtn = document.querySelector('#context-menu button');
     if(firstBtn) firstBtn.focus();
   }, 100);
 }
 
-// --- GEMINI (ANALISI + LAYOUT) ---
+// --- GEMINI & PROMPT AGGIORNATI PER NON VEDENTI ---
 async function analyzeContext(context){
-  if(!GEMINI_KEY){ 
-    announce("Manca chiave API. Apri Impostazioni API."); 
-    return; 
+  if(!GEMINI_KEY){ announce("Manca chiave API."); return; }
+  
+  // UI: Se non è approfondimento social, chiudi il menu contestuale
+  if(context !== 'social'){
+      document.getElementById('context-menu').classList.add('hidden');
   }
-  if(!currentPhotoBase64){
-    announce("Nessuna foto da analizzare.");
-    return;
-  }
-
-  document.getElementById('context-menu').classList.add('hidden');
+  
   document.getElementById('result-screen').classList.remove('hidden');
   document.getElementById('result-screen').removeAttribute('aria-hidden');
-  document.getElementById('result-text').textContent = "Gemini sta elaborando...";
-  announce("Gemini elabora...");
+  document.getElementById('result-text').textContent = "Gemini sta analizzando...";
+  announce("Gemini sta analizzando...");
   
   const layoutPrompt = `
-  ALLA FINE DELLA RISPOSTA, aggiungi una riga speciale con questo formato ESATTO per dirmi come scrivere un testo sull'immagine in modo leggibile ed estetico:
-  ###LAYOUT:POS|COLORE|SFONDO###
-  Dove:
-  POS = TOP (alto), MIDDLE (centro) o BOTTOM (basso). Scegli dove c'è spazio vuoto.
-  COLORE = WHITE (testo bianco) o BLACK (testo nero).
-  SFONDO = BOX (rettangolo semitrasparente se lo sfondo è caotico), SHADOW (solo ombra se uniforme), NONE (nessuno).
-  Esempio: ###LAYOUT:TOP|BLACK|NONE###
-  `;
+  ALLA FINE DELLA RISPOSTA, aggiungi una riga: ###LAYOUT:POS|COLORE|SFONDO###
+  Dove POS=TOP/MIDDLE/BOTTOM, COLORE=WHITE/BLACK, SFONDO=BOX/SHADOW/NONE.`;
 
   let prompt = "";
-  if(context === 'social'){
-    prompt = `Agisci come consulente tecnico. Analizza l'immagine per idoneità social. 1. Inquadratura. 2. Qualità. 3. Sfondo. ` + layoutPrompt;
-  } else if (context === 'selfie') prompt = "Analizza selfie. Espressione, occhi, luce, estetica." + layoutPrompt;
-  else if (context === 'group') prompt = "Analizza gruppo. Chiusi gli occhi? Tutti visibili?" + layoutPrompt;
-  else if (context === 'environment') prompt = "Descrivi ambiente e ostacoli." + layoutPrompt;
-  else if (context === 'document') prompt = "Estrai e trascrivi tutto il testo visibile." + layoutPrompt;
-  else prompt = "Descrivi immagine." + layoutPrompt;
+  
+  if (context === 'selfie') {
+      prompt = `Agisci come un consulente di immagine per una persona non vedente. Descrivi il selfie con onestà.
+      1. **Sguardo e Direzione:** Sto guardando nell'obiettivo o altrove? Ho gli occhi aperti?
+      2. **Viso e Trucco:** Ci sono macchie sul viso o trucco sbavato? I denti sono puliti?
+      3. **Vestiti:** I vestiti sono in ordine? Ci sono macchie visibili?
+      4. **Inquadratura:** Sono centrata? Se sono spostata, la foto è comunque gradevole?
+      5. **Privacy:** C'è disordine o qualcosa di imbarazzante nello sfondo?` + layoutPrompt;
+  }
+  else if (context === 'group') {
+      prompt = `Analizza questa foto di gruppo per una persona non vedente.
+      1. **Chi c'è:** Quante persone? Descrivi l'atmosfera (seria, allegra).
+      2. **Occhi e Sguardi:** Tutti guardano l'obiettivo? Qualcuno ha gli occhi chiusi o guarda altrove?
+      3. **Inquadratura:** Qualcuno è tagliato o coperto?` + layoutPrompt;
+  }
+  else if (context === 'environment') {
+      prompt = `Descrivi questa scena. Che luogo è? Illuminazione e colori. 
+      **Sicurezza e Privacy:** Ci sono ostacoli? Ci sono dati sensibili o oggetti imbarazzanti visibili?` + layoutPrompt;
+  }
+  else if (context === 'document') {
+      prompt = `Trascrivi tutto il testo. Di che documento si tratta?` + layoutPrompt;
+  }
+  else if(context === 'social') {
+      prompt = `Analisi Tecnica per Social Media (Instagram/LinkedIn).
+      1. Qualità (luce, fuoco, rumore).
+      2. Estetica (voto 1-10).
+      3. Verdetto finale: Pubblicabile o da rifare? (Sii severo).` + layoutPrompt;
+  }
 
   try {
-    const base64Clean = currentPhotoBase64.split(',')[1];
-    const response = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ 
-        contents: [{ 
-          parts: [
-            {text: prompt}, 
-            {inline_data: {mime_type: 'image/jpeg', data: base64Clean}}
-          ] 
-        }] 
-      })
+    const b64 = currentPhotoBase64.split(',')[1];
+    const res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: 'image/jpeg', data: b64}}] }] })
     });
+    const data = await res.json();
+    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Errore.";
     
-    if(!response.ok){
-      throw new Error(`API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    if(!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts){
-      document.getElementById('result-text').textContent = "Risposta Gemini non valida.";
-      announce("Errore analisi.");
-      return;
-    }
-
-    let text = data.candidates[0].content.parts.map(p => p.text || "").join("\n");
-    
-    // Extract layout config
     if(text.includes("###LAYOUT:")){
-      const extract = text.split("###LAYOUT:")[1].split("###")[0];
-      const parts = extract.split("|");
-      if(parts.length === 3){
-        aiTextConfig.pos = parts[0].toLowerCase();
-        aiTextConfig.color = parts[1].toLowerCase();
-        aiTextConfig.bg = parts[2].toLowerCase();
-      }
+      const extract = text.split("###LAYOUT:")[1].split("###")[0].split("|");
+      if(extract.length === 3) aiTextConfig = { pos: extract[0].toLowerCase(), color: extract[1].toLowerCase(), bg: extract[2].toLowerCase() };
       text = text.split("###LAYOUT:")[0];
     }
     
-    // FIX: Sanitizzazione XSS - rimuovi markup markdown e converti newline
-    const sanitized = text
-      .replace(/\*\*/g, '')
-      .replace(/[<>]/g, '') // rimuove < e >
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0)
-      .join('<br><br>');
-    
-    const resultEl = document.getElementById('result-text');
-    resultEl.textContent = ''; // clear first
-    resultEl.innerHTML = sanitized;
-    
-    announce("Analisi completata. Puoi aggiungere testo, condividere, scaricare o eliminare. Premi Escape per tornare.");
-    
-    // Focus risultato
-    setTimeout(() => resultEl.focus(), 100);
-    
+    const sanitized = text.replace(/\*\*/g, '').replace(/[<>]/g, '').replace(/\n/g, '<br><br>');
+    document.getElementById('result-text').innerHTML = sanitized;
+    announce("Analisi completata.");
+    setTimeout(() => document.getElementById('result-text').focus(), 100);
   } catch(e) { 
-    document.getElementById('result-text').textContent = "Errore connessione Gemini: " + e.message; 
     announce("Errore analisi."); 
-    console.error("Gemini error:", e);
+    document.getElementById('result-text').textContent = "Errore: " + e.message;
   }
 }
 
 function downloadImage(){
-  if(!finalPhotoBase64 && !currentPhotoBase64) return;
   const link = document.createElement('a');
   link.href = finalPhotoBase64 || currentPhotoBase64;
-  const date = new Date();
-  const hh = String(date.getHours()).padStart(2,"0");
-  const mm = String(date.getMinutes()).padStart(2,"0");
-  const ss = String(date.getSeconds()).padStart(2,"0");
-  const timestamp = `${hh}${mm}${ss}`;
-  link.download = `smart_foto_${timestamp}.jpg`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  announce("File scaricato.");
+  link.download = `smart_foto_${Date.now()}.jpg`;
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  announce("Scaricato.");
 }
 
 async function shareImageNative(){
-  if(!finalPhotoBase64 && !currentPhotoBase64) return;
-  const imgToUse = finalPhotoBase64 || currentPhotoBase64;
-  
   try{
-    const res = await fetch(imgToUse); 
+    const res = await fetch(finalPhotoBase64 || currentPhotoBase64); 
     const blob = await res.blob(); 
     const file = new File([blob], "smart_foto.jpg", {type: "image/jpeg"});
-    
-    if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){ 
-      await navigator.share({files:[file], title:'Smart Photo'});
-      announce("Immagine condivisa.");
-    } else {
-      announce("Condivisione non supportata, uso scarica.");
-      downloadImage();
-    }
-  }catch(e){
-    if(e.name !== 'AbortError'){ // L'utente ha annullato
-      console.error("Share error:", e);
-      announce("Errore condivisione, uso scarica.");
-      downloadImage();
-    }
-  }
-}
-
-// UTILS TESTO
-function openTextEditor(){
-  document.getElementById('text-editor').style.display = 'block'; 
-  setTimeout(() => {
-    document.getElementById('caption-input').focus();
-  }, 100);
-  announce("Scrivi il testo da aggiungere. Premi Invio per confermare o Escape per annullare.");
-}
-
-function closeTextEditor(){ 
-  document.getElementById('text-editor').style.display = 'none'; 
-  announce("Editor chiuso.");
-}
-
-function applyTextToImage(){
-  const txt = document.getElementById('caption-input').value.trim(); 
-  if(!txt){
-    announce("Nessun testo inserito.");
-    return;
-  }
-  
-  const img = new Image(); 
-  img.onload = () => {
-    const c = document.createElement('canvas'); 
-    c.width = img.width; 
-    c.height = img.height; 
-    const ctx = c.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    
-    const fontSize = c.width * 0.06; 
-    ctx.font = `bold ${fontSize}px Arial`; 
-    ctx.textAlign = "center";
-    
-    let x = c.width/2; 
-    let y = c.height - (fontSize*2); 
-    if(aiTextConfig.pos === "top") y = fontSize * 2.5;
-    if(aiTextConfig.pos === "middle") y = c.height/2;
-
-    const textWidth = ctx.measureText(txt).width;
-    const padding = 20;
-
-    if(aiTextConfig.bg === "box"){
-      if(aiTextConfig.color === "white") ctx.fillStyle = "rgba(0,0,0,0.6)";
-      else ctx.fillStyle = "rgba(255,255,255,0.7)";
-      ctx.fillRect(x - textWidth/2 - padding/2, y - fontSize, textWidth + padding, fontSize * 1.4);
-    } else if (aiTextConfig.bg === "shadow"){
-      ctx.shadowColor = "rgba(0,0,0,0.8)"; 
-      ctx.shadowBlur = 15;
-    }
-
-    ctx.fillStyle = aiTextConfig.color === "white" ? "#fff" : "#000"; 
-    ctx.fillText(txt, x, y); 
-    ctx.shadowBlur = 0;
-    
-    finalPhotoBase64 = c.toDataURL('image/jpeg', 0.9); 
-    announce("Testo applicato. Ora puoi Condividere, Scaricare o Eliminare."); 
-    closeTextEditor();
-  }; 
-  img.onerror = () => {
-    announce("Errore caricamento immagine.");
-  };
-  img.src = currentPhotoBase64;
+    if(navigator.share){ await navigator.share({files:[file], title:'Smart Photo'}); announce("Condiviso."); }
+    else downloadImage();
+  }catch(e){ downloadImage(); }
 }
 
 function discardPhoto(){ 
   document.getElementById('context-menu').classList.add('hidden'); 
   document.getElementById('result-screen').classList.add('hidden'); 
   document.getElementById('main-interface').classList.remove('hidden'); 
-  closeTextEditor(); // FIX: Chiudi editor se aperto
-  currentPhotoBase64=null; 
-  finalPhotoBase64=null;
+  closeTextEditor();
   announce("Foto eliminata."); 
 }
 
-function announce(msg){ 
-  const announcer = document.getElementById('sr-announcer');
-  announcer.textContent = ''; // Clear first per forzare ri-lettura
-  setTimeout(() => {
-    announcer.textContent = msg;
-  }, 100);
+// EDITOR TESTO
+function openTextEditor(){ 
+    document.getElementById('text-editor').style.display = 'block'; 
+    setTimeout(() => document.getElementById('caption-input').focus(), 100); 
 }
-
-function openSettings(){ 
-  document.getElementById('key-screen').classList.remove('hidden'); 
-  setTimeout(() => {
-    document.getElementById('key-input').focus();
-  }, 100);
-}
-
-function closeSettings(){ 
-  document.getElementById('key-screen').classList.add('hidden'); 
-}
-
-function saveKey(){ 
-  GEMINI_KEY = document.getElementById('key-input').value.trim(); 
-  localStorage.setItem('gemini_key', GEMINI_KEY); 
-  closeSettings(); 
-  announce("Chiave salvata."); 
-}
-
-// --- COMANDI VOCALI ---
-let recognition = null; 
-let voiceActive = false;
-
-function toggleVoiceControl(){
-  if(!SpeechRecognitionClass){
-    announce("Comandi vocali non supportati su questo dispositivo.");
-    return;
-  }
-
-  voiceActive = !voiceActive; 
-  const btn = document.getElementById('btn-voice');
-  const voiceStatus = document.getElementById('voice-status');
-
-  if(voiceActive){
-    btn.classList.add('active-tool'); 
-    voiceStatus.style.display='block';
+function closeTextEditor(){ document.getElementById('text-editor').style.display = 'none'; }
+function applyTextToImage(){
+  const txt = document.getElementById('caption-input').value.trim();
+  if(!txt){ announce("Nessun testo."); return; }
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas'); 
+    c.width = img.width; c.height = img.height; 
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const fs = c.width * 0.06; ctx.font = `bold ${fs}px Arial`; ctx.textAlign = "center";
+    let x = c.width/2, y = c.height - (fs*2);
+    if(aiTextConfig.pos === "top") y = fs * 2.5; else if(aiTextConfig.pos === "middle") y = c.height/2;
     
+    if(aiTextConfig.bg === "box"){
+      ctx.fillStyle = aiTextConfig.color==="white"?"rgba(0,0,0,0.6)":"rgba(255,255,255,0.7)";
+      const tw = ctx.measureText(txt).width;
+      ctx.fillRect(x - tw/2 - 10, y - fs, tw + 20, fs * 1.4);
+    } else if (aiTextConfig.bg === "shadow"){
+      ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 15;
+    }
+    ctx.fillStyle = aiTextConfig.color === "white" ? "#fff" : "#000"; 
+    ctx.fillText(txt, x, y);
+    finalPhotoBase64 = c.toDataURL('image/jpeg', 0.9);
+    announce("Testo applicato."); closeTextEditor();
+  };
+  img.src = currentPhotoBase64;
+}
+
+// SETTINGS & HELPERS
+function announce(msg){ 
+  const el = document.getElementById('sr-announcer'); 
+  el.textContent = ''; setTimeout(() => el.textContent = msg, 100); 
+}
+function openSettings(){ 
+    document.getElementById('key-screen').classList.remove('hidden'); 
+    setTimeout(() => document.getElementById('key-input').focus(), 100); 
+}
+function closeSettings(){ document.getElementById('key-screen').classList.add('hidden'); }
+function saveKey(){ 
+    GEMINI_KEY = document.getElementById('key-input').value.trim(); 
+    localStorage.setItem('gemini_key', GEMINI_KEY); 
+    closeSettings(); announce("Chiave salvata."); 
+}
+
+// VOCALE
+let recognition, voiceActive = false;
+function toggleVoiceControl(){
+  if(!SpeechRecognitionClass){ announce("No supporto vocale."); return; }
+  voiceActive = !voiceActive;
+  const btn = document.getElementById('btn-voice');
+  if(voiceActive){
+    btn.classList.add('active-tool'); document.getElementById('voice-status').style.display='block';
     if(!recognition){
       recognition = new SpeechRecognitionClass(); 
-      recognition.lang = 'it-IT'; 
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      
+      recognition.lang = 'it-IT'; recognition.continuous = true;
       recognition.onresult = (e) => { 
         const cmd = e.results[e.results.length-1][0].transcript.toLowerCase();
-        announce(`Comando: ${cmd}`);
-        
         if(cmd.includes('scatta')) startCountdown(5); 
         else if(cmd.includes('guida')) toggleSmartGuide();
-        else if(cmd.includes('luce')) toggleLight(); 
-        else if(cmd.includes('colore')) toggleColor();
-        else announce("Comando non riconosciuto. Dì: scatta, guida, luce o colore.");
       };
-      
-      // FIX: Gestione errori migliorata
-      recognition.onerror = (e) => {
-        if(e.error === 'no-speech'){
-          return; // Ignora silenzi
-        }
-        if(e.error === 'aborted'){
-          return; // Ignora aborted (succede quando si ferma)
-        }
-        
-        console.error("Speech recognition error:", e.error);
-        announce(`Errore comandi vocali: ${e.error}. Disattivo.`);
-        voiceActive = false;
-        btn.classList.remove('active-tool'); 
-        voiceStatus.style.display='none';
-        try{recognition.stop();}catch(err){}
-      };
-      
-      recognition.onend = () => {
-        // Se ancora attivo, riavvia (continuous può interrompersi)
-        if(voiceActive){
-          try{
-            recognition.start();
-          }catch(e){
-            console.error("Restart error:", e);
-          }
-        }
-      };
+      recognition.onerror = () => { try{recognition.stop();}catch(e){} voiceActive=false; btn.classList.remove('active-tool'); };
+      recognition.onend = () => { if(voiceActive) try{recognition.start();}catch(e){} };
     }
-    
-    try{
-      recognition.start(); 
-      announce("Vocale attivo. Dì: scatta, guida, luce o colore.");
-    }catch(e){
-      console.error("Start recognition error:", e);
-      announce("Impossibile avviare i comandi vocali.");
-      voiceActive = false;
-      btn.classList.remove('active-tool'); 
-      voiceStatus.style.display='none';
-    }
+    try{ recognition.start(); announce("Vocale attivo. Dì: scatta o guida."); }catch(e){}
   }else{ 
-    if(recognition){
-      try{ 
-        recognition.stop(); 
-      }catch(e){
-        console.error("Stop recognition error:", e);
-      }
-    }
-    btn.classList.remove('active-tool'); 
-    voiceStatus.style.display='none'; 
-    announce("Vocale spento."); 
+    if(recognition) try{ recognition.stop(); }catch(e){}
+    btn.classList.remove('active-tool'); document.getElementById('voice-status').style.display='none'; announce("Vocale spento.");
   }
 }
 
-// --- KEYBOARD NAVIGATION ---
 function setupModalKeyboardHandlers(){
-  // Context menu
-  document.getElementById('context-menu').addEventListener('keydown', (e) => {
-    if(e.key === 'Escape'){
-      discardPhoto();
-    }
-  });
-  
-  // Result screen
-  document.getElementById('result-screen').addEventListener('keydown', (e) => {
-    if(e.key === 'Escape'){
-      discardPhoto();
-    }
-  });
-  
-  // Text editor
-  document.getElementById('text-editor').addEventListener('keydown', (e) => {
-    if(e.key === 'Escape'){
-      closeTextEditor();
-    }
-    if(e.key === 'Enter' && e.target.id === 'caption-input'){
-      applyTextToImage();
-    }
-  });
-  
-  // Settings
-  document.getElementById('key-screen').addEventListener('keydown', (e) => {
-    if(e.key === 'Escape'){
-      closeSettings();
-    }
-    if(e.key === 'Enter' && e.target.id === 'key-input'){
-      saveKey();
-    }
-  });
+  const closeOnEsc = (id, fn) => document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Escape') fn(); });
+  closeOnEsc('context-menu', discardPhoto);
+  closeOnEsc('result-screen', discardPhoto);
+  closeOnEsc('text-editor', closeTextEditor);
+  closeOnEsc('key-screen', closeSettings);
 }
 
 window.onload = init;
