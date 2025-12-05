@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - Selection Pro</title>
+<title>Smart Photo Assistant - Final</title>
 <style>
 /* STILE BASE */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -35,13 +35,14 @@ button:active{background:#555;transform:scale(.98)}
 .full-width{grid-column:1/-1}
 .btn-primary{background:#004080;border-color:#4a90e2}
 .btn-action{background:#006400;border-color:#0f0;color:#0f0}
+.btn-download{background:#4B0082;border-color:#9370DB;color:#fff}
 .btn-guide{background:#8B0000;border-color:#f00;font-size:1.1rem}
 .active-tool{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
 
 /* MENU CONTESTO */
 #context-menu{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:80;padding:15px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
 .context-title{font-size:1.2rem;color:#D4AF37;text-align:center;margin-bottom:10px}
-.btn-share-now{background:#2F4F4F!important;border-color:#00CED1!important;color:#fff!important;min-height:80px;font-size:1.2rem}
+.btn-share-now{background:#2F4F4F!important;border-color:#00CED1!important;color:#fff!important;min-height:60px;font-size:1.1rem}
 
 /* SCHERMATA RISULTATO */
 #result-screen{position:absolute;top:0;left:0;width:100%;height:100%;background:#111;z-index:90;display:flex;flex-direction:column;padding:15px}
@@ -69,25 +70,20 @@ button:active{background:#555;transform:scale(.98)}
 
 <div id="main-interface">
   <div id="camera-controls">
-    
     <button class="full-width" id="btn-select-mode" onclick="toggleSelectionMode()" style="background:#333;border-color:#777">
       SELEZIONA COSA FOTOGRAFARE
     </button>
-    
     <div id="selection-panel">
       <div style="font-size:0.9rem;color:#ccc;margin-bottom:5px">Oggetti visibili (clicca per selezionare):</div>
       <div id="detected-list">In attesa...</div>
       <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:40px;margin-top:5px">CONFERMA E CHIUDI</button>
     </div>
-
     <button class="full-width btn-guide" id="btn-guide" onclick="toggleSmartGuide()">
       AVVIA GUIDA AUTO-SCATTO
     </button>
-
     <div id="local-ai-status" class="full-width" style="text-align:center;padding:10px;background:#222;border:1px solid #444;border-radius:8px;color:#ccc" aria-live="polite">
       In attesa...
     </div>
-
     <button onclick="toggleLight()" id="btn-light">SONDA LUCE</button>
     <button onclick="toggleColor()" id="btn-color">COLORE</button>
     <button class="full-width btn-action" onclick="startCountdown(5)">SCATTA MANUALE (5 SEC)</button>
@@ -99,33 +95,44 @@ button:active{background:#555;transform:scale(.98)}
 
 <div id="context-menu" class="hidden" aria-hidden="true">
   <h2 class="context-title">Foto Acquisita</h2>
-  <button class="btn-share-now full-width" onclick="shareImageNative()">USA / CONDIVIDI SUBITO</button>
-  <div style="height:1px;background:#555;margin:10px 0"></div>
-  <p style="text-align:center;color:#ccc;margin:5px">Analisi Gemini:</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">
+    <button class="btn-share-now" onclick="shareImageNative()">CONDIVIDI</button>
+    <button class="btn-download" onclick="downloadImage()">SCARICA</button>
+  </div>
+  <div style="height:1px;background:#555;margin:5px 0"></div>
+  <p style="text-align:center;color:#ccc;margin:5px">Scegli Analisi:</p>
   <button class="btn-primary" onclick="analyzeContext('selfie')">SELFIE / RITRATTO</button>
   <button class="btn-primary" onclick="analyzeContext('group')">GRUPPO</button>
   <button class="btn-primary" onclick="analyzeContext('environment')">AMBIENTE</button>
   <button class="btn-primary" onclick="analyzeContext('document')">LEGGI TESTO</button>
+  <button style="background:#E1306C;border-color:#fff;margin-top:10px" class="full-width" onclick="analyzeContext('social')">ANALISI TECNICA SOCIAL</button>
   <div style="height:1px;background:#555;margin:10px 0"></div>
-  <button style="background:#E1306C;border-color:#fff" class="full-width" onclick="analyzeContext('social')">ANALISI SOCIAL (IG/TikTok)</button>
-  <button onclick="discardPhoto()" style="background:#8B0000;margin-top:15px">ELIMINA</button>
+  <button onclick="discardPhoto()" style="background:#8B0000;margin-top:5px">ELIMINA E TORNA</button>
 </div>
 
 <div id="result-screen" class="hidden" aria-hidden="true">
   <h2 style="color:#D4AF37;text-align:center;margin:0 0 10px 0">Risultato</h2>
   <div id="result-text" tabindex="0">Elaborazione...</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <button onclick="openTextEditor()" class="full-width btn-primary">AGGIUNGI TESTO</button>
-    <button onclick="shareImageNative()" class="full-width btn-action">CONDIVIDI</button>
-    <button onclick="discardPhoto()" class="full-width" style="background:#8B0000">CHIUDI</button>
+  
+  <button onclick="analyzeContext('social')" class="full-width" style="background:#E1306C;margin-bottom:10px">VERIFICA IDONEITÀ SOCIAL</button>
+
+  <div id="after-analysis-buttons">
+    
+    <button onclick="openTextEditor()" class="full-width btn-primary" style="background:#006400;border-color:#0f0;min-height:50px;margin-bottom:15px">AGGIUNGI TESTO (IA POSIZIONA)</button>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button onclick="shareImageNative()" class="btn-action">CONDIVIDI</button>
+        <button onclick="downloadImage()" class="btn-download">SCARICA</button>
+        <button onclick="discardPhoto()" class="full-width" style="background:#8B0000;grid-column:1/-1">ELIMINA</button>
+    </div>
   </div>
 </div>
 
 <div id="text-editor">
-  <h3 style="color:#fff;margin-top:0">Testo su foto</h3>
-  <input type="text" id="caption-input" placeholder="Scrivi qui...">
+  <h3 style="color:#fff;margin-top:0">Scrivi Testo</h3>
+  <input type="text" id="caption-input" placeholder="Il tuo messaggio..." style="color:black">
   <div style="display:flex;gap:10px">
-    <button onclick="applyTextToImage()" class="btn-action" style="flex:1">APPLICA</button>
+    <button onclick="applyTextToImage()" class="btn-action" style="flex:1">CONFERMA</button>
     <button onclick="closeTextEditor()" style="flex:1">ANNULLA</button>
   </div>
 </div>
@@ -151,27 +158,23 @@ let tempCtx = tempCanvas.getContext('2d');
 let stream = null;
 let currentPhotoBase64 = null;
 let finalPhotoBase64 = null;
-let textPositionSuggestion = "bottom";
+
+// IA CONFIG PER TESTO
+let aiTextConfig = { pos: "bottom", color: "white", bg: "box" };
 
 // TOOLS
 let audioCtx, lightOsc, lightGain;
 let lightActive = false, colorActive = false;
-
-// AI LOCAL
 let objectDetector = null;
 let faceLandmarker = null;
-
-// STATI GUIDA
 let isGuiding = false;
 let isSelectionMode = false;
 let guideInterval = null;
 let lastGuideTime = 0;
 let isCountdownRunning = false;
 let countdownTimerIds = [];
-
-// TARGETING
-let selectedTargets = []; // Array di stringhe con i nomi degli oggetti scelti
-let availableObjects = []; // Cosa vede la camera ora
+let selectedTargets = []; 
+let availableObjects = []; 
 
 async function init(){
   audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -208,30 +211,25 @@ function loopTools(){
   }
   requestAnimationFrame(loopTools);
 }
-// (Funzioni Luce/Colore omesse per brevità, sono identiche a prima, le reinserisco sotto compatte)
+
 function toggleLight(){ lightActive=!lightActive; document.getElementById('btn-light').classList.toggle('active-tool'); announce(lightActive?"Luce ON":"Luce OFF"); if(lightActive && !lightOsc){lightOsc=audioCtx.createOscillator();lightGain=audioCtx.createGain();lightOsc.connect(lightGain);lightGain.connect(audioCtx.destination);lightOsc.start();lightGain.gain.value=0;} if(!lightActive && lightGain)lightGain.gain.value=0; }
 function processLight(){ const d=tempCtx.getImageData(0,0,tempCanvas.width,tempCanvas.height).data; let s=0; for(let i=0;i<d.length;i+=4)s+=(d[i]+d[i+1]+d[i+2])/3; const b=s/(d.length/4); if(lightOsc)lightOsc.frequency.value=200+b*2; if(lightGain)lightGain.gain.value=0.1; }
 function toggleColor(){ colorActive=!colorActive; document.getElementById('btn-color').classList.toggle('active-tool'); announce(colorActive?"Colore ON":"Colore OFF"); if(colorActive) processColor(); }
 function processColor(){ const w=tempCanvas.width,h=tempCanvas.height; const d=tempCtx.getImageData(w/2-10,h/2-10,20,20).data; let r=0,g=0,b=0,c=0; for(let i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2];c++;} r=Math.round(r/c);g=Math.round(g/c);b=Math.round(b/c); announce(`Colore: ${r>200&&g>200&&b>200?'Bianco':r<50&&g<50&&b<50?'Nero':r>150&&g<100?'Rosso':g>150&&r<100?'Verde':b>150?'Blu':'Misto'}`); }
 
-// --- GESTIONE SELEZIONE MANUALE ---
+// --- SELEZIONE ---
 function toggleSelectionMode(){
   isSelectionMode = !isSelectionMode;
   const panel = document.getElementById('selection-panel');
   const btn = document.getElementById('btn-select-mode');
-  
   if(isSelectionMode){
-    // Ferma la guida se attiva
     if(isGuiding) toggleSmartGuide();
-    
     panel.style.display = 'flex';
     btn.classList.add('active-tool');
     btn.textContent = "CHIUDI SELEZIONE";
     announce("Modalità selezione. Esploro la scena...");
-    selectedTargets = []; // Reset selezione precedente
+    selectedTargets = []; 
     updateSelectionUI();
-    
-    // Avvia loop di scansione per popolare la lista
     guideInterval = setInterval(scanForSelection, 1000);
   } else {
     panel.style.display = 'none';
@@ -244,15 +242,9 @@ function toggleSelectionMode(){
 
 async function scanForSelection(){
   if(video.readyState !== 4 || !objectDetector) return;
-  
   const detections = objectDetector.detectForVideo(video, performance.now());
-  // Estrai nomi univoci
   const currentSet = new Set();
   detections.detections.forEach(d => currentSet.add(d.categories[0].categoryName));
-  
-  // Aggiungiamo anche 'person' se non c'è ma il faceLandmarker vede un volto?
-  // Per semplicità usiamo l'object detector che vede 'person'.
-  
   availableObjects = Array.from(currentSet);
   updateSelectionUI();
 }
@@ -260,26 +252,20 @@ async function scanForSelection(){
 function updateSelectionUI(){
   const list = document.getElementById('detected-list');
   list.innerHTML = '';
-  
   if(availableObjects.length === 0){
     list.innerHTML = '<span style="color:#777">Nessun oggetto rilevato...</span>';
     return;
   }
-  
   availableObjects.forEach(objName => {
-    // Traduzione semplice
     let display = objName;
     if(objName==='person') display='Persona';
-    if(objName==='cup') display='Tazza';
-    if(objName==='bottle') display='Bottiglia';
-    if(objName==='chair') display='Sedia';
-    if(objName==='laptop') display='Computer';
-    if(objName==='cell phone') display='Telefono';
+    else if(objName==='cup') display='Tazza';
+    else if(objName==='bottle') display='Bottiglia';
+    else display = objName;
     
     const btn = document.createElement('button');
     btn.className = 'obj-btn';
     if(selectedTargets.includes(objName)) btn.classList.add('selected');
-    
     btn.textContent = display + (selectedTargets.includes(objName) ? " (SCELTO)" : "");
     btn.onclick = () => {
       if(selectedTargets.includes(objName)){
@@ -296,7 +282,7 @@ function updateSelectionUI(){
 }
 
 function confirmSelection(){
-  toggleSelectionMode(); // Chiude il pannello
+  toggleSelectionMode(); 
   if(selectedTargets.length > 0){
     announce(`Hai scelto: ${selectedTargets.length} oggetti. Premi Avvia Guida.`);
     document.getElementById('btn-guide').textContent = "AVVIA GUIDA (SELEZIONE ATTIVA)";
@@ -306,22 +292,17 @@ function confirmSelection(){
   }
 }
 
-// --- LOGICA GUIDA INTELLIGENTE (IBRIDA) ---
+// --- GUIDA ---
 function toggleSmartGuide(){
   isGuiding = !isGuiding;
   const btn = document.getElementById('btn-guide');
-  
   if(isGuiding){
-    // Chiudi selezione se aperta
     if(isSelectionMode) toggleSelectionMode();
-    
     btn.textContent = "STOP GUIDA"; 
     btn.style.background = "#006400";
-    
     let msg = "Guida Automatica Attiva.";
     if(selectedTargets.length > 0) msg = "Guida Selettiva Attiva. Cerco i tuoi oggetti.";
     announce(msg);
-    
     isCountdownRunning = false;
     guideInterval = setInterval(processLocalFrame, 200);
   }else{
@@ -338,13 +319,9 @@ async function processLocalFrame(){
   if(!isCountdownRunning && now - lastGuideTime < 1800) return; 
 
   let targetsFound = [];
-  let label = "";
-
-  // 1. Rilevamento Volti (Sempre utile)
   if(faceLandmarker){
     const faces = faceLandmarker.detectForVideo(video, performance.now());
     if(faces.faceLandmarks.length > 0){
-      // Se l'utente ha selezionato "person", il volto conta come persona
       if(selectedTargets.length === 0 || selectedTargets.includes('person')){
          let points = faces.faceLandmarks[0];
          let cx=0, cy=0;
@@ -354,7 +331,6 @@ async function processLocalFrame(){
     }
   }
 
-  // 2. Rilevamento Oggetti
   if(objectDetector){
     const detections = objectDetector.detectForVideo(video, performance.now());
     detections.detections.forEach(det => {
@@ -362,41 +338,24 @@ async function processLocalFrame(){
       const box = det.boundingBox;
       const cx = (box.originX + box.width/2) / video.videoWidth;
       const cy = (box.originY + box.height/2) / video.videoHeight;
-      
-      // LOGICA DI FILTRO
       if(selectedTargets.length > 0){
-        // MODALITÀ SELETTIVA: Accetta solo se è nella lista
-        if(selectedTargets.includes(cat)){
-          targetsFound.push({x: cx, y: cy, name: cat});
-        }
+        if(selectedTargets.includes(cat)) targetsFound.push({x: cx, y: cy, name: cat});
       } else {
-        // MODALITÀ AUTOMATICA: Accetta persone o oggetti grandi
-        if(cat === 'person' || targetsFound.length === 0){ 
-           // Se non abbiamo ancora trovato nulla (es. niente volti), prendiamo il primo oggetto
-           // O se è una persona (priorità)
-           targetsFound.push({x: cx, y: cy, name: cat}); 
-        }
+        if(cat === 'person' || targetsFound.length === 0) targetsFound.push({x: cx, y: cy, name: cat}); 
       }
     });
   }
 
-  // DECISIONE
   if(targetsFound.length > 0){
-    // Calcola il centro di TUTTI i target trovati (media geometrica)
     let avgX = 0, avgY = 0;
     targetsFound.forEach(t => { avgX += t.x; avgY += t.y; });
     avgX /= targetsFound.length;
     avgY /= targetsFound.length;
-    
-    // Usa il nome del primo per il feedback
     let nameDisplay = targetsFound[0].name;
     if(targetsFound.length > 1) nameDisplay = "Oggetti scelti";
     if(nameDisplay==='person') nameDisplay='Persona';
-    
     handleCentering(avgX, avgY, nameDisplay, now);
-    
   } else {
-    // NIENTE TROVATO
     if(isCountdownRunning){
       cancelCountdown();
       announce("Perso il soggetto! Timer annullato.");
@@ -413,27 +372,14 @@ function handleCentering(x, y, label, now){
   const isPerfect = (distX < 0.05 && distY < 0.05);
   const isSafe = (distX < 0.20 && distY < 0.20);
   const isWayOff = (distX > 0.30 || distY > 0.30);
-
   if(isCountdownRunning){
     if(isWayOff){ cancelCountdown(); announce("Spostata troppo! Fermo timer."); return; }
-    return; // Continua a contare
+    return; 
   }
-
-  if(isPerfect){
-    announce(`Perfetto! ${label} centrato. Scatto in 3 secondi.`);
-    startCountdown(3);
-    return;
-  }
-  
-  if(isSafe){
-    announce(`${label} in posizione buona. Scatto in 3 secondi.`);
-    startCountdown(3);
-    return;
-  }
-
+  if(isPerfect){ announce(`Perfetto! ${label} centrato. Scatto in 3 secondi.`); startCountdown(3); return; }
+  if(isSafe){ announce(`${label} in posizione buona. Scatto in 3 secondi.`); startCountdown(3); return; }
   let hDir = x < 0.3 ? "Sinistra" : x > 0.7 ? "Destra" : ""; 
   let vDir = y < 0.3 ? "Su" : y > 0.7 ? "Giù" : "";
-  
   if(hDir || vDir){
     announce(`${label}: Sposta a ${hDir} ${vDir}`);
     document.getElementById('local-ai-status').innerText = `${label}: ${hDir} ${vDir}`;
@@ -441,7 +387,7 @@ function handleCentering(x, y, label, now){
   }
 }
 
-// --- SCATTO E COUNTDOWN ---
+// --- SCATTO ---
 function startCountdown(seconds){
   if(isCountdownRunning) return;
   isCountdownRunning = true;
@@ -449,7 +395,6 @@ function startCountdown(seconds){
   overlay.style.display = 'block';
   announce(seconds.toString());
   overlay.innerText = seconds;
-  
   let count = seconds;
   for(let i=1; i<=seconds; i++){
     let id = setTimeout(() => {
@@ -478,25 +423,36 @@ function captureAndOpenMenu(){
   document.getElementById('context-menu').classList.remove('hidden');
   document.getElementById('context-menu').removeAttribute('aria-hidden');
   if(isGuiding) toggleSmartGuide();
-  announce("Foto scattata!");
+  announce("Foto scattata! Scegli azione.");
   if(lightActive) toggleLight();
 }
 
-// --- GEMINI (SOCIAL) ---
+// --- GEMINI (ANALISI + LAYOUT) ---
 async function analyzeContext(context){
   if(!GEMINI_KEY){ announce("Manca chiave API."); return; }
   document.getElementById('context-menu').classList.add('hidden');
   document.getElementById('result-screen').classList.remove('hidden');
   document.getElementById('result-screen').removeAttribute('aria-hidden');
-  announce("Analisi Gemini...");
+  document.getElementById('result-text').innerText = "Gemini sta elaborando...";
+  announce("Gemini elabora...");
   
+  const layoutPrompt = `
+  ALLA FINE DELLA RISPOSTA, aggiungi una riga speciale con questo formato ESATTO per dirmi come scrivere un testo sull'immagine in modo leggibile ed estetico:
+  ###LAYOUT:POS|COLORE|SFONDO###
+  Dove:
+  POS = TOP (alto), MIDDLE (centro) o BOTTOM (basso). Scegli dove c'è spazio vuoto.
+  COLORE = WHITE (testo bianco) o BLACK (testo nero).
+  SFONDO = BOX (rettangolo semitrasparente se lo sfondo è caotico), SHADOW (solo ombra se uniforme), NONE (nessuno).
+  Esempio: ###LAYOUT:TOP|BLACK|NONE###
+  `;
+
   let prompt = "";
   if(context === 'social'){
-    prompt = `Social Media Manager per non vedenti. 1. Formato (Story/Post)? 2. Tagli/Rischi? 3. Spazio testo libero (TOP_LEFT, MIDDLE, BOTTOM_RIGHT etc)? 4. Caption.`;
-  } else if (context === 'selfie') prompt = "Analizza selfie: espressione, luce, sfondo.";
-  else if (context === 'environment') prompt = "Descrivi ambiente e ostacoli.";
-  else if (context === 'document') prompt = "Leggi tutto il testo.";
-  else prompt = "Descrivi scena.";
+    prompt = `Agisci come consulente tecnico. Analizza l'immagine per idoneità social. 1. Inquadratura. 2. Qualità. 3. Sfondo. ` + layoutPrompt;
+  } else if (context === 'selfie') prompt = "Analizza selfie. Espressione, occhi, luce, estetica." + layoutPrompt;
+  else if (context === 'group') prompt = "Analizza gruppo. Chiudi gli occhi? Tutti visibili?" + layoutPrompt;
+  else if (context === 'environment') prompt = "Descrivi ambiente e ostacoli." + layoutPrompt;
+  else prompt = "Descrivi immagine." + layoutPrompt;
 
   try {
     const base64Clean = currentPhotoBase64.split(',')[1];
@@ -505,36 +461,83 @@ async function analyzeContext(context){
       body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: 'image/jpeg', data: base64Clean}}] }] })
     });
     const data = await response.json();
-    const text = data.candidates[0].content.parts[0].text;
-    if(text.includes("TOP_")) textPositionSuggestion = "top";
-    if(text.includes("BOTTOM_")) textPositionSuggestion = "bottom";
-    if(text.includes("MIDDLE")) textPositionSuggestion = "middle";
+    let text = data.candidates[0].content.parts[0].text;
+    
+    if(text.includes("###LAYOUT:")){
+      const extract = text.split("###LAYOUT:")[1].split("###")[0];
+      const parts = extract.split("|");
+      if(parts.length === 3){
+        aiTextConfig.pos = parts[0].toLowerCase();
+        aiTextConfig.color = parts[1].toLowerCase();
+        aiTextConfig.bg = parts[2].toLowerCase();
+      }
+      text = text.split("###LAYOUT:")[0];
+    }
     document.getElementById('result-text').innerHTML = text.replace(/\*\*/g, '').replace(/\n/g, '<br>');
-    announce("Risultato pronto.");
-  } catch(e) { document.getElementById('result-text').innerText = "Errore."; announce("Errore analisi."); }
+    announce("Analisi completata. Puoi aggiungere testo, condividere, scaricare o eliminare.");
+  } catch(e) { document.getElementById('result-text').innerText = "Errore connessione Gemini."; announce("Errore analisi."); }
 }
 
-// UTILS
-function openTextEditor(){ document.getElementById('text-editor').style.display = 'block'; document.getElementById('caption-input').focus(); announce("Scrivi testo."); }
+function downloadImage(){
+  if(!finalPhotoBase64 && !currentPhotoBase64) return;
+  const link = document.createElement('a');
+  link.href = finalPhotoBase64 || currentPhotoBase64;
+  const date = new Date();
+  const timestamp = `${date.getHours()}${date.getMinutes()}${date.getSeconds()}`;
+  link.download = `smart_foto_${timestamp}.jpg`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  announce("File scaricato.");
+}
+
+async function shareImageNative(){
+  if(!finalPhotoBase64 && !currentPhotoBase64) return;
+  const imgToUse = finalPhotoBase64 || currentPhotoBase64;
+  const res = await fetch(imgToUse); const blob = await res.blob(); const file = new File([blob], "smart_foto.jpg", {type: "image/jpeg"});
+  if(navigator.share && navigator.canShare({files:[file]})){ 
+    try{ await navigator.share({files:[file], title:'Smart Photo'}); }catch(e){} 
+  } else {
+    announce("Condivisione non supportata, uso scarica.");
+    downloadImage();
+  }
+}
+
+// UTILS TESTO
+function openTextEditor(){ document.getElementById('text-editor').style.display = 'block'; document.getElementById('caption-input').focus(); announce("Scrivi il testo da aggiungere."); }
 function closeTextEditor(){ document.getElementById('text-editor').style.display = 'none'; }
+
 function applyTextToImage(){
   const txt = document.getElementById('caption-input').value; if(!txt)return;
-  const img = new Image(); img.onload = () => {
+  const img = new Image(); 
+  img.onload = () => {
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const ctx = c.getContext('2d');
     ctx.drawImage(img, 0, 0);
-    const fs = c.width * 0.05; ctx.font = `bold ${fs}px Arial`; ctx.fillStyle = "white"; ctx.strokeStyle = "black"; ctx.lineWidth = fs/4; ctx.textAlign = "center";
-    let x = c.width/2; let y = c.height - (fs*2);
-    if(textPositionSuggestion.includes("top")) y = fs*2; if(textPositionSuggestion.includes("middle")) y = c.height/2;
-    ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y);
-    finalPhotoBase64 = c.toDataURL('image/jpeg', 0.9); announce("Testo applicato."); closeTextEditor();
-  }; img.src = currentPhotoBase64;
+    const fs = c.width * 0.06; ctx.font = `bold ${fs}px Arial`; ctx.textAlign = "center";
+    let x = c.width/2; 
+    let y = c.height - (fs*2); 
+    if(aiTextConfig.pos === "top") y = fs * 2.5;
+    if(aiTextConfig.pos === "middle") y = c.height/2;
+
+    const textWidth = ctx.measureText(txt).width;
+    const padding = 20;
+
+    if(aiTextConfig.bg === "box"){
+      if(aiTextConfig.color === "white") ctx.fillStyle = "rgba(0,0,0,0.6)";
+      else ctx.fillStyle = "rgba(255,255,255,0.7)";
+      ctx.fillRect(x - textWidth/2 - padding/2, y - fs, textWidth + padding, fs * 1.4);
+    } else if (aiTextConfig.bg === "shadow"){
+      ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 15;
+    }
+
+    ctx.fillStyle = aiTextConfig.color; ctx.fillText(txt, x, y); ctx.shadowBlur = 0;
+    finalPhotoBase64 = c.toDataURL('image/jpeg', 0.9); 
+    announce("Testo applicato. Ora puoi Condividere, Scaricare o Eliminare."); 
+    closeTextEditor();
+  }; 
+  img.src = currentPhotoBase64;
 }
-async function shareImageNative(){
-  if(!finalPhotoBase64) return;
-  const res = await fetch(finalPhotoBase64); const blob = await res.blob(); const file = new File([blob], "smart.jpg", {type: "image/jpeg"});
-  if(navigator.share && navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:'SmartPhoto'}); }catch(e){} }
-  else { const a = document.createElement('a'); a.href = finalPhotoBase64; a.download = "smart.jpg"; document.body.appendChild(a); a.click(); document.body.removeChild(a); announce("Scarico foto."); }
-}
+
 function discardPhoto(){ document.getElementById('context-menu').classList.add('hidden'); document.getElementById('result-screen').classList.add('hidden'); document.getElementById('main-interface').classList.remove('hidden'); currentPhotoBase64=null; announce("Foto eliminata."); }
 function announce(msg){ document.getElementById('sr-announcer').textContent = msg; }
 function openSettings(){ document.getElementById('key-screen').classList.remove('hidden'); }
