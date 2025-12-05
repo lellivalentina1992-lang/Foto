@@ -176,8 +176,13 @@ let qualityHistory = []; // ultimi 10 frame
 let bestQualityInSession = 0;
 let lastQualityAnnounce = 0; // per annunci vocali periodici
 
-// Stato autoscatto intelligente
+// Stato autoscatto intelligente con sessione 30 secondi
 let autoShotTimer = null;
+let autoShotSessionActive = false;
+let autoShotSessionPhotos = []; // array di {base64, quality, timestamp, analysis}
+let autoShotInterval = null;
+let autoShotCountdown = 30; // secondi rimanenti
+let autoShotPhotoInterval = 3000; // scatta ogni 3 secondi
 let autoShotMode = null;
 let autoShotCountdown = null;
 let goodQualityFrames = 0; // conta frame con qualità accettabile
@@ -206,6 +211,7 @@ const video = document.getElementById('webcam'),
       ctx = canvas.getContext('2d');
 let lastShotB64 = null;
 let targetClass = null;
+let targetDetectionObject = null; // nome italiano dell'oggetto selezionato per la guida
 let hasPerformedSocialCheck = false;
 
 const objectDict = {
@@ -719,47 +725,205 @@ function updateGuideModeLabel(){
 }
 
 function toggleGuidance(){
+  if(!targetDetectionObject){
+    announce("Prima seleziona cosa fotografare con il pulsante Cosa Vede La Camera.");
+    return;
+  }
+  
   if(mode === 'guiding'){
-    mode = 'idle';
-    stopAutoShot();
-    document.getElementById('btn-guide').classList.remove('guiding');
-    announce("Guida scena disattivata.");
-    qualityHistory = [];
-    goodQualityFrames = 0;
-  }else{
-    if(!GEMINI_KEY){
-      announce("Chiave Gemini non configurata. Apri le impostazioni.");
-      openSettings();
-      return;
+    // Ferma la sessione
+    stopGuidanceSession();
+    return;
+  }
+  
+  if(!GEMINI_KEY){
+    announce("Chiave Gemini non configurata. Apri le impostazioni.");
+    openSettings();
+    return;
+  }
+  
+  // Avvia nuova sessione di 30 secondi
+  mode = 'guiding';
+  document.getElementById('btn-guide').classList.add('guiding');
+  document.getElementById('btn-guide').textContent = 'STOP SESSIONE';
+  document.getElementById('btn-guide').setAttribute('aria-label', 'Sessione guida attiva - Premi per fermare');
+  
+  autoShotSessionActive = true;
+  autoShotSessionPhotos = [];
+  autoShotCountdown = 30;
+  
+  announce(`Sessione guida avviata per ${targetDetectionObject}. Durata 30 secondi con scatti automatici. Posizionati mentre ti guido.`);
+  
+  // Countdown timer vocale
+  autoShotTimer = setInterval(() => {
+    autoShotCountdown--;
+    
+    if(autoShotCountdown === 20){
+      speak("20 secondi rimanenti");
+    } else if(autoShotCountdown === 10){
+      speak("10 secondi rimanenti");
+    } else if(autoShotCountdown === 5){
+      speak("Ultimi 5 secondi");
     }
-    mode = 'guiding';
-    autoShotMode = null;
-    document.getElementById('btn-guide').classList.add('guiding');
-    announce("Guida scena attivata. Scegli il tipo di scatto o attendi il rilevamento automatico.");
-    qualityHistory = [];
-    goodQualityFrames = 0;
-    bestQualityInSession = 0;
+    
+    if(autoShotCountdown <= 0){
+      stopGuidanceSession();
+    }
+  }, 1000);
+  
+  // Scatta foto ogni 3 secondi
+  autoShotInterval = setInterval(() => {
+    if(autoShotSessionActive){
+      capturePhotoForSession();
+    }
+  }, autoShotPhotoInterval);
+  
+  // Prima foto immediata
+  setTimeout(() => capturePhotoForSession(), 500);
+}
+
+function stopGuidanceSession(){
+  mode = 'idle';
+  autoShotSessionActive = false;
+  
+  if(autoShotTimer){
+    clearInterval(autoShotTimer);
+    autoShotTimer = null;
+  }
+  
+  if(autoShotInterval){
+    clearInterval(autoShotInterval);
+    autoShotInterval = null;
+  }
+  
+  document.getElementById('btn-guide').classList.remove('guiding');
+  document.getElementById('btn-guide').textContent = 'GUIDA SCENA LIVE CON AUTO-SCATTO';
+  document.getElementById('btn-guide').setAttribute('aria-label', 'Attiva guida scena live con autoscatto intelligente.');
+  
+  // Analizza tutte le foto e seleziona la migliore
+  if(autoShotSessionPhotos.length > 0){
+    announce(`Sessione completata. ${autoShotSessionPhotos.length} foto scattate. Analizzo per selezionare la migliore...`);
+    selectBestPhotoFromSession();
+  }else{
+    announce("Sessione terminata. Nessuna foto scattata.");
+  }
+}
+
+async function capturePhotoForSession(){
+  if(!video.videoWidth || !autoShotSessionActive) return;
+  
+  const captureCanvas = document.createElement('canvas');
+  captureCanvas.width = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+  const captureCtx = captureCanvas.getContext('2d');
+  captureCtx.drawImage(video, 0, 0);
+  
+  const base64 = captureCanvas.toDataURL('image/jpeg', 0.92);
+  
+  // Calcola qualità base (luminosità media)
+  const imageData = captureCtx.getImageData(0, 0, captureCanvas.width, captureCanvas.height);
+  const data = imageData.data;
+  let totalBrightness = 0;
+  for(let i = 0; i < data.length; i += 4){
+    totalBrightness += (data[i] + data[i+1] + data[i+2]) / 3;
+  }
+  const avgBrightness = totalBrightness / (data.length / 4);
+  const qualityEstimate = Math.min(100, Math.max(0, avgBrightness / 2.55));
+  
+  autoShotSessionPhotos.push({
+    base64: base64,
+    quality: qualityEstimate,
+    timestamp: Date.now()
+  });
+  
+  const photoNum = autoShotSessionPhotos.length;
+  speak(`Foto ${photoNum}`);
+}
+
+async function selectBestPhotoFromSession(){
+  if(!GEMINI_KEY || autoShotSessionPhotos.length === 0) return;
+  
+  announce("Analisi qualità in corso...");
+  
+  try{
+    // Analizza tutte le foto con Gemini
+    const analyses = [];
+    
+    for(let i = 0; i < autoShotSessionPhotos.length; i++){
+      const photo = autoShotSessionPhotos[i];
+      const imageData = photo.base64.split(',')[1];
+      
+      const prompt = `Analizza brevemente questa foto e assegna un PUNTEGGIO di qualità da 0 a 100.
+Considera: nitidezza, illuminazione, composizione, presenza completa del soggetto principale.
+Rispondi SOLO con il formato: PUNTEGGIO: [numero]`;
+      
+      try{
+        const response = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {text: prompt},
+                {inline_data: {mime_type: 'image/jpeg', data: imageData}}
+              ]
+            }]
+          })
+        });
+        
+        const data = await response.json();
+        if(data.candidates && data.candidates[0].content){
+          const result = data.candidates[0].content.parts[0].text;
+          const scoreMatch = result.match(/PUNTEGGIO:\s*(\d+)/i);
+          const score = scoreMatch ? parseInt(scoreMatch[1]) : photo.quality;
+          
+          analyses.push({
+            index: i,
+            score: score,
+            aiAnalysis: result
+          });
+        }
+      }catch(e){
+        console.error(`Errore analisi foto ${i+1}`, e);
+        analyses.push({
+          index: i,
+          score: photo.quality,
+          aiAnalysis: "Errore analisi"
+        });
+      }
+    }
+    
+    // Trova la foto con il punteggio più alto
+    let bestPhoto = analyses[0];
+    for(const analysis of analyses){
+      if(analysis.score > bestPhoto.score){
+        bestPhoto = analysis;
+      }
+    }
+    
+    // Mostra la foto migliore
+    lastShotB64 = autoShotSessionPhotos[bestPhoto.index].base64;
+    
+    announce(`Foto migliore selezionata: numero ${bestPhoto.index + 1} con qualità ${bestPhoto.score} su 100.`);
+    
+    // Ora analizza in dettaglio solo la foto migliore
+    await analyzePhotoQuality(lastShotB64);
+    
+  }catch(e){
+    console.error("Errore selezione migliore", e);
+    // Fallback: usa la prima foto
+    if(autoShotSessionPhotos.length > 0){
+      lastShotB64 = autoShotSessionPhotos[0].base64;
+      announce("Errore nella selezione. Mostro la prima foto scattata.");
+      await analyzePhotoQuality(lastShotB64);
+    }
   }
 }
 
 async function processGuidance(){
-  updateQualityIndicator();
+  if(!autoShotSessionActive) return;
   
-  // Auto-detect tipo di scatto se non ancora impostato
-  if(!autoShotMode){
-    let detected = await detectSceneType();
-    if(detected){
-      autoShotMode = detected;
-      const typeNames = {
-        'selfie_face': 'selfie del volto',
-        'selfie_full': 'selfie figura intera',
-        'object': 'oggetto'
-      };
-      announce(`Rilevato: ${typeNames[autoShotMode]}. Posizionati e attendi l'autoscatto.`);
-    }
-  }
-  
-  // Guida vocale periodica
+  // Guida vocale periodica durante la sessione
   const now = Date.now();
   if(now - lastGuideMessageTime > 4000){
     provideGuidance();
@@ -804,12 +968,12 @@ async function detectSceneType(){
 }
 
 function provideGuidance(){
-  if(!autoShotMode) return;
+  if(!autoShotSessionActive) return;
   
   let message = "";
   
-  if(autoShotMode === 'selfie_face'){
-    // Guida per selfie del volto
+  // Se è selezionato "person" = selfie
+  if(targetClass === 'person'){
     if(faceLandmarker && modelsReady.face){
       try{
         const faceResults = faceLandmarker.detectForVideo(video, Date.now());
@@ -834,61 +998,39 @@ function provideGuidance(){
           }else if(faceY > 0.55){
             message = "Alza leggermente il telefono.";
           }else{
-            message = "Posizione buona! Mantieni così.";
+            message = "Posizione ottima!";
           }
         }
       }catch(e){}
     }
-  }else if(autoShotMode === 'selfie_full'){
-    // Guida per selfie figura intera
-    if(poseLandmarker && modelsReady.pose){
-      try{
-        const poseResults = poseLandmarker.detectForVideo(video, Date.now());
-        if(!poseResults.landmarks || poseResults.landmarks.length === 0){
-          message = "Non vedo la tua figura. Allontanati un po'.";
-        }else{
-          message = "Buona posizione! Mantieni la posa.";
-        }
-      }catch(e){}
-    }
-  }else if(autoShotMode === 'object'){
-    // Guida per oggetto
-    if(objectDetector && modelsReady.detector && targetClass){
+  }else if(targetClass){
+    // Guida per oggetto specifico
+    if(objectDetector && modelsReady.detector){
       try{
         const objResults = objectDetector.detectForVideo(video, Date.now());
         const target = objResults.detections.find(d => 
           d.categories[0].categoryName === targetClass
         );
         if(!target){
-          message = "Oggetto non visibile. Inquadralo meglio.";
+          message = `${targetDetectionObject} non visibile. Inquadralo meglio.`;
         }else{
           const box = target.boundingBox;
-          const centerX = box.originX + box.width / 2;
-          const centerY = box.originY + box.height / 2;
+          const centerX = (box.originX + box.width / 2) / video.videoWidth;
           
           if(centerX < 0.4){
             message = "Sposta la camera a sinistra.";
           }else if(centerX > 0.6){
             message = "Sposta la camera a destra.";
           }else{
-            message = "Oggetto ben inquadrato.";
+            message = "Inquadratura perfetta!";
           }
         }
       }catch(e){}
     }
   }
   
-  // Aggiungi info sulla qualità
-  if(currentQualityLevel === 'excellent'){
-    message += " Qualità eccellente!";
-  }else if(currentQualityLevel === 'good'){
-    message += " Qualità buona.";
-  }else if(currentQualityLevel === 'poor'){
-    message += " Luce insufficiente.";
-  }
-  
   if(message && message !== lastGuideText){
-    announce(message);
+    speak(message);
     lastGuideText = message;
   }
 }
@@ -901,15 +1043,12 @@ function manualFind(){
 
 function selectObjectFromChoice(engName, itaName){
   targetClass = engName;
+  targetDetectionObject = itaName;
   autoShotMode = 'object';
-  announce(`Cerco: ${itaName}. Attendi l'autoscatto quando l'oggetto è ben inquadrato.`);
+  announce(`Selezionato: ${itaName}. Ora puoi avviare la guida scena per fotografarlo.`);
   
   // Pulisci area scelta
   document.getElementById('object-choice').innerHTML = '';
-  
-  if(mode !== 'guiding'){
-    toggleGuidance();
-  }
 }
 
 async function quickDescribeScene(){
@@ -929,6 +1068,8 @@ async function quickDescribeScene(){
         if(faceResults.faceLandmarks && faceResults.faceLandmarks.length > 0){
           parts.push("Vedo il tuo volto.");
           personSeen = true;
+          // Aggiungi opzione Persona per selfie
+          options.push({eng:'person', ita:'Persona'});
         }
       }catch(e){}
     }
