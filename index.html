@@ -190,6 +190,29 @@ let currentFramingMode = "closeup";
 
 const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
+// DIZIONARIO COMPLETO COCO-SSD (80 Classi)
+const OBJECT_TRANSLATIONS = {
+    'person': 'Persona', 'bicycle': 'Bicicletta', 'car': 'Auto', 'motorcycle': 'Moto', 
+    'airplane': 'Aereo', 'bus': 'Autobus', 'train': 'Treno', 'truck': 'Camion', 'boat': 'Barca',
+    'traffic light': 'Semaforo', 'fire hydrant': 'Idrante', 'stop sign': 'Segnale Stop', 
+    'parking meter': 'Parchimetro', 'bench': 'Panchina', 'bird': 'Uccello', 'cat': 'Gatto', 
+    'dog': 'Cane', 'horse': 'Cavallo', 'sheep': 'Pecora', 'cow': 'Mucca', 'elephant': 'Elefante', 
+    'bear': 'Orso', 'zebra': 'Zebra', 'giraffe': 'Giraffa', 'backpack': 'Zaino', 'umbrella': 'Ombrello', 
+    'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'frisbee': 'Frisbee', 'skis': 'Sci', 
+    'snowboard': 'Snowboard', 'sports ball': 'Palla', 'kite': 'Aquilone', 'baseball bat': 'Mazza', 
+    'baseball glove': 'Guanto', 'skateboard': 'Skateboard', 'surfboard': 'Surf', 'tennis racket': 'Racchetta', 
+    'bottle': 'Bottiglia', 'wine glass': 'Bicchiere', 'cup': 'Tazza', 'fork': 'Forchetta', 
+    'knife': 'Coltello', 'spoon': 'Cucchiaio', 'bowl': 'Ciotola', 'banana': 'Banana', 'apple': 'Mela', 
+    'sandwich': 'Panino', 'orange': 'Arancia', 'broccoli': 'Broccoli', 'carrot': 'Carota', 
+    'hot dog': 'Hot dog', 'pizza': 'Pizza', 'donut': 'Ciambella', 'cake': 'Torta', 'chair': 'Sedia', 
+    'couch': 'Divano', 'potted plant': 'Pianta', 'bed': 'Letto', 'dining table': 'Tavolo', 'toilet': 'WC', 
+    'tv': 'TV/Schermo', 'laptop': 'Computer', 'mouse': 'Mouse', 'remote': 'Telecomando', 
+    'keyboard': 'Tastiera', 'cell phone': 'Cellulare', 'microwave': 'Microonde', 'oven': 'Forno', 
+    'toaster': 'Tostapane', 'sink': 'Lavandino', 'refrigerator': 'Frigo', 'book': 'Libro', 
+    'clock': 'Orologio', 'vase': 'Vaso', 'scissors': 'Forbici', 'teddy bear': 'Peluche', 
+    'hair drier': 'Phon', 'toothbrush': 'Spazzolino'
+};
+
 async function init(){
   document.body.addEventListener('click', initAudioContext, {once: true});
   document.body.addEventListener('touchstart', initAudioContext, {once: true});
@@ -255,7 +278,7 @@ async function loadLocalModels(){
   }
 }
 
-// --- SELEZIONE (CORRETTA PER ACCESSIBILITÀ) ---
+// --- SELEZIONE ---
 function toggleSelectionMode(){
   isSelectionMode = !isSelectionMode;
   const panel = document.getElementById('selection-panel');
@@ -269,7 +292,6 @@ function toggleSelectionMode(){
     btn.textContent = "CHIUDI SELEZIONE";
     announce("Modalità selezione. Tocca lo schermo in basso per cercare oggetti.");
     
-    // Reset pulito della lista all'avvio
     selectedTargets = []; 
     list.innerHTML = '<span style="color:#777">In attesa di oggetti...</span>';
     
@@ -296,31 +318,20 @@ async function scanForSelection(){
   }catch(e){}
 }
 
-// FIX: Update DOM incrementale per non perdere il focus del lettore di schermo
 function updateSelectionUI(){
   const list = document.getElementById('detected-list');
   
-  // Rimuovi messaggio "in attesa" se abbiamo oggetti o bottoni già creati
   if((availableObjects.length > 0 || list.children.length > 0) && list.querySelector('span')){
       const sp = list.querySelector('span');
       if(sp) sp.remove();
   }
 
   availableObjects.forEach(objName => {
-    // ID univoco per il bottone
     const btnId = 'btn-obj-' + objName.replace(/\s+/g, '-');
     let btn = document.getElementById(btnId);
 
     if (!btn) {
-      // Traduzioni comuni
-      let display = objName;
-      const translations = {
-          'person': 'Persona', 'cup': 'Tazza', 'bottle': 'Bottiglia',
-          'chair': 'Sedia', 'potted plant': 'Pianta', 'tv': 'Schermo',
-          'laptop': 'Computer', 'cell phone': 'Cellulare', 'mouse': 'Mouse',
-          'keyboard': 'Tastiera', 'book': 'Libro', 'cat': 'Gatto', 'dog': 'Cane'
-      };
-      if(translations[objName]) display = translations[objName];
+      let display = OBJECT_TRANSLATIONS[objName] || objName;
 
       btn = document.createElement('button');
       btn.id = btnId;
@@ -337,15 +348,12 @@ function updateSelectionUI(){
         updateSelectionUI(); 
       };
       
-      // Imposta testo base (salvato come proprietà per non perderlo)
       btn.dataset.label = display;
       btn.textContent = display;
       list.appendChild(btn);
     }
 
-    // Aggiorna stato (senza distruggere il bottone)
     const isSelected = selectedTargets.includes(objName);
-    
     if(isSelected){
         btn.classList.add('selected');
         if(!btn.textContent.includes("(V)")) btn.textContent = btn.dataset.label + " (V)";
@@ -354,7 +362,6 @@ function updateSelectionUI(){
         if(btn.textContent.includes("(V)")) btn.textContent = btn.dataset.label;
     }
     
-    // ARIA state è cruciale per i ciechi
     btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
   });
 }
@@ -405,7 +412,7 @@ async function processLocalFrame(){
   let faceSizeRatio = 0; 
   let isPersonMode = (selectedTargets.length === 0 || selectedTargets.includes('person'));
 
-  // 1. VISO
+  // 1. VISO (Priorità alta)
   if(faceLandmarker && isPersonMode){
     try{
       const faces = faceLandmarker.detectForVideo(video, performance.now());
@@ -420,13 +427,14 @@ async function processLocalFrame(){
            faceSizeRatio = maxX - minX; 
            targetsFound.push({ x: cx/points.length, y: cy/points.length, name: "Volto" });
 
-           let cutLeft = minX < 0.02, cutRight = maxX > 0.98;
-           let cutTop = minY < 0.02, cutBottom = maxY > 0.98;
-           if(cutLeft || cutRight || cutTop || cutBottom){
-               let cm = "Viso tagliato ";
-               if(cutLeft) cm+="a sinistra."; else if(cutRight) cm+="a destra.";
-               else if(cutTop) cm+="in alto."; else if(cutBottom) cm+="in basso.";
-               errorState = cm;
+           let cuts = [];
+           if(minX < 0.02) cuts.push("a sinistra");
+           if(maxX > 0.98) cuts.push("a destra");
+           if(minY < 0.02) cuts.push("in alto");
+           if(maxY > 0.98) cuts.push("in basso");
+           
+           if(cuts.length > 0){
+               errorState = "Viso tagliato " + cuts.join(" e ") + ".";
            } else {
                if(faceSizeRatio > 0.70) errorState = "Troppo vicino! Allontanati.";
                else if(faceSizeRatio < 0.15) errorState = "Troppo lontano! Avvicinati.";
@@ -435,12 +443,15 @@ async function processLocalFrame(){
     }catch(e){}
   }
 
-  // 2. OGGETTI
+  // 2. OGGETTI (Con logica di taglio migliorata)
   if(objectDetector && !errorState){
     try{
       const dets = objectDetector.detectForVideo(video, performance.now());
       dets.detections.forEach(det => {
         const cat = det.categories[0].categoryName;
+        // Traduzione
+        const displayCat = OBJECT_TRANSLATIONS[cat] || cat;
+
         let isRel = false;
         if(selectedTargets.length>0){ if(selectedTargets.includes(cat)) isRel=true; } 
         else if (!isPersonMode) { isRel=true; } 
@@ -455,11 +466,18 @@ async function processLocalFrame(){
             const oMinX=box.originX/video.videoWidth, oMaxX=(box.originX+box.width)/video.videoWidth;
             const oMinY=box.originY/video.videoHeight, oMaxY=(box.originY+box.height)/video.videoHeight;
 
-            targetsFound.push({x: nx, y: ny, name: cat});
+            targetsFound.push({x: nx, y: ny, name: cat}); // Name originale per logica interna
 
-            if(oMinX<0.01 || oMaxX>0.99 || oMinY<0.01 || oMaxY>0.99){
-                let cm = `${cat} tagliato.`;
-                errorState = cm;
+            // LOGICA TAGLIO ESPANSA
+            let cuts = [];
+            if(oMinX < 0.01) cuts.push("a sinistra");
+            if(oMaxX > 0.99) cuts.push("a destra");
+            if(oMinY < 0.01) cuts.push("in alto");
+            if(oMaxY > 0.99) cuts.push("in basso");
+
+            if(cuts.length > 0){
+                // Esempio: "Tazza tagliata a sinistra e in basso"
+                errorState = `${displayCat} tagliato ${cuts.join(" e ")}.`;
             } else {
                 if(nw>0.85 || nh>0.85) errorState = "Oggetto troppo vicino.";
                 else if(nw<0.10) errorState = "Oggetto troppo lontano.";
@@ -483,11 +501,13 @@ async function processLocalFrame(){
     avgX /= targetsFound.length; avgY /= targetsFound.length;
     
     let dName = targetsFound[0].name;
-    if(dName==='person') dName='Persona';
-    if(targetsFound.length>1) dName='Soggetti';
+    // Usa la traduzione globale per l'annuncio
+    let translatedName = OBJECT_TRANSLATIONS[dName] || dName;
+    
+    if(targetsFound.length>1) translatedName='Soggetti';
 
     let idealY = 0.5; 
-    if(dName==='Volto' || dName==='Persona'){
+    if(dName==='Volto' || dName==='person'){ // person per compatibilità
         if(faceSizeRatio < 0.40 && currentFramingMode !== "bust"){
             currentFramingMode = "bust"; announce("Mezzo Busto.");
         } else if(faceSizeRatio > 0.50 && currentFramingMode !== "closeup"){
@@ -495,12 +515,16 @@ async function processLocalFrame(){
         }
         idealY = (currentFramingMode === "bust") ? 0.42 : 0.5;
     }
-    handleCentering(avgX, avgY, dName, now, idealY);
+    handleCentering(avgX, avgY, translatedName, now, idealY);
   } else {
     if(isCountdownRunning){ cancelCountdown(); announce("Soggetto perso."); }
     else if (now - lastGuideTime > 3000) {
-       let msg = selectedTargets.length>0 ? `Cerco: ${selectedTargets.join(', ')}` : "Inquadra un volto o un oggetto.";
-       announce(msg); lastGuideTime = now; 
+       if(selectedTargets.length>0){
+           announce("Cerco selezione...");
+       } else {
+           announce("Inquadra un volto o un oggetto.");
+       }
+       lastGuideTime = now; 
     }
   }
 }
