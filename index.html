@@ -427,15 +427,23 @@ async function processLocalFrame(){
            faceSizeRatio = maxX - minX; 
            targetsFound.push({ x: cx/points.length, y: cy/points.length, name: "Volto" });
 
-           let cuts = [];
-           if(minX < 0.02) cuts.push("a sinistra");
-           if(maxX > 0.98) cuts.push("a destra");
-           if(minY < 0.02) cuts.push("in alto");
-           if(maxY > 0.98) cuts.push("in basso");
-           
-           if(cuts.length > 0){
-               errorState = "Viso tagliato " + cuts.join(" e ") + ".";
-           } else {
+           // LOGICA DIRETTA: Dì cosa fare, non qual è il problema
+           let instructions = [];
+           let isTooClose = false;
+
+           // Orizzontale
+           if(minX < 0.02 && maxX > 0.98) isTooClose = true;
+           else if(minX < 0.02) instructions.push("Sposta a Sinistra");
+           else if(maxX > 0.98) instructions.push("Sposta a Destra");
+
+           // Verticale
+           if(minY < 0.02 && maxY > 0.98) isTooClose = true;
+           else if(minY < 0.02) instructions.push("Sposta in Alto");
+           else if(maxY > 0.98) instructions.push("Sposta in Basso");
+
+           if(isTooClose) errorState = "Troppo vicino! Allontanati.";
+           else if(instructions.length > 0) errorState = instructions.join(" e ");
+           else {
                if(faceSizeRatio > 0.70) errorState = "Troppo vicino! Allontanati.";
                else if(faceSizeRatio < 0.15) errorState = "Troppo lontano! Avvicinati.";
            }
@@ -443,13 +451,12 @@ async function processLocalFrame(){
     }catch(e){}
   }
 
-  // 2. OGGETTI (Con logica di taglio migliorata)
+  // 2. OGGETTI (Con logica direttiva)
   if(objectDetector && !errorState){
     try{
       const dets = objectDetector.detectForVideo(video, performance.now());
       dets.detections.forEach(det => {
         const cat = det.categories[0].categoryName;
-        // Traduzione
         const displayCat = OBJECT_TRANSLATIONS[cat] || cat;
 
         let isRel = false;
@@ -466,19 +473,23 @@ async function processLocalFrame(){
             const oMinX=box.originX/video.videoWidth, oMaxX=(box.originX+box.width)/video.videoWidth;
             const oMinY=box.originY/video.videoHeight, oMaxY=(box.originY+box.height)/video.videoHeight;
 
-            targetsFound.push({x: nx, y: ny, name: cat}); // Name originale per logica interna
+            targetsFound.push({x: nx, y: ny, name: cat}); 
 
-            // LOGICA TAGLIO ESPANSA
-            let cuts = [];
-            if(oMinX < 0.01) cuts.push("a sinistra");
-            if(oMaxX > 0.99) cuts.push("a destra");
-            if(oMinY < 0.01) cuts.push("in alto");
-            if(oMaxY > 0.99) cuts.push("in basso");
+            // LOGICA DIRETTA ANCHE PER OGGETTI
+            let instructions = [];
+            let isTooClose = false;
 
-            if(cuts.length > 0){
-                // Esempio: "Tazza tagliata a sinistra e in basso"
-                errorState = `${displayCat} tagliato ${cuts.join(" e ")}.`;
-            } else {
+            if(oMinX < 0.01 && oMaxX > 0.99) isTooClose = true;
+            else if(oMinX < 0.01) instructions.push("Sposta a Sinistra");
+            else if(oMaxX > 0.99) instructions.push("Sposta a Destra");
+
+            if(oMinY < 0.01 && oMaxY > 0.99) isTooClose = true;
+            else if(oMinY < 0.01) instructions.push("Sposta in Alto");
+            else if(oMaxY > 0.99) instructions.push("Sposta in Basso");
+
+            if(isTooClose) errorState = `Troppo vicino a ${displayCat}. Allontanati.`;
+            else if(instructions.length > 0) errorState = instructions.join(" e ");
+            else {
                 if(nw>0.85 || nh>0.85) errorState = "Oggetto troppo vicino.";
                 else if(nw<0.10) errorState = "Oggetto troppo lontano.";
             }
@@ -501,13 +512,11 @@ async function processLocalFrame(){
     avgX /= targetsFound.length; avgY /= targetsFound.length;
     
     let dName = targetsFound[0].name;
-    // Usa la traduzione globale per l'annuncio
     let translatedName = OBJECT_TRANSLATIONS[dName] || dName;
-    
     if(targetsFound.length>1) translatedName='Soggetti';
 
     let idealY = 0.5; 
-    if(dName==='Volto' || dName==='person'){ // person per compatibilità
+    if(dName==='Volto' || dName==='person'){ 
         if(faceSizeRatio < 0.40 && currentFramingMode !== "bust"){
             currentFramingMode = "bust"; announce("Mezzo Busto.");
         } else if(faceSizeRatio > 0.50 && currentFramingMode !== "closeup"){
