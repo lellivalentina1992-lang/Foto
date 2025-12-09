@@ -25,9 +25,11 @@ canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none
 
 /* AREA SELEZIONE OGGETTI */
 #selection-panel{background:#111;border:1px solid #444;border-radius:8px;padding:10px;display:none;flex-direction:column;gap:5px}
-#detected-list{display:flex;flex-wrap:wrap;gap:5px;max-height:100px;overflow-y:auto}
-.obj-btn{padding:8px 12px;border:1px solid #555;background:#222;color:#fff;border-radius:20px;font-size:0.9rem}
-.obj-btn.selected{background:#006400;border-color:#0f0;color:#0f0}
+#detected-list{display:flex;flex-wrap:wrap;gap:8px;max-height:120px;overflow-y:auto;padding:5px}
+/* Stile bottone oggetto migliorato per focus */
+.obj-btn{padding:10px 15px;border:2px solid #555;background:#222;color:#fff;border-radius:20px;font-size:1rem;min-height:44px;}
+.obj-btn:focus{outline:3px solid #fff;border-color:#fff}
+.obj-btn.selected{background:#006400;border-color:#0f0;color:#0f0;font-weight:bold}
 
 /* PULSANTI */
 button{border:2px solid #555;border-radius:12px;font-size:1.1rem;font-weight:bold;text-transform:uppercase;color:#fff;background:#222;min-height:65px;touch-action:manipulation}
@@ -74,9 +76,13 @@ button:active{background:#555;transform:scale(.98)}
       SELEZIONA COSA FOTOGRAFARE
     </button>
     <div id="selection-panel">
-      <div style="font-size:0.9rem;color:#ccc;margin-bottom:5px">Oggetti visibili (clicca per selezionare):</div>
-      <div id="detected-list">In attesa...</div>
-      <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:50px;margin-top:5px">CONFERMA E CHIUDI</button>
+      <div style="font-size:1rem;color:#fff;margin-bottom:10px;font-weight:bold" id="sel-instructions">
+          Oggetti rilevati (tocca per selezionare):
+      </div>
+      <div id="detected-list" aria-live="polite">
+          <span style="color:#777">In attesa di oggetti...</span>
+      </div>
+      <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:50px;margin-top:10px">CONFERMA E CHIUDI</button>
     </div>
     
     <button class="full-width btn-guide" id="btn-guide" onclick="toggleSmartGuide()">
@@ -180,7 +186,7 @@ let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
 let availableObjects = []; 
-let currentFramingMode = "closeup"; // "closeup" o "bust"
+let currentFramingMode = "closeup"; 
 
 const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 
@@ -249,18 +255,24 @@ async function loadLocalModels(){
   }
 }
 
-// --- SELEZIONE ---
+// --- SELEZIONE (CORRETTA PER ACCESSIBILITÀ) ---
 function toggleSelectionMode(){
   isSelectionMode = !isSelectionMode;
   const panel = document.getElementById('selection-panel');
   const btn = document.getElementById('btn-select-mode');
+  const list = document.getElementById('detected-list');
+  
   if(isSelectionMode){
     if(isGuiding) toggleSmartGuide();
     panel.style.display = 'flex';
     btn.classList.add('active-tool');
     btn.textContent = "CHIUDI SELEZIONE";
-    announce("Modalità selezione.");
-    selectedTargets = []; updateSelectionUI();
+    announce("Modalità selezione. Tocca lo schermo in basso per cercare oggetti.");
+    
+    // Reset pulito della lista all'avvio
+    selectedTargets = []; 
+    list.innerHTML = '<span style="color:#777">In attesa di oggetti...</span>';
+    
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = setInterval(scanForSelection, 1000);
   } else {
@@ -284,35 +296,66 @@ async function scanForSelection(){
   }catch(e){}
 }
 
+// FIX: Update DOM incrementale per non perdere il focus del lettore di schermo
 function updateSelectionUI(){
   const list = document.getElementById('detected-list');
-  list.innerHTML = '';
-  if(availableObjects.length === 0){
-    list.innerHTML = '<span style="color:#777">Nessun oggetto...</span>';
-    return;
+  
+  // Rimuovi messaggio "in attesa" se abbiamo oggetti o bottoni già creati
+  if((availableObjects.length > 0 || list.children.length > 0) && list.querySelector('span')){
+      const sp = list.querySelector('span');
+      if(sp) sp.remove();
   }
+
   availableObjects.forEach(objName => {
-    let display = objName;
-    if(objName==='person') display='Persona';
-    else if(objName==='cup') display='Tazza';
-    else if(objName==='bottle') display='Bottiglia';
+    // ID univoco per il bottone
+    const btnId = 'btn-obj-' + objName.replace(/\s+/g, '-');
+    let btn = document.getElementById(btnId);
+
+    if (!btn) {
+      // Traduzioni comuni
+      let display = objName;
+      const translations = {
+          'person': 'Persona', 'cup': 'Tazza', 'bottle': 'Bottiglia',
+          'chair': 'Sedia', 'potted plant': 'Pianta', 'tv': 'Schermo',
+          'laptop': 'Computer', 'cell phone': 'Cellulare', 'mouse': 'Mouse',
+          'keyboard': 'Tastiera', 'book': 'Libro', 'cat': 'Gatto', 'dog': 'Cane'
+      };
+      if(translations[objName]) display = translations[objName];
+
+      btn = document.createElement('button');
+      btn.id = btnId;
+      btn.className = 'obj-btn';
+      
+      btn.onclick = () => {
+        if(selectedTargets.includes(objName)){
+          selectedTargets = selectedTargets.filter(t => t !== objName);
+          announce(`Rimosso ${display}`);
+        } else {
+          selectedTargets.push(objName);
+          announce(`Selezionato ${display}`);
+        }
+        updateSelectionUI(); 
+      };
+      
+      // Imposta testo base (salvato come proprietà per non perderlo)
+      btn.dataset.label = display;
+      btn.textContent = display;
+      list.appendChild(btn);
+    }
+
+    // Aggiorna stato (senza distruggere il bottone)
+    const isSelected = selectedTargets.includes(objName);
     
-    const btn = document.createElement('button');
-    btn.className = 'obj-btn';
-    btn.setAttribute('aria-pressed', selectedTargets.includes(objName) ? 'true' : 'false');
-    if(selectedTargets.includes(objName)) btn.classList.add('selected');
-    btn.textContent = display + (selectedTargets.includes(objName) ? " (V)" : "");
-    btn.onclick = () => {
-      if(selectedTargets.includes(objName)){
-        selectedTargets = selectedTargets.filter(t => t !== objName);
-        announce(`Rimosso ${display}`);
-      } else {
-        selectedTargets.push(objName);
-        announce(`Selezionato ${display}`);
-      }
-      updateSelectionUI();
-    };
-    list.appendChild(btn);
+    if(isSelected){
+        btn.classList.add('selected');
+        if(!btn.textContent.includes("(V)")) btn.textContent = btn.dataset.label + " (V)";
+    } else {
+        btn.classList.remove('selected');
+        if(btn.textContent.includes("(V)")) btn.textContent = btn.dataset.label;
+    }
+    
+    // ARIA state è cruciale per i ciechi
+    btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
   });
 }
 
@@ -345,7 +388,7 @@ async function processLocalFrame(){
   const now = Date.now();
   if(!isCountdownRunning && now - lastGuideTime < 1200) return;
 
-  // 0. CONTROLLO LUCE (Soglia 60)
+  // 0. CONTROLLO LUCE
   if(!isCountdownRunning){
       tempCtx.drawImage(video, 0, 0, 50, 50);
       const d = tempCtx.getImageData(0,0,50,50).data;
@@ -552,11 +595,10 @@ function captureAndOpenMenu(){
   }, 100);
 }
 
-// --- GEMINI & PROMPT AGGIORNATI PER NON VEDENTI ---
+// --- GEMINI & PROMPT ---
 async function analyzeContext(context){
   if(!GEMINI_KEY){ announce("Manca chiave API."); return; }
   
-  // UI: Se non è approfondimento social, chiudi il menu contestuale
   if(context !== 'social'){
       document.getElementById('context-menu').classList.add('hidden');
   }
@@ -571,33 +613,20 @@ async function analyzeContext(context){
   Dove POS=TOP/MIDDLE/BOTTOM, COLORE=WHITE/BLACK, SFONDO=BOX/SHADOW/NONE.`;
 
   let prompt = "";
-  
   if (context === 'selfie') {
-      prompt = `Agisci come un consulente di immagine per una persona non vedente. Descrivi il selfie con onestà.
-      1. **Sguardo e Direzione:** Sto guardando nell'obiettivo o altrove? Ho gli occhi aperti?
-      2. **Viso e Trucco:** Ci sono macchie sul viso o trucco sbavato? I denti sono puliti?
-      3. **Vestiti:** I vestiti sono in ordine? Ci sono macchie visibili?
-      4. **Inquadratura:** Sono centrata? Se sono spostata, la foto è comunque gradevole?
-      5. **Privacy:** C'è disordine o qualcosa di imbarazzante nello sfondo?` + layoutPrompt;
+      prompt = `Agisci come consulente per non vedenti. Descrivi: sguardo, viso/trucco, vestiti, inquadratura, privacy sfondo.` + layoutPrompt;
   }
   else if (context === 'group') {
-      prompt = `Analizza questa foto di gruppo per una persona non vedente.
-      1. **Chi c'è:** Quante persone? Descrivi l'atmosfera (seria, allegra).
-      2. **Occhi e Sguardi:** Tutti guardano l'obiettivo? Qualcuno ha gli occhi chiusi o guarda altrove?
-      3. **Inquadratura:** Qualcuno è tagliato o coperto?` + layoutPrompt;
+      prompt = `Analizza foto gruppo per non vedenti. Chi c'è, sguardi, qualcuno tagliato?` + layoutPrompt;
   }
   else if (context === 'environment') {
-      prompt = `Descrivi questa scena. Che luogo è? Illuminazione e colori. 
-      **Sicurezza e Privacy:** Ci sono ostacoli? Ci sono dati sensibili o oggetti imbarazzanti visibili?` + layoutPrompt;
+      prompt = `Descrivi scena, luogo, luce. Ostacoli o dati sensibili?` + layoutPrompt;
   }
   else if (context === 'document') {
-      prompt = `Trascrivi tutto il testo. Di che documento si tratta?` + layoutPrompt;
+      prompt = `Trascrivi tutto il testo.` + layoutPrompt;
   }
   else if(context === 'social') {
-      prompt = `Analisi Tecnica per Social Media (Instagram/LinkedIn).
-      1. Qualità (luce, fuoco, rumore).
-      2. Estetica (voto 1-10).
-      3. Verdetto finale: Pubblicabile o da rifare? (Sii severo).` + layoutPrompt;
+      prompt = `Analisi Tecnica per Social (Instagram). Qualità, Estetica (1-10), Verdetto.` + layoutPrompt;
   }
 
   try {
@@ -607,18 +636,7 @@ async function analyzeContext(context){
       body: JSON.stringify({ contents: [{ parts: [{text: prompt}, {inline_data: {mime_type: 'image/jpeg', data: b64}}] }] })
     });
     
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      if (res.status === 401 || res.status === 403) {
-        throw new Error("Chiave API non valida o mancante. Verifica nelle impostazioni.");
-      } else if (res.status === 429) {
-        throw new Error("Troppe richieste. Attendi qualche minuto e riprova.");
-      } else if (res.status === 400) {
-        throw new Error("Richiesta non valida. Verifica il formato dell'immagine.");
-      } else {
-        throw new Error(`Errore API (${res.status}): ${errorData.error?.message || 'Sconosciuto'}`);
-      }
-    }
+    if (!res.ok) throw new Error("Errore API.");
     
     const data = await res.json();
     let text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Errore.";
@@ -699,7 +717,7 @@ function applyTextToImage(){
   img.src = currentPhotoBase64;
 }
 
-// SETTINGS & HELPERS
+// SETTINGS
 function announce(msg){ 
   const el = document.getElementById('sr-announcer'); 
   el.textContent = ''; setTimeout(() => el.textContent = msg, 100); 
