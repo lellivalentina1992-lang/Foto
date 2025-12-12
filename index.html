@@ -3,14 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>AI Photo Hub v48 (FREE Local + Share + APIs + Social Text Overlay + Chat)</title>
+<title>AI Photo Hub v49 (FREE Local + Share + APIs + Social Goal + Overlay + Chat)</title>
 <style>
   body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column}
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
   .hidden{display:none !important}
-
   #main-container{flex-grow:1;display:flex;flex-direction:column;padding:15px;gap:15px;justify-content:center}
-
   button{
     border:3px solid #555;border-radius:18px;font-size:1.2rem;font-weight:bold;text-transform:uppercase;
     color:#fff;background:#222;padding:20px 10px;width:100%;touch-action:manipulation;margin-bottom:10px;
@@ -35,10 +33,9 @@
   }
 
   #result-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:120;padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
-  #result-text{background:#111;border:1px solid #555;padding:14px;font-size:1.15rem;line-height:1.6;white-space:pre-wrap;border-radius:10px}
+  #result-text{background:#111;border:1px solid #555;padding:14px;font-size:1.12rem;line-height:1.6;white-space:pre-wrap;border-radius:10px}
   .small-note{color:#aaa;font-size:0.9rem;font-weight:normal;text-transform:none}
 
-  /* Chat */
   #chat-box{background:#0f0f0f;border:1px solid #333;border-radius:10px;padding:10px;max-height:30vh;overflow:auto}
   .chat-msg{padding:8px 10px;border-radius:10px;margin:8px 0;white-space:pre-wrap;line-height:1.5}
   .chat-user{background:#1b1b1b;border:1px solid #2a2a2a}
@@ -47,13 +44,11 @@
   .row{display:flex;gap:10px}
   .row > *{flex:1}
 
-  /* Settings */
   #settings-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#111;z-index:200;display:flex;flex-direction:column;padding:20px;overflow-y:auto}
   .setting-group{margin-bottom:20px;border-bottom:1px solid #333;padding-bottom:12px}
   .setting-label{display:block;color:#aaa;margin-bottom:5px;font-size:0.9rem}
   .setting-input{width:100%;padding:14px;background:#222;color:#fff;border:1px solid #555;border-radius:8px;font-size:1.02rem}
 
-  /* Overlay editor */
   #overlay-preview{width:100%;max-width:520px;border:1px solid #444;border-radius:10px}
   #overlay-text{width:100%;padding:14px;background:#222;color:#fff;border:1px solid #555;border-radius:10px;font-size:1.05rem}
   #overlay-status{color:#aaa;font-size:0.95rem}
@@ -84,12 +79,12 @@
   </button>
 </div>
 
-<!-- AI / ACTION SCREEN -->
+<!-- ACTION SCREEN -->
 <div id="ai-screen" class="screen hidden" aria-hidden="true">
   <h2 style="text-align:center;margin:0 0 6px 0">Cosa vuoi fare?</h2>
 
   <button class="btn-free" onclick="runFreeLocal()">
-    FREE (LOCALE)<br><span class="small-note">nessuna key • può impiegare ~1 min al primo uso</span>
+    FREE (LOCALE)<br><span class="small-note">nessuna key • primo uso lento (download modello)</span>
   </button>
 
   <button class="btn-share" onclick="shareImageNative()">
@@ -125,8 +120,8 @@
     OGGETTI / SCENA<br><span class="small-note">cosa è centrato • disordine • estetica • conservabile?</span>
   </button>
 
-  <button onclick="openSocialPlatforms()">
-    SOCIAL<br><span class="small-note">IG/FB/TikTok: crop, safe area, consigli formato + testo in foto</span>
+  <button onclick="openSocialGoal()">
+    SOCIAL<br><span class="small-note">scegli obiettivo: Feed / Schermo intero / Decidi tu</span>
   </button>
 
   <button onclick="setContextAndRun('document')">
@@ -144,33 +139,29 @@
   <button style="background:#333;margin-top:8px" onclick="backToAIScreen()">INDIETRO</button>
 </div>
 
-<!-- SOCIAL PLATFORM -->
-<div id="social-screen" class="screen hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0 0 6px 0">Social: dove pubblichi?</h2>
+<!-- SOCIAL GOAL (simple) -->
+<div id="social-goal-screen" class="screen hidden" aria-hidden="true">
+  <h2 style="text-align:center;margin:0 0 6px 0">Social: obiettivo</h2>
 
-  <button onclick="setSocialAndRun('instagram_feed')">
-    INSTAGRAM FEED<br><span class="small-note">1:1 / 4:5 • rischio taglio sopra/sotto</span>
+  <button onclick="setSocialGoalAndRun('feed')">
+    FEED<br><span class="small-note">quadrato 1:1 o verticale 4:5 (IG/FB)</span>
   </button>
 
-  <button onclick="setSocialAndRun('instagram_stories')">
-    IG STORIES / REELS<br><span class="small-note">9:16 • safe area UI alto/basso</span>
+  <button onclick="setSocialGoalAndRun('fullscreen')">
+    SCHERMO INTERO<br><span class="small-note">verticale 9:16 (Stories/Reels/TikTok)</span>
   </button>
 
-  <button onclick="setSocialAndRun('tiktok')">
-    TIKTOK<br><span class="small-note">9:16 • safe area e UI laterale/basso</span>
+  <button onclick="setSocialGoalAndRun('auto')">
+    NON LO SO / DECIDI TU<br><span class="small-note">l’AI propone l’opzione meno rischiosa</span>
   </button>
 
-  <button onclick="setSocialAndRun('facebook_feed')">
-    FACEBOOK FEED<br><span class="small-note">crop variabile • anteprime</span>
-  </button>
-
-  <button style="background:#333;margin-top:8px" onclick="backToContext()">INDIETRO</button>
+  <button style="background:#333;margin-top:8px" onclick="backToContextFromGoal()">INDIETRO</button>
 </div>
 
 <!-- OVERLAY EDITOR (social only) -->
 <div id="overlay-screen" class="screen hidden" aria-hidden="true" style="z-index:150">
   <h2 style="text-align:center;margin:0">Testo in foto</h2>
-  <div id="overlay-status">Scrivi il testo. Poi l’AI decide posizione/dimensione/colore per il social scelto.</div>
+  <div id="overlay-status">Scrivi il testo. Poi l’AI decide posizione/dimensione/colore per l’obiettivo social.</div>
 
   <textarea id="overlay-text" rows="3" placeholder="Scrivi il testo da mettere in foto..."></textarea>
 
@@ -182,7 +173,7 @@
   <canvas id="overlay-preview" class="hidden"></canvas>
 
   <div class="row">
-    <button onclick="downloadOverlay()" style="background:#1a73e8;border-color:#8ab4f8">SCARICA IMMAGINE</button>
+    <button onclick="downloadOverlay()" style="background:#1a73e8;border-color:#8ab4f8">SCARICA</button>
     <button onclick="shareOverlay()" class="btn-share">CONDIVIDI</button>
   </div>
 
@@ -203,7 +194,7 @@
 
   <h3 style="margin:8px 0 0 0;font-size:1.05rem;color:#D4AF37">Chat con l’AI scelta</h3>
   <div id="chat-box" aria-label="Chat"></div>
-  <textarea id="chat-input" rows="2" placeholder="Scrivi una domanda (es. 'Ritaglio migliore?', 'Sono centrata?', 'Metti titolo più leggibile')"></textarea>
+  <textarea id="chat-input" rows="2" placeholder="Scrivi una domanda... (es. 'Meglio 1:1 o 4:5?', 'Dove ritaglio?', 'Testo più leggibile?')"></textarea>
 
   <div class="row">
     <button onclick="sendChat()" style="background:#006400;border-color:#4be38b">INVIA</button>
@@ -257,13 +248,13 @@ let KEYS = {
   claudeModel: localStorage.getItem('model_claude') || "claude-sonnet-4-5"
 };
 
-let currentPhotoBase64 = null;         // data URL
-let currentProvider = null;            // gemini|openai|claude
-let currentContext = null;             // selfie|objects|social|document|safety|product
-let currentSocialTarget = null;        // instagram_feed|instagram_stories|tiktok|facebook_feed
-let currentCameraKind = 'environment'; // selfie/environment
+let currentPhotoBase64 = null;
+let currentProvider = null;             // gemini|openai|claude
+let currentContext = null;              // selfie|objects|social|document|safety|product
+let socialGoal = null;                  // feed|fullscreen|auto
+let currentCameraKind = 'environment';  // selfie/environment
 
-let chatHistory = []; // [{role:'user'|'assistant', text:string}]
+let chatHistory = [];
 let lastAnalysisText = "";
 
 // overlay
@@ -304,13 +295,12 @@ function addChat(role, text){
   box.scrollTop = box.scrollHeight;
 }
 
-/* -------------------- CAMERA FLOW -------------------- */
+/* -------------------- CAMERA -------------------- */
 function triggerCamera(mode){
   currentCameraKind = (mode === 'user') ? 'selfie' : 'environment';
   if(mode === 'user') document.getElementById('inp-cam-user').click();
   else document.getElementById('inp-cam-env').click();
 }
-
 function handlePhoto(input){
   if (input.files && input.files[0]) {
     const file = input.files[0];
@@ -319,7 +309,6 @@ function handlePhoto(input){
     reader.onload = function(e) {
       currentPhotoBase64 = e.target.result;
 
-      // labels
       document.getElementById('lbl-gemini-model').innerText = KEYS.geminiModel;
       document.getElementById('lbl-openai-model').innerText = KEYS.openaiModel;
       document.getElementById('lbl-claude-model').innerText = KEYS.claudeModel;
@@ -332,60 +321,51 @@ function handlePhoto(input){
   }
 }
 
-/* -------------------- ACTION SCREEN -------------------- */
+/* -------------------- NAV -------------------- */
 function chooseProvider(p){
   currentProvider = p;
-
   if(p === 'gemini' && !KEYS.gemini){ announce("Manca Key Gemini."); openSettings(); return; }
   if(p === 'openai' && !KEYS.openai){ announce("Manca Key OpenAI."); openSettings(); return; }
   if(p === 'claude' && !KEYS.claude){ announce("Manca Key Claude."); openSettings(); return; }
-
   hide('ai-screen');
   show('context-screen');
   announce("Scegli contesto.");
 }
-
 function backToAIScreen(){
-  hide('context-screen'); hide('social-screen');
+  hide('context-screen'); hide('social-goal-screen');
   show('ai-screen');
   announce("Torno alla scelta.");
 }
-function backToContext(){
-  hide('social-screen');
+function setContextAndRun(ctx){
+  currentContext = ctx;
+  socialGoal = null;
+  hide('context-screen');
+  runSelectedProvider();
+}
+
+function openSocialGoal(){
+  hide('context-screen');
+  show('social-goal-screen');
+  announce("Scegli obiettivo social.");
+}
+function backToContextFromGoal(){
+  hide('social-goal-screen');
   show('context-screen');
   announce("Scegli contesto.");
 }
-function openSocialPlatforms(){
-  hide('context-screen');
-  show('social-screen');
-  announce("Scegli piattaforma social.");
-}
-
-function setContextAndRun(ctx){
-  currentContext = ctx;
-  currentSocialTarget = null;
-  hide('context-screen');
-  runSelectedProvider();
-}
-function setSocialAndRun(target){
+function setSocialGoalAndRun(goal){
   currentContext = 'social';
-  currentSocialTarget = target;
-  hide('social-screen');
+  socialGoal = goal; // feed|fullscreen|auto
+  hide('social-goal-screen');
   runSelectedProvider();
 }
 
-/* -------------------- PROMPTS (OTTIMI) -------------------- */
-function socialTargetLabel(){
-  switch(currentSocialTarget){
-    case 'instagram_feed': return "Instagram Feed (crop 1:1 e 4:5)";
-    case 'instagram_stories': return "Instagram Stories/Reels (9:16 con UI sopra/sotto)";
-    case 'tiktok': return "TikTok (9:16 con UI laterale/basso)";
-    case 'facebook_feed': return "Facebook Feed (crop variabile / anteprime)";
-    default: return "Social (generico)";
-  }
+/* -------------------- PROMPTS -------------------- */
+function goalLabel(){
+  if(socialGoal === 'feed') return "FEED (preferisci 1:1 o 4:5 a seconda della foto; minimizza tagli e mantieni soggetto leggibile in anteprima)";
+  if(socialGoal === 'fullscreen') return "SCHERMO INTERO 9:16 (Stories/Reels/TikTok; rispetta safe area UI)";
+  return "AUTO (scegli l’opzione meno rischiosa: evita crop aggressivi se può tagliare parti importanti)";
 }
-
-// Prompt analisi (1° risposta)
 function buildAnalysisPrompt(){
   const base = `
 Rispondi in ITALIANO. Sii concreto e utile.
@@ -406,9 +386,9 @@ Obiettivo: dire se è venuta bene e se è pubblicabile.
 ${base}
 
 In più includi SEMPRE:
-- VISO: espressione, sorriso (naturale/forzato), occhi (aperti/chiusi, sguardo in camera), eventuali ombre.
-- INQUADRATURA: testa/mento tagliati? spalle visibili? camera troppo alta/bassa? distanza giusta?
-- PROFILO: è adatta a foto profilo (che spesso ritaglia in cerchio)? cosa rischia di sparire?
+- VISO: espressione, sorriso (naturale/forzato), occhi (aperti/chiusi, sguardo), ombre sul viso.
+- INQUADRATURA: testa/mento tagliati? camera troppo alta/bassa? distanza giusta?
+- PROFILO: adatta a foto profilo con possibile crop circolare? cosa rischia di sparire?
 Concludi con: "VOTO 0-10 + 1 motivo".
 `;
   }
@@ -416,29 +396,29 @@ Concludi con: "VOTO 0-10 + 1 motivo".
   if(currentContext === 'objects'){
     return `
 Sei un valutatore di foto di oggetti/scena per archiviazione e pubblicazione.
-Obiettivo: capire cosa è il soggetto, se è centrato, e se la foto è utile.
+Obiettivo: capire soggetto, centratura, tagli, utilità.
 
 ${base}
 
 In più:
 - SOGGETTO PRINCIPALE: cos’è e dove sta (centro/bordi).
-- TAGLI PROBLEMATICI: parti importanti tagliate ai bordi? cosa manca?
-- CONSERVABILE: Sì/No e perché (si vede bene? completa? leggibile?).
+- TAGLI PROBLEMATICI: parti importanti tagliate? cosa manca?
+- CONSERVABILE: Sì/No e perché.
 `;
   }
 
   if(currentContext === 'social'){
     return `
-Sei un social media editor. Obiettivo: capire se la foto regge i tagli automatici e suggerire il formato migliore.
-Target: ${socialTargetLabel()}.
+Sei un social media editor. Obiettivo: consigli di crop/formato/safe-area e prontezza pubblicazione.
+Obiettivo social scelto: ${goalLabel()}.
 
 ${base}
 
 In più includi SEMPRE:
-- SAFE AREA: cosa è troppo vicino ai bordi (viso, mani, oggetti, testo, logo).
-- RISCHIO CROP: cosa può essere tagliato e in quale direzione (alto/basso/lati).
-- FORMATO CONSIGLIATO: 1:1, 4:5, 9:16, 16:9 (scegline uno e spiega).
-- CROP CONSIGLIATO: descrivi un ritaglio “a parole” (es. lascia più spazio sopra, taglia a sinistra…).
+- FORMATO CONSIGLIATO: scegli tra 1:1, 4:5, 9:16, 16:9 (coerente con l’obiettivo). Se FEED, decidi tra 1:1 o 4:5.
+- SAFE AREA: cosa è troppo vicino ai bordi (viso, mani, oggetto, testo).
+- RISCHIO CROP: cosa può essere tagliato se si passa al formato consigliato (alto/basso/lati).
+- CROP CONSIGLIATO: descrivi un ritaglio “a parole” (es. taglia un po’ sotto, lascia spazio sopra…).
 Concludi con: "PRONTA PER SOCIAL: Sì/Quasi/No + 1 correzione top".
 `;
   }
@@ -486,24 +466,21 @@ In più:
   return `Descrivi l’immagine in modo utile. ${base}`;
 }
 
-// Prompt chat (continua conversazione)
 function buildChatSystemHint(){
-  let ctx = currentContext || "generico";
-  let target = currentContext === 'social' ? socialTargetLabel() : "";
   return `
 Sei l'assistente della stessa sessione foto. Mantieni coerenza con l'analisi precedente.
-Contesto: ${ctx}. ${target ? "Target: " + target + "." : ""}
-Regola: risposte pratiche, brevi ma utili, con consigli operativi (crop, centratura, testo, ecc.).
+Contesto: ${currentContext || "generico"}.
+${currentContext === 'social' ? ("Obiettivo social: " + goalLabel() + ".") : ""}
+Regola: risposte pratiche, con istruzioni operative su crop, centratura, testo, ecc.
 `;
 }
 
 /* -------------------- RESULT SCREEN -------------------- */
 function showResultScreen(msg){
-  hide('ai-screen'); hide('context-screen'); hide('social-screen');
+  hide('ai-screen'); hide('context-screen'); hide('social-goal-screen');
   show('result-screen');
   setResultText(msg);
   resetChat();
-  // social tools
   if(currentContext === 'social') show('social-tools'); else hide('social-tools');
   announce(msg);
 }
@@ -519,7 +496,6 @@ async function runSelectedProvider(){
   if(currentProvider === 'claude') return analyzeWithClaude(prompt);
 }
 
-/* Gemini */
 async function analyzeWithGemini(prompt){
   const b64 = currentPhotoBase64.split(',')[1];
   try{
@@ -528,25 +504,19 @@ async function analyzeWithGemini(prompt){
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
       body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: 'image/jpeg', data: b64 } }
-          ]
-        }]
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }]
       })
     });
     if(!res.ok) throw new Error("Errore API Google");
     const d = await res.json();
     const text = d.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join("\n") || "Nessun risultato.";
     setResultText(text.replace(/\*/g,''));
-    addChat('assistant', "Dimmi cosa vuoi migliorare (crop, centratura, testo, ecc.) e ti guido.");
+    addChat('assistant', "Dimmi cosa vuoi migliorare (crop, centratura, testo, ecc.).");
   }catch(e){
     setResultText("Errore con Gemini: " + (e?.message || e));
   }
 }
 
-/* OpenAI Responses */
 async function analyzeWithOpenAI(prompt){
   try{
     const res = await fetch("https://api.openai.com/v1/responses", {
@@ -554,59 +524,42 @@ async function analyzeWithOpenAI(prompt){
       headers: { "Content-Type":"application/json", "Authorization": `Bearer ${KEYS.openai}` },
       body: JSON.stringify({
         model: KEYS.openaiModel,
-        input: [{
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url: currentPhotoBase64 }
-          ]
-        }],
+        input: [{ role: "user", content: [{ type: "input_text", text: prompt }, { type: "input_image", image_url: currentPhotoBase64 }] }],
         max_output_tokens: 900
       })
     });
     if(!res.ok) throw new Error("Errore API OpenAI");
     const d = await res.json();
     setResultText(d.output_text || "Nessuna risposta.");
-    addChat('assistant', "Vuoi un crop preciso o un testo in foto? Scrivimi qui.");
+    addChat('assistant', "Vuoi un crop preciso o testo in foto? Scrivimi qui.");
   }catch(e){
     setResultText("Errore con OpenAI: " + (e?.message || e));
   }
 }
 
-/* Claude */
 async function analyzeWithClaude(prompt){
   const b64 = currentPhotoBase64.split(',')[1];
   try{
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type":"application/json",
-        "x-api-key": KEYS.claude,
-        "anthropic-version": "2023-06-01"
-      },
+      headers: { "Content-Type":"application/json", "x-api-key": KEYS.claude, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: KEYS.claudeModel,
         max_tokens: 900,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } },
-            { type: "text", text: prompt }
-          ]
-        }]
+        messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }, { type: "text", text: prompt }] }]
       })
     });
     if(!res.ok) throw new Error("Errore API Anthropic");
     const d = await res.json();
     const text = (d.content || []).filter(x => x.type === "text" && x.text).map(x => x.text).join("\n") || "Nessuna risposta.";
     setResultText(text);
-    addChat('assistant', "Chiedimi: ‘come cropperesti per IG/TikTok?’ oppure ‘dove mettere il testo?’");
+    addChat('assistant', "Chiedimi: ‘meglio 1:1 o 4:5?’ oppure ‘dove mettere il testo?’");
   }catch(e){
     setResultText("Errore con Claude: " + (e?.message || e));
   }
 }
 
-/* -------------------- CHAT (talk to chosen API) -------------------- */
+/* -------------------- CHAT -------------------- */
 async function sendChat(){
   const inp = document.getElementById('chat-input');
   const userText = (inp.value || "").trim();
@@ -615,10 +568,7 @@ async function sendChat(){
   addChat('user', userText);
 
   const hint = buildChatSystemHint();
-  const conversationSummary = `
-Analisi precedente:
-${lastAnalysisText}
-`;
+  const summary = `Analisi precedente:\n${lastAnalysisText}\n`;
 
   try{
     if(currentProvider === 'openai'){
@@ -627,12 +577,7 @@ ${lastAnalysisText}
         headers:{ "Content-Type":"application/json", "Authorization": `Bearer ${KEYS.openai}` },
         body: JSON.stringify({
           model: KEYS.openaiModel,
-          input: [{
-            role: "user",
-            content: [
-              { type:"input_text", text: hint + "\n" + conversationSummary + "\nDomanda: " + userText }
-            ]
-          }],
+          input: [{ role:"user", content:[{ type:"input_text", text: hint + "\n" + summary + "\nDomanda: " + userText }] }],
           max_output_tokens: 450
         })
       });
@@ -647,11 +592,7 @@ ${lastAnalysisText}
       const res = await fetch(url, {
         method:'POST',
         headers:{ 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: hint + "\n" + conversationSummary + "\nDomanda: " + userText }]
-          }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: hint + "\n" + summary + "\nDomanda: " + userText }] }] })
       });
       if(!res.ok) throw new Error("Errore chat Gemini");
       const d = await res.json();
@@ -663,18 +604,11 @@ ${lastAnalysisText}
     if(currentProvider === 'claude'){
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "x-api-key": KEYS.claude,
-          "anthropic-version":"2023-06-01"
-        },
+        headers:{ "Content-Type":"application/json", "x-api-key": KEYS.claude, "anthropic-version":"2023-06-01" },
         body: JSON.stringify({
           model: KEYS.claudeModel,
           max_tokens: 450,
-          messages: [{
-            role:"user",
-            content:[{ type:"text", text: hint + "\n" + conversationSummary + "\nDomanda: " + userText }]
-          }]
+          messages: [{ role:"user", content:[{ type:"text", text: hint + "\n" + summary + "\nDomanda: " + userText }] }]
         })
       });
       if(!res.ok) throw new Error("Errore chat Claude");
@@ -684,18 +618,17 @@ ${lastAnalysisText}
       return;
     }
 
-    // free local: risposta semplice
-    addChat('assistant', "Modalità FREE locale: posso descrivere la foto, ma non ho una chat intelligente come le API. Usa OpenAI/Gemini/Claude per chat avanzata.");
+    addChat('assistant', "Seleziona una API per la chat avanzata.");
   }catch(e){
     addChat('assistant', "Errore: " + (e?.message || e));
   }
 }
 
-/* -------------------- SOCIAL TEXT OVERLAY -------------------- */
+/* -------------------- OVERLAY -------------------- */
 function openOverlay(){
-  if(currentContext !== 'social'){ announce("Il testo in foto è disponibile nel contesto Social."); return; }
+  if(currentContext !== 'social'){ announce("Disponibile solo in Social."); return; }
   document.getElementById('overlay-text').value = "";
-  document.getElementById('overlay-status').innerText = "Scrivi il testo. Poi l’AI decide posizione/dimensione/colore per il social scelto.";
+  document.getElementById('overlay-status').innerText = "Scrivi il testo. Poi l’AI decide posizione/dimensione/colore per l’obiettivo social.";
   hide('result-screen');
   show('overlay-screen');
   overlayCanvas = document.getElementById('overlay-preview');
@@ -712,12 +645,13 @@ function closeOverlay(){
 function applyOverlayQuick(){
   const text = (document.getElementById('overlay-text').value || "").trim();
   if(!text){ announce("Scrivi il testo."); return; }
-  // default safe: centro-basso, box scuro, testo bianco
+  const isFullscreen = (socialGoal === 'fullscreen');
   drawOverlay({
     text,
-    xPct: 50, yPct: 82,
+    xPct: 50,
+    yPct: isFullscreen ? 78 : 82,
     maxWidthPct: 86,
-    fontSizePct: 6,
+    fontSizePct: isFullscreen ? 6 : 6,
     fill: "#ffffff",
     boxFill: "rgba(0,0,0,0.55)",
     boxPadPct: 1.6,
@@ -725,49 +659,38 @@ function applyOverlayQuick(){
     stroke: "rgba(0,0,0,0.0)",
     strokeWidthPct: 0
   });
-  document.getElementById('overlay-status').innerText = "Applicato rapido. Se vuoi, usa ‘Applica con AI’ per una scelta più intelligente.";
+  document.getElementById('overlay-status').innerText = "Applicato rapido. Usa ‘Applica con AI’ per una scelta migliore.";
 }
 
 async function applyOverlayWithAI(){
   const text = (document.getElementById('overlay-text').value || "").trim();
   if(!text){ announce("Scrivi il testo."); return; }
-
-  // Se l’utente vuole “semplice”, NON ti chiedo altro:
-  // Posizionamento dipende dal social: quindi lo deduco da currentSocialTarget.
   document.getElementById('overlay-status').innerText = "L’AI sta scegliendo stile e posizione…";
 
-  // Se provider non c’è (es. hai analizzato con FREE), facciamo euristica:
-  if(!currentProvider){
-    applyOverlayQuick();
-    document.getElementById('overlay-status').innerText = "Se vuoi una scelta migliore, usa una API (OpenAI/Gemini/Claude) e poi ‘Aggiungi testo in foto’.";
-    return;
-  }
-
-  // Chiedo all’AI SOLO un JSON con scelte grafiche
   const layoutPrompt = `
 Sei un graphic editor per social. Devo mettere TESTO sopra questa foto.
-Target social: ${socialTargetLabel()}.
-Testo da inserire (esatto): """${text}"""
+Obiettivo social: ${goalLabel()}.
+Testo (esatto): """${text}"""
 
-Dammi SOLO un JSON valido, senza testo extra, con questi campi:
+Dammi SOLO un JSON valido, senza testo extra:
 {
-  "xPct": number,          // 0-100 (centro del testo)
-  "yPct": number,          // 0-100
-  "maxWidthPct": number,   // 20-95 (larghezza massima del blocco testo)
-  "fontSizePct": number,   // 2-12 (percentuale della dimensione min(w,h))
+  "xPct": number,
+  "yPct": number,
+  "maxWidthPct": number,
+  "fontSizePct": number,
   "fill": "#RRGGBB",
   "align": "left|center|right",
   "boxFill": "rgba(r,g,b,a)" o null,
-  "boxPadPct": number,     // 0-4
+  "boxPadPct": number,
   "stroke": "rgba(r,g,b,a)" o null,
-  "strokeWidthPct": number // 0-1.5
+  "strokeWidthPct": number
 }
 
 Regole:
-- Mantieni SAFE AREA: non troppo vicino a bordi e aree UI (soprattutto in 9:16).
-- Se lo sfondo sembra complesso, usa boxFill scuro semitrasparente.
-- Scegli fill che massimizza leggibilità.
-- xPct/yPct devono evitare volto/oggetto principale (se evidente).
+- Mantieni safe area: non appiccicare ai bordi. In 9:16 evita alto e basso (UI).
+- Evita di coprire viso/soggetto principale se evidente.
+- Se sfondo è complesso, usa boxFill scuro semitrasparente.
+- Scegli colori leggibili.
 `;
 
   try{
@@ -779,13 +702,7 @@ Regole:
         headers:{ "Content-Type":"application/json", "Authorization": `Bearer ${KEYS.openai}` },
         body: JSON.stringify({
           model: KEYS.openaiModel,
-          input: [{
-            role:"user",
-            content:[
-              { type:"input_text", text: layoutPrompt },
-              { type:"input_image", image_url: currentPhotoBase64 }
-            ]
-          }],
+          input: [{ role:"user", content:[{ type:"input_text", text: layoutPrompt }, { type:"input_image", image_url: currentPhotoBase64 }] }],
           max_output_tokens: 400
         })
       });
@@ -801,12 +718,7 @@ Regole:
         method:'POST',
         headers:{ 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: layoutPrompt },
-              { inline_data: { mime_type: 'image/jpeg', data: b64 } }
-            ]
-          }]
+          contents: [{ parts: [{ text: layoutPrompt }, { inline_data: { mime_type: 'image/jpeg', data: b64 } }] }]
         })
       });
       if(!res.ok) throw new Error("Errore layout Gemini");
@@ -818,21 +730,11 @@ Regole:
       const b64 = currentPhotoBase64.split(',')[1];
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "x-api-key": KEYS.claude,
-          "anthropic-version":"2023-06-01"
-        },
+        headers:{ "Content-Type":"application/json", "x-api-key": KEYS.claude, "anthropic-version":"2023-06-01" },
         body: JSON.stringify({
           model: KEYS.claudeModel,
           max_tokens: 450,
-          messages:[{
-            role:"user",
-            content:[
-              { type:"image", source:{ type:"base64", media_type:"image/jpeg", data:b64 } },
-              { type:"text", text: layoutPrompt }
-            ]
-          }]
+          messages:[{ role:"user", content:[{ type:"image", source:{ type:"base64", media_type:"image/jpeg", data:b64 } }, { type:"text", text: layoutPrompt }] }]
         })
       });
       if(!res.ok) throw new Error("Errore layout Claude");
@@ -840,17 +742,15 @@ Regole:
       jsonText = (d.content || []).filter(x => x.type === "text" && x.text).map(x => x.text).join("\n").trim();
     }
 
-    // Estrai JSON anche se ha roba extra
     const extracted = extractJsonObject(jsonText);
-    if(!extracted) throw new Error("JSON non valido ricevuto dall’AI.");
+    if(!extracted) throw new Error("JSON non valido.");
 
     const spec = JSON.parse(extracted);
-    // sanitize
     const safe = normalizeOverlaySpec(spec, text);
     drawOverlay(safe);
     document.getElementById('overlay-status').innerText = "Applicato con AI. Puoi scaricare o condividere.";
   }catch(e){
-    document.getElementById('overlay-status').innerText = "Non sono riuscito a leggere le istruzioni dell’AI. Applico una versione rapida.";
+    document.getElementById('overlay-status').innerText = "Non riesco a leggere le istruzioni dell’AI. Applico rapido.";
     applyOverlayQuick();
   }
 }
@@ -862,16 +762,14 @@ function extractJsonObject(s){
   if(first === -1 || last === -1 || last <= first) return null;
   return s.slice(first, last+1);
 }
-
 function normalizeOverlaySpec(spec, text){
-  // fallback defaults
-  const is916 = (currentSocialTarget === 'instagram_stories' || currentSocialTarget === 'tiktok');
+  const isFullscreen = (socialGoal === 'fullscreen');
   const def = {
     text,
     xPct: 50,
-    yPct: is916 ? 78 : 82,
+    yPct: isFullscreen ? 78 : 82,
     maxWidthPct: 86,
-    fontSizePct: is916 ? 6 : 6,
+    fontSizePct: 6,
     fill: "#ffffff",
     align: "center",
     boxFill: "rgba(0,0,0,0.55)",
@@ -879,15 +777,13 @@ function normalizeOverlaySpec(spec, text){
     stroke: "rgba(0,0,0,0.0)",
     strokeWidthPct: 0
   };
-
   const out = {...def};
 
-  const num = (v, lo, hi, fallback) => {
+  const num = (v, lo, hi, fb) => {
     const x = Number(v);
     if(Number.isFinite(x)) return Math.min(hi, Math.max(lo, x));
-    return fallback;
+    return fb;
   };
-
   out.xPct = num(spec.xPct, 5, 95, def.xPct);
   out.yPct = num(spec.yPct, 5, 95, def.yPct);
   out.maxWidthPct = num(spec.maxWidthPct, 30, 95, def.maxWidthPct);
@@ -897,7 +793,6 @@ function normalizeOverlaySpec(spec, text){
 
   if(typeof spec.fill === "string" && spec.fill.startsWith("#")) out.fill = spec.fill;
   if(spec.align === "left" || spec.align === "center" || spec.align === "right") out.align = spec.align;
-
   out.boxFill = (typeof spec.boxFill === "string" || spec.boxFill === null) ? spec.boxFill : def.boxFill;
   out.stroke = (typeof spec.stroke === "string" || spec.stroke === null) ? spec.stroke : def.stroke;
 
@@ -906,7 +801,6 @@ function normalizeOverlaySpec(spec, text){
 }
 
 async function drawOverlay(spec){
-  // Load image
   const img = await loadImage(currentPhotoBase64);
   const c = overlayCanvas;
   const ctx = c.getContext("2d");
@@ -921,26 +815,21 @@ async function drawOverlay(spec){
   const fontPx = Math.max(14, Math.round((spec.fontSizePct/100) * minDim));
   ctx.font = `700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
   ctx.textBaseline = "middle";
+  ctx.textAlign = spec.align;
 
   const maxWidth = (spec.maxWidthPct/100) * c.width;
   const lines = wrapText(ctx, spec.text, maxWidth);
-
   const lineH = Math.round(fontPx * 1.2);
   const blockH = lines.length * lineH;
 
-  // alignment
-  ctx.textAlign = spec.align;
+  let blockW = 0;
+  for(const ln of lines) blockW = Math.max(blockW, ctx.measureText(ln).width);
 
   const x = (spec.xPct/100) * c.width;
   const y = (spec.yPct/100) * c.height;
 
-  // Compute block width
-  let blockW = 0;
-  for(const ln of lines) blockW = Math.max(blockW, ctx.measureText(ln).width);
-
   const pad = (spec.boxPadPct/100) * minDim;
 
-  // Determine top-left of box depending on align
   let boxXLeft = x - blockW/2;
   if(spec.align === "left") boxXLeft = x;
   if(spec.align === "right") boxXLeft = x - blockW;
@@ -953,7 +842,6 @@ async function drawOverlay(spec){
     ctx.fill();
   }
 
-  // Stroke behind text (optional)
   if(spec.stroke && spec.strokeWidthPct > 0){
     ctx.strokeStyle = spec.stroke;
     ctx.lineWidth = Math.max(1, (spec.strokeWidthPct/100) * minDim);
@@ -963,14 +851,12 @@ async function drawOverlay(spec){
     }
   }
 
-  // Fill text
   ctx.fillStyle = spec.fill;
   for(let i=0;i<lines.length;i++){
     const yy = boxYTop + (i+0.5)*lineH;
     ctx.fillText(lines[i], x, yy, maxWidth);
   }
 
-  // Make blob for share/download
   overlayCanvas.classList.remove('hidden');
   overlayBlob = await new Promise(resolve => c.toBlob(resolve, "image/jpeg", 0.92));
 }
@@ -989,9 +875,8 @@ function wrapText(ctx, text, maxWidth){
     }
   }
   if(line) lines.push(line);
-  return lines.slice(0, 8); // evita muri di testo
+  return lines.slice(0, 8);
 }
-
 function roundRect(ctx, x, y, w, h, r){
   const rr = Math.min(r, w/2, h/2);
   ctx.beginPath();
@@ -1002,7 +887,6 @@ function roundRect(ctx, x, y, w, h, r){
   ctx.arcTo(x, y, x+w, y, rr);
   ctx.closePath();
 }
-
 function loadImage(src){
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -1011,7 +895,6 @@ function loadImage(src){
     img.src = src;
   });
 }
-
 async function downloadOverlay(){
   if(!overlayBlob){ announce("Prima applica il testo."); return; }
   const url = URL.createObjectURL(overlayBlob);
@@ -1024,7 +907,6 @@ async function downloadOverlay(){
   URL.revokeObjectURL(url);
   announce("Download avviato.");
 }
-
 async function shareOverlay(){
   if(!overlayBlob){ announce("Prima applica il testo."); return; }
   try{
@@ -1038,51 +920,44 @@ async function shareOverlay(){
   }
 }
 
-/* -------------------- FREE LOCAL AI (no keys) -------------------- */
+/* -------------------- FREE LOCAL AI -------------------- */
 let localPipeline = null;
 let localLoading = false;
 
-// Semplice: caption dell’immagine + euristiche su aspect ratio e “crop risk”
 async function runFreeLocal(){
-  showResultScreen("FREE locale: sto caricando il modello (prima volta può essere lenta)…");
+  showResultScreen("FREE locale: sto caricando il modello (prima volta lenta)…");
   try{
     const caption = await localCaption(currentPhotoBase64);
-    const advice = localHeuristics(currentPhotoBase64);
     const out =
 `A) VERDETTO (FREE)
-Questa modalità è locale: utile, ma meno precisa delle API.
+Modalità locale: nessuna key. Buona per descrizione, meno precisa per social avanzato.
 
-B) DESCRIZIONE (caption)
+B) DESCRIZIONE
 ${caption}
 
-C) CONSIGLI RAPIDI (euristici)
-${advice}
-
-Se vuoi consigli “social/crop” più affidabili, usa una API (OpenAI/Gemini/Claude).`;
+C) CONSIGLI RAPIDI
+- Se vuoi FEED: spesso funziona 4:5 verticale; 1:1 può tagliare sopra/sotto.
+- Se vuoi 9:16: lascia margini sopra/sotto (UI). Evita testo vicino ai bordi.
+- Se vuoi davvero consigli crop precisi: usa una API (OpenAI/Gemini/Claude).`;
     setResultText(out);
-    addChat('assistant', "Modalità FREE: posso descrivere, ma per valutazioni social precise meglio una API.");
-    // niente social tools, perché senza provider la parte AI overlay sarebbe più povera (ma overlay rapido resta in social con API)
+    addChat('assistant', "Modalità FREE: per chat e consigli social avanzati usa una API.");
     hide('social-tools');
   }catch(e){
     setResultText("FREE locale: errore nel caricamento. Prova su Wi-Fi o usa una API.");
   }
 }
 
-// transformers.js da CDN (modello leggero captioning)
 async function localCaption(dataUrl){
   if(localLoading) return "Caricamento in corso…";
   localLoading = true;
 
-  // Lazy import
   if(!window.__transformers_loaded){
     await loadScript("https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js");
     window.__transformers_loaded = true;
   }
 
   const { pipeline } = window.transformers;
-
   if(!localPipeline){
-    // modello captioning abbastanza “semplice”
     localPipeline = await pipeline("image-to-text", "Xenova/vit-gpt2-image-captioning");
   }
 
@@ -1091,15 +966,6 @@ async function localCaption(dataUrl){
 
   const text = Array.isArray(result) && result[0]?.generated_text ? result[0].generated_text : JSON.stringify(result);
   return text;
-}
-
-function localHeuristics(dataUrl){
-  // Non possiamo “vedere” davvero i bordi come un modello forte: faccio consigli basati su rapporto d’aspetto
-  // (è onesto: meglio così che inventare).
-  // Per avere dimensioni: carico in modo sync-ish tramite Image (best effort)
-  return `- Se devi pubblicare: controlla che soggetto/viso non sia vicino ai bordi (rischio crop).
-- Per IG Feed spesso rende meglio un crop 4:5; per Stories/TikTok 9:16 lascia margini sopra/sotto (UI).
-- Se la foto è molto “larga” (panoramica), in social verticali rischi molto taglio laterale.`;
 }
 
 function loadScript(src){
@@ -1127,22 +993,20 @@ async function shareImageNative(){
   }
 }
 
-/* -------------------- NAV -------------------- */
+/* -------------------- CLOSE / RESET -------------------- */
 function discardPhoto(){
-  hide('ai-screen'); hide('context-screen'); hide('social-screen'); hide('result-screen'); hide('overlay-screen');
+  hide('ai-screen'); hide('context-screen'); hide('social-goal-screen'); hide('result-screen'); hide('overlay-screen');
   document.getElementById('main-container').classList.remove('hidden');
   document.getElementById('inp-cam-user').value = "";
   document.getElementById('inp-cam-env').value = "";
   currentProvider = null;
   currentContext = null;
-  currentSocialTarget = null;
+  socialGoal = null;
   resetChat();
   announce("Home.");
 }
-
 function closeResult(){
   hide('result-screen');
-  // Torna allo screen AI (così puoi scegliere Share/Free/API senza rifare foto)
   show('ai-screen');
   announce("Torno alla scelta.");
 }
@@ -1158,7 +1022,6 @@ function openSettings(){
   document.getElementById('model-claude').value = KEYS.claudeModel;
 }
 function closeSettings(){ document.getElementById('settings-screen').classList.add('hidden'); }
-
 function saveSettings(){
   KEYS.gemini = document.getElementById('key-gemini').value.trim();
   KEYS.geminiModel = document.getElementById('model-gemini').value.trim() || "gemini-3-pro-preview";
