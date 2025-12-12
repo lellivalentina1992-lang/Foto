@@ -2,43 +2,35 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Smart Photo Assistant - Ultimate v18 (Stable)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Smart Photo Assistant - v22 Zoom Edition</title>
 <style>
-/* STILE BASE */
+/* STILE BASE AD ALTO CONTRASTO */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-
-/* UTILS */
 .hidden{display:none !important}
 
 /* AREA CAMERA */
 #cam-container{position:relative;flex-grow:1;background:#111;display:flex;justify-content:center;align-items:center;overflow:hidden}
-video{width:100%;height:100%;object-fit:cover;opacity:.8;transition:transform 0.3s ease-out}
+video{width:100%;height:100%;object-fit:cover;opacity:.8; transition: transform 0.3s ease-out; transform-origin: center;}
 canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 
 /* STATUS E COUNTDOWN */
-#voice-status{position:absolute;top:10px;right:10px;padding:8px 12px;border-radius:20px;background:rgba(0,0,0,0.8);border:1px solid #777;font-size:0.9rem;z-index:60;display:none}
-#countdown-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:8rem;color:#fff;font-weight:bold;text-shadow:0 0 15px #000;z-index:70;display:none}
-
-/* CONTROLLI ZOOM */
-#zoom-controls{position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:15px;z-index:50}
-.round-btn{width:70px;height:70px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,0.6);color:#fff;font-weight:bold;font-size:1.1rem;display:flex;justify-content:center;align-items:center;box-shadow:0 0 10px #000;backdrop-filter:blur(4px)}
-.round-btn:active{transform:scale(0.95);background:#4a90e2}
+#countdown-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10rem;color:#fff;font-weight:bold;text-shadow:0 0 20px #000;z-index:70;display:none}
 
 /* INTERFACCIA PRINCIPALE */
-#main-interface{height:55vh;width:100%;background:#000;border-top:2px solid #333;display:flex;flex-direction:column}
-#camera-controls{flex-grow:1;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:10px;padding:15px;overflow-y:auto}
+#main-interface{min-height:45vh;width:100%;background:#000;border-top:2px solid #333;display:flex;flex-direction:column}
+#camera-controls{flex-grow:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px;overflow-y:auto}
 
 /* MODALITÀ FOTO TOGGLE */
 #mode-switch{grid-column:1/-1;display:flex;gap:5px;margin-bottom:5px}
-.mode-btn{flex:1;padding:12px 5px;border:2px solid #555;background:#222;color:#aaa;border-radius:8px;font-weight:bold;font-size:0.9rem;text-transform:uppercase}
+.mode-btn{flex:1;padding:12px 2px;border:2px solid #555;background:#222;color:#aaa;border-radius:10px;font-weight:bold;font-size:0.9rem;text-transform:uppercase}
 .mode-btn.active{background:#004080;border-color:#4a90e2;color:#fff;box-shadow:0 0 10px rgba(74,144,226,0.3)}
 
 /* AREA SELEZIONE OGGETTI */
-#selection-panel{background:#111;border:1px solid #444;border-radius:8px;padding:10px;display:none;flex-direction:column;gap:5px;grid-column:1/-1}
-#detected-list{display:flex;flex-wrap:wrap;gap:8px;max-height:120px;overflow-y:auto;padding:5px}
-.obj-btn{padding:10px 15px;border:2px solid #555;background:#222;color:#fff;border-radius:20px;font-size:1rem;min-height:44px;}
+#selection-panel{background:#111;border:1px solid #444;border-radius:10px;padding:15px;display:flex;flex-direction:column;gap:10px;grid-column:1/-1;height:100%}
+#detected-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;overflow-y:auto;flex-grow:1}
+.obj-btn{padding:15px;border:2px solid #555;background:#222;color:#fff;border-radius:12px;font-size:1.1rem;min-height:60px;display:flex;align-items:center;justify-content:center;text-align:center}
 .obj-btn.selected{background:#006400;border-color:#0f0;color:#0f0;font-weight:bold}
 
 /* PULSANTI */
@@ -48,16 +40,13 @@ button:active{background:#555;transform:scale(.98)}
 .btn-primary{background:#004080;border-color:#4a90e2}
 .btn-action{background:#006400;border-color:#0f0;color:#0f0}
 .btn-download{background:#4B0082;border-color:#9370DB;color:#fff}
-.btn-guide{background:#8B0000;border-color:#f00;font-size:1.2rem}
-.active-tool{background:#DAA520!important;border-color:#FFD700!important;color:#000!important}
+.btn-guide{background:#8B0000;border-color:#f00;font-size:1.3rem}
 
 /* MENU CONTESTO & RISULTATO */
-#context-menu, #result-screen{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:80;padding:15px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
-#result-text{flex-grow:1;background:#111;border:1px solid #555;padding:15px;font-size:1.2rem;line-height:1.5;white-space:pre-wrap}
+#context-menu, #result-screen{position:absolute;top:0;left:0;width:100%;height:100%;background:#000;z-index:80;padding:20px;display:flex;flex-direction:column;gap:15px;overflow-y:auto}
+#result-text{flex-grow:1;background:#111;border:1px solid #555;padding:15px;font-size:1.3rem;line-height:1.6;white-space:pre-wrap}
 
-/* EDITOR & SETTINGS */
-/* FIX 1: Rimosso key-screen da display:none nel CSS, gestito solo via classe .hidden */
-#text-editor {position:absolute;bottom:0;left:0;width:100%;background:#222;padding:15px;z-index:100;border-top:2px solid #D4AF37;display:none}
+/* SETTINGS */
 #key-screen {position:absolute;top:0;left:0;width:100%;height:100%;background:#111;z-index:200;display:flex;flex-direction:column;justify-content:center;align-items:center}
 </style>
 </head>
@@ -67,14 +56,7 @@ button:active{background:#555;transform:scale(.98)}
 
 <div id="cam-container">
   <video id="webcam" playsinline muted autoplay></video>
-  <canvas id="overlay"></canvas>
-  <div id="voice-status">Ascolto...</div>
   <div id="countdown-overlay"></div>
-  
-  <div id="zoom-controls">
-      <button class="round-btn" onclick="describeSceneNow()" aria-label="Cosa vedo?">👁️</button>
-      <button class="round-btn" id="btn-zoom" onclick="cycleZoom()" aria-label="Zoom">1x</button>
-  </div>
 </div>
 
 <div id="main-interface">
@@ -85,45 +67,45 @@ button:active{background:#555;transform:scale(.98)}
         <button id="btn-mode-objects" class="mode-btn" onclick="setPhotoMode('objects')">OGGETTI</button>
     </div>
 
-    <button class="full-width" onclick="describeSceneNow()" style="background:#004080; border-color:#4a90e2; margin-bottom:5px">
-        COSA VEDO? (RAPIDO)
-    </button>
-
-    <button class="full-width" id="btn-select-mode" onclick="toggleSelectionMode()" style="background:#333;border-color:#777">
-      SELEZIONA COSA CERCARE
-    </button>
-    
     <div id="selection-panel" class="hidden">
-      <div style="font-size:1rem;color:#fff;margin-bottom:10px;font-weight:bold">
-          Oggetti rilevati:
+      <div style="font-size:1.2rem;color:#D4AF37;margin-bottom:10px;text-align:center">
+          Tocca per includere/escludere:
       </div>
       <div id="detected-list" aria-live="polite"></div>
-      <button onclick="confirmSelection()" class="full-width btn-action" style="min-height:50px;margin-top:10px">CHIUDI SELEZIONE</button>
-    </div>
-    
-    <button class="full-width btn-guide" id="btn-guide" onclick="toggleSmartGuide()">
-      AVVIA GUIDA
-    </button>
-    
-    <div id="local-ai-status" class="full-width" style="text-align:center;padding:10px;background:#222;border:1px solid #444;border-radius:8px;color:#ccc;grid-column:1/-1" aria-live="polite">
-      In attesa...
+      <button onclick="confirmSelection()" class="full-width btn-action" style="margin-top:10px">CONFERMA E CHIUDI</button>
+      <button onclick="clearSelection()" class="full-width" style="margin-top:5px;background:#8B0000">RESETTA SELEZIONE</button>
     </div>
 
-    <button onclick="startCountdown(5)" class="btn-action">SCATTA (5s)</button>
-    <button onclick="flipCamera()">RUOTA CAM</button>
-    
-    <button onclick="toggleVoiceControl()" id="btn-voice">VOCALE</button>
-    <button onclick="openSettings()" style="font-size:0.9rem;background:#333">API KEY</button>
+    <div id="standard-controls" style="display:contents">
+        <button class="full-width btn-guide" id="btn-guide" onclick="toggleSmartGuide()">
+        AVVIA GUIDA
+        </button>
+
+        <button class="full-width" id="btn-select-objects" onclick="toggleSelectionMode()" style="background:#333;border-color:#777">
+        SCEGLI SFONDO (OPZIONALE)
+        </button>
+        
+        <div id="local-ai-status" class="full-width" style="text-align:center;padding:10px;background:#222;border:1px solid #444;border-radius:8px;color:#ccc;grid-column:1/-1" aria-live="polite">
+        Caricamento AI...
+        </div>
+
+        <button onclick="startCountdown(3)" class="btn-action">SCATTA SUBITO</button>
+        <button onclick="cycleZoom()" id="btn-zoom">ZOOM 1x</button>
+        
+        <button onclick="flipCamera()" id="btn-flip">RUOTA CAM</button>
+        <button onclick="toggleVoiceControl()" id="btn-voice">VOCALE</button>
+        <button onclick="openSettings()" style="font-size:0.9rem;background:#333;grid-column:1/-1">IMPOSTA API KEY</button>
+    </div>
   </div>
 </div>
 
 <div id="context-menu" class="hidden" aria-hidden="true">
-  <h2 style="text-align:center;color:#D4AF37">Foto Scattata</h2>
+  <h2 style="text-align:center;color:#D4AF37">FOTO PRONTA</h2>
   <button class="btn-primary" onclick="analyzeContext('environment')">DESCRIVI SCENA</button>
   <button class="btn-primary" onclick="analyzeContext('selfie')">ANALISI SELFIE</button>
   <button class="btn-primary" onclick="analyzeContext('document')">LEGGI TESTO</button>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
-    <button class="btn-share-now" onclick="shareImageNative()">CONDIVIDI</button>
+    <button class="btn-share-now" onclick="shareImageNative()" style="background:#006400">CONDIVIDI</button>
     <button class="btn-download" onclick="downloadImage()">SCARICA</button>
   </div>
   <button onclick="discardPhoto()" style="background:#8B0000;margin-top:10px">ELIMINA</button>
@@ -132,46 +114,37 @@ button:active{background:#555;transform:scale(.98)}
 <div id="result-screen" class="hidden" aria-hidden="true">
   <h2 style="color:#D4AF37;text-align:center;margin:0">Risultato</h2>
   <div id="result-text" tabindex="0">Attendi...</div>
-  <button onclick="openTextEditor()" class="full-width btn-primary">AGGIUNGI TESTO</button>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <button onclick="shareImageNative()" class="btn-action">CONDIVIDI</button>
       <button onclick="discardPhoto()" style="background:#8B0000">CHIUDI</button>
   </div>
 </div>
 
-<div id="text-editor">
-  <input type="text" id="caption-input" placeholder="Scrivi qui..." style="width:100%;padding:15px;margin-bottom:10px;color:black">
-  <button onclick="applyTextToImage()" class="btn-action full-width">CONFERMA</button>
-  <button onclick="closeTextEditor()" class="full-width" style="margin-top:10px">ANNULLA</button>
-</div>
-
 <div id="key-screen" class="hidden">
   <h2>API Key</h2>
   <input type="text" id="key-input" style="width:80%;padding:15px;color:black">
   <button onclick="saveKey()" style="padding:20px;width:80%;margin-top:20px">SALVA</button>
+  <button onclick="clearKey()" style="margin-top:10px;padding:20px;width:80%;background:#8B0000">CANCELLA KEY</button>
   <button onclick="closeSettings()" style="margin-top:10px;padding:20px;width:80%;background:#333">CHIUDI</button>
 </div>
 
 <script>
 let GEMINI_KEY = localStorage.getItem('gemini_key') || "";
-// FIX 4: Modello standard
 const MODEL_NAME = "gemini-1.5-flash"; 
 const API_ENDPOINT = "v1beta";
 
 // SYSTEM
 let video = document.getElementById('webcam');
-
-// FIX 2: Canvas Ottimizzato (Fisso a 640x480 per performance)
 const AI_W = 640, AI_H = 480;
 let aiCanvas = document.createElement('canvas'); aiCanvas.width = AI_W; aiCanvas.height = AI_H;
 let aiCtx = aiCanvas.getContext('2d');
 
 let stream = null;
 let currentPhotoBase64 = null;
-let finalPhotoBase64 = null;
 let currentFacingMode = 'environment';
 let currentPhotoMode = 'memory'; 
-let zoomLevel = 1; 
+let zoomLevel = 1; // NUOVO: Stato Zoom
+let lastFocus = null; 
 
 // AI
 let objectDetector = null;
@@ -184,30 +157,34 @@ let isSelectionMode = false;
 let guideInterval = null;
 let selectionInterval = null; 
 let lastGuideTime = 0;
-let guideStartTime = 0;
 let prevDetectedSet = ""; 
 let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
+let lastAnnouncedMsg = ""; 
 
-// CALIBRATION
-let calibrationData = { active: false, startTime: 0, measurements: [], baselineWidth: null, failCount: 0 };
+// STABILIZZAZIONE
+let stabilityStartTime = 0;
+let lastCentroid = {x:0, y:0};
+const STABLE_DURATION = 1500; 
+const MOVE_THRESHOLD = 0.03; 
 
 const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition || null;
 const OBJECT_TRANSLATIONS = {
-    'person': 'Persona', 'bicycle': 'Bicicletta', 'car': 'Auto', 'cat': 'Gatto', 'dog': 'Cane', 
+    'person': 'Persona', 'bicycle': 'Bici', 'car': 'Auto', 'cat': 'Gatto', 'dog': 'Cane', 
     'chair': 'Sedia', 'bottle': 'Bottiglia', 'laptop': 'PC', 'cell phone': 'Cellulare', 
     'book': 'Libro', 'cup': 'Tazza', 'potted plant': 'Pianta', 'vase': 'Vaso', 'wine glass': 'Bicchiere',
-    'tv': 'TV', 'remote': 'Telecomando', 'keyboard': 'Tastiera', 'mouse': 'Mouse'
+    'tv': 'TV', 'remote': 'Telecomando', 'keyboard': 'Tastiera', 'mouse': 'Mouse', 'backpack':'Zaino',
+    'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bowl': 'Ciotola', 'banana':'Banana', 'apple':'Mela'
 };
 
 async function init(){
   document.body.addEventListener('click', initAudioContext, {once: true});
-  document.body.addEventListener('touchstart', initAudioContext, {once: true});
   await setupCamera();
   await loadLocalModels();
   setupModalKeyboardHandlers();
-  announce("App pronta. Usa Zoom o Cosa Vedo per esplorare.");
+  updateButtonLabels();
+  announce("App pronta.");
 }
 
 function initAudioContext(){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume(); }catch(e){} }
@@ -217,59 +194,35 @@ function setPhotoMode(mode){
     document.getElementById('btn-mode-memory').classList.toggle('active', mode==='memory');
     document.getElementById('btn-mode-social').classList.toggle('active', mode==='social');
     document.getElementById('btn-mode-objects').classList.toggle('active', mode==='objects');
-    let msg = "";
-    if(mode === 'memory') msg = "Ricordo. Centratura precisa.";
-    else if(mode === 'social') msg = "Social. Stile libero.";
-    else msg = "Oggetti. Ignoro volti.";
-    announce(msg);
+    
+    updateButtonLabels();
+    if(mode === 'objects') {
+        announce("Oggetti. Seleziona cosa cercare.");
+        if(!isSelectionMode) toggleSelectionMode();
+    } else {
+        announce("Modalità " + (mode==='memory'?"Ricordo":"Social"));
+    }
 }
 
+// NUOVO: Funzione Zoom
 function cycleZoom(){
     if(zoomLevel === 1) zoomLevel = 2;
     else if(zoomLevel === 2) zoomLevel = 3;
     else zoomLevel = 1;
+    
+    // Effetto visivo CSS
     video.style.transform = `scale(${zoomLevel})`;
-    document.getElementById('btn-zoom').innerText = zoomLevel + "x";
-    announce(`Zoom ${zoomLevel}x`);
+    document.getElementById('btn-zoom').innerText = "ZOOM " + zoomLevel + "x";
+    announce("Zoom " + zoomLevel + " per");
 }
 
-// FIX 3: Logica Zoom corretta con drawImage scalato
-function getFrameForAI(){
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    
-    // Se zoom=1, scala tutto il video nel canvas fisso
-    if(zoomLevel === 1){
-        aiCtx.drawImage(video, 0, 0, vw, vh, 0, 0, AI_W, AI_H);
-        return aiCanvas;
+function updateButtonLabels(){
+    const btn = document.getElementById('btn-select-objects');
+    if(currentPhotoMode === 'objects'){
+        btn.textContent = "SCEGLI COSA CERCARE";
+    } else {
+        btn.textContent = "SCEGLI SFONDO (OPZIONALE)";
     }
-
-    // Se zoom > 1, ritaglia e scala
-    const cropW = vw / zoomLevel;
-    const cropH = vh / zoomLevel;
-    const cropX = (vw - cropW) / 2;
-    const cropY = (vh - cropH) / 2;
-    
-    aiCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, AI_W, AI_H);
-    return aiCanvas;
-}
-
-async function describeSceneNow(){
-    if(!objectDetector){ announce("AI non ancora pronta."); return; }
-    announce("Guardo...");
-    const frame = getFrameForAI();
-    try {
-        const res = objectDetector.detectForVideo(frame, performance.now());
-        const detections = res.detections.sort((a,b)=> (b.boundingBox.width*b.boundingBox.height)-(a.boundingBox.width*a.boundingBox.height));
-        const cats = detections.map(d => d.categories[0].categoryName);
-        const unique = [...new Set(cats)].slice(0, 4);
-        
-        if(unique.length === 0) announce("Non distinguo oggetti.");
-        else {
-            const names = unique.map(n => OBJECT_TRANSLATIONS[n] || n);
-            announce("Vedo: " + names.join(", "));
-        }
-    } catch(e) { announce("Errore scansione."); }
 }
 
 async function setupCamera(){
@@ -284,7 +237,9 @@ async function setupCamera(){
 
 async function flipCamera(){
   currentFacingMode = (currentFacingMode==='environment')?'user':'environment';
-  announce("Cambio camera."); await setupCamera();
+  let msg = (currentFacingMode==='user') ? "Camera Frontale Selfie" : "Camera Posteriore Ambiente";
+  announce(msg); 
+  await setupCamera();
 }
 
 async function loadLocalModels(){
@@ -300,7 +255,7 @@ async function loadLocalModels(){
     
     faceLandmarker = await FaceLandmarker.createFromOptions(vision, { 
       baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" }, 
-      runningMode: "VIDEO", numFaces: 5 
+      runningMode: "VIDEO", numFaces: 1 
     });
     document.getElementById('local-ai-status').innerText = "AI Pronta.";
   }catch(e){ announce("Errore AI."); }
@@ -312,17 +267,8 @@ function toggleSmartGuide(){
   if(isGuiding){
     if(isSelectionMode) toggleSelectionMode(); 
     btn.textContent = "STOP GUIDA"; btn.style.background = "#006400";
-    
-    if(currentPhotoMode === 'objects'){
-        announce("Guida oggetti. Inquadra.");
-        calibrationData.active = false;
-        guideStartTime = performance.now();
-    } else {
-        calibrationData = { active: true, startTime: performance.now(), measurements: [], baselineWidth: null, failCount: 0 };
-        guideStartTime = performance.now();
-        announce("Calibrazione. Braccio teso.");
-    }
-    
+    announce("Guida attiva. Braccio teso.");
+    stabilityStartTime = 0; 
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = setInterval(processLocalFrame, 350);
   }else{
@@ -334,200 +280,267 @@ function toggleSmartGuide(){
   }
 }
 
+// NUOVO: Funzione Helper per disegnare con Zoom
+function drawZoomedFrame(targetCanvas, targetCtx){
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    if(vw === 0 || vh === 0) return false;
+
+    // Calcolo crop per zoom digitale
+    const cropW = vw / zoomLevel;
+    const cropH = vh / zoomLevel;
+    const cropX = (vw - cropW) / 2;
+    const cropY = (vh - cropH) / 2;
+
+    targetCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetCanvas.width, targetCanvas.height);
+    return true;
+}
+
 async function processLocalFrame(){
   if(video.readyState !== 4 || isCountdownRunning) return;
+  if(video.videoWidth === 0) return; // FIX 1
+  
   const now = performance.now(); 
-  if(now - lastGuideTime < 1800 && !calibrationData.active) return; 
+  if(now - lastGuideTime < 1500 && stabilityStartTime === 0) return; 
 
-  // Frame ottimizzato
-  const aiFrame = getFrameForAI();
-
-  // 1. LUCE (Usa il video originale per sicurezza)
-  if(now - lastGuideTime > 2000){
-      // Canvas temp per luce
-      let lc = document.createElement('canvas'); lc.width=50; lc.height=50;
-      lc.getContext('2d').drawImage(video, 0, 0, 50, 50);
-      const d = lc.getContext('2d').getImageData(0,0,50,50).data;
-      let b = 0; for(let i=0; i<d.length; i+=4) b+=(d[i]+d[i+1]+d[i+2])/3;
-      if((b/(d.length/4)) < 40){ 
-          announce("Troppo buio."); 
-          lastGuideTime = now; 
-          return; 
-      }
-  }
-
-  let instructions = null;
-  let facesFound = false;
-
-  // 2. FACE DETECTION
+  // USO NUOVO HELPER ZOOM
+  drawZoomedFrame(aiCanvas, aiCtx);
+  
   if(currentPhotoMode !== 'objects' && faceLandmarker){
-    try{
-       const res = faceLandmarker.detectForVideo(aiFrame, now); 
-       const faces = res.faceLandmarks;
-       if(faces.length > 0){
-           facesFound = true;
-           if(calibrationData.active){
-               if(faces.length > 1){
-                   announce("Per calibrare, solo 1 persona.");
-                   calibrationData.measurements = [];
-                   calibrationData.startTime = now; 
-                   lastGuideTime = now + 1500;
-                   return;
-               }
-               const lm = faces[0];
-               let minX=1, maxX=0; lm.forEach(p=>{if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;});
-               calibrationData.measurements.push(maxX - minX);
-               if(now - calibrationData.startTime > 2500){
-                   const vals = calibrationData.measurements;
-                   const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
-                   const variance = vals.reduce((a,b)=>a+Math.pow(b-mean,2),0)/vals.length;
-                   const stdDev = Math.sqrt(variance);
-                   let cv = (mean > 0.01) ? (stdDev / mean) : 1;
-                   calibrationData.active = false;
-                   if(cv > 0.10){ 
-                       calibrationData.failCount++;
-                       if(calibrationData.failCount >= 2){
-                           calibrationData.baselineWidth = null;
-                           announce("Troppi movimenti. Uso standard. Via.");
-                           lastGuideTime = now + 2000;
-                       } else {
-                           announce("Instabile. Riprovo.");
-                           calibrationData.measurements = [];
-                           calibrationData.startTime = now;
-                           calibrationData.active = true;
-                       }
-                   } else {
-                       calibrationData.baselineWidth = mean;
-                       announce("Calibrato. Via.");
-                   }
-                   if(!calibrationData.active) lastGuideTime = now + 1000;
-               }
-               return; 
-           }
-           const instruction = analyzeFaceLogic(faces, aiFrame); 
-           if(instruction) instructions = instruction;
-       }
-    }catch(e){}
-  }
-
-  const shouldCheckObjects = (currentPhotoMode === 'objects') || (!instructions && !calibrationData.active && !facesFound);
-  if(shouldCheckObjects && objectDetector && !instructions){
-      const elapsed = now - guideStartTime;
-      if(currentPhotoMode === 'objects' || elapsed > 3000){
-          const instruction = analyzeObjectLogic(aiFrame, now); 
-          if(instruction) instructions = instruction;
-          if(!instruction && currentPhotoMode === 'objects' && now - lastGuideTime > 4000){
-              if(selectedTargets.length > 0) instructions = "Cerco selezione...";
-              else instructions = "Cerco oggetti...";
+      const res = faceLandmarker.detectForVideo(aiCanvas, now);
+      if(res.faceLandmarks.length > 0){
+          const face = res.faceLandmarks[0];
+          
+          if(selectedTargets.length > 0){
+             const bgMsg = checkBackgroundPresence(aiCanvas, now);
+             if(bgMsg){ announce(bgMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           }
+          
+          const posMsg = analyzeFacePosition(face);
+          if(posMsg){ announce(posMsg); lastGuideTime=now; stabilityStartTime=0; return; }
+          
+          // FIX 2: Math Safety nel controllo espressione
+          const exprMsg = analyzeExpressionAdaptive(face);
+          if(exprMsg){ announce(exprMsg); lastGuideTime=now; stabilityStartTime=0; return; }
+
+          checkStabilityAndSnap({x: face[1].x, y: face[1].y}, now, "Viso ok");
+          return;
       }
   }
-  if(instructions){ announce(instructions); lastGuideTime = now; }
+
+  if(currentPhotoMode === 'objects' && objectDetector){
+      if(selectedTargets.length === 0){
+          announce("Nessun oggetto scelto.");
+          if(isGuiding) toggleSmartGuide(); 
+          if(!isSelectionMode) toggleSelectionMode();
+          return;
+      }
+      
+      const res = objectDetector.detectForVideo(aiCanvas, now);
+      const target = res.detections.find(d => selectedTargets.includes(d.categories[0].categoryName));
+      
+      if(target){
+          const guideMsg = analyzeObjectPosition(target);
+          if(guideMsg){ announce(guideMsg); lastGuideTime=now; stabilityStartTime=0; }
+          else {
+              const box = target.boundingBox;
+              const cx = (box.originX + box.width/2)/AI_W;
+              const cy = (box.originY + box.height/2)/AI_H;
+              checkStabilityAndSnap({x:cx, y:cy}, now, target.categories[0].categoryName + " ok");
+          }
+      } else {
+          if(now-lastGuideTime>3000){ announce("Cerco " + selectedTargets.map(t=>OBJECT_TRANSLATIONS[t]||t).join(", ")); lastGuideTime=now; }
+      }
+      return;
+  }
+  
+  if(currentPhotoMode !== 'objects' && now-lastGuideTime>3000){ announce("Non vedo volti."); lastGuideTime=now; }
 }
 
-function analyzeFaceLogic(faces, frame){
-    let minX=1, maxX=0, minY=1, maxY=0, cx=0, cy=0;
-    let totalPoints = 0;
-    faces.forEach(face => {
-        face.forEach(p => {if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;cx+=p.x;cy+=p.y;});
-        totalPoints += face.length;
-    });
-    cx /= totalPoints; cy /= totalPoints;
+function analyzeExpressionAdaptive(face){
+    const upperLip = face[13];
+    const lowerLip = face[14];
+    const lipDist = Math.abs(upperLip.y - lowerLip.y);
     
-    let tilt = 0;
-    if(faces.length === 1){ const eL=faces[0][33], eR=faces[0][263]; if(eL&&eR) tilt=eR.y-eL.y; }
-    const width = maxX - minX;
-
-    if(minY < 0.02) return "Tagli la fronte. Abbassa.";
-    if(maxY > 0.98) return "Tagli il mento. Alza.";
-    if(minX < 0.02) return "Tagli a sinistra. Sposta a destra."; 
-    if(maxX > 0.98) return "Tagli a destra. Sposta a sinistra."; 
-
-    let tooClose=false, tooFar=false;
-    if(currentPhotoMode === 'social' && width < 0.15) return "Troppo lontano. Avvicina.";
-    if(calibrationData.baselineWidth){
-        const ratio = width / calibrationData.baselineWidth;
-        if(ratio > 1.8) tooClose = true; else if(ratio < 0.7) tooFar = true;
-    } else {
-        if(width > 0.75) tooClose = true; else if(width < 0.25) tooFar = true;
-    }
-    if(tooClose) return zoomLevel>1 ? "Troppo vicino. Riduci zoom o allontana." : "Troppo vicino. Allontana.";
-    if(tooFar) return "Troppo lontano. Avvicina.";
-
-    if(Math.abs(tilt) > 0.05 && faces.length === 1) return tilt > 0 ? "Ruota a sinistra." : "Ruota a destra.";
-
-    let xOk = false, yOk = false;
-    if(cy < 0.35) return "Alza."; else if(cy > 0.65) return "Abbassa."; else yOk = true;
+    const leftFace = face[234]; const rightFace = face[454];
+    const faceWidth = Math.abs(rightFace.x - leftFace.x);
     
-    if(currentPhotoMode === 'memory'){
-        if(cx < 0.40) return "Sposta a Sinistra."; else if(cx > 0.60) return "Sposta a Destra."; else xOk = true;
-    } else {
-        if(cx < 0.30) return "Sposta a Sinistra."; else if(cx > 0.70) return "Sposta a Destra."; else xOk = true;
-    }
+    // FIX 2: Safety Check
+    if(faceWidth < 0.02) return null; // Tracking perso o troppo piccolo
 
-    if(xOk && yOk){
-        const bgMsg = checkBackground(frame);
-        if(bgMsg) return bgMsg;
-        const msg = (currentPhotoMode==='memory') ? "Ok ricordo. Fermo..." : "Ottima social. Fermo...";
-        announce(msg); startCountdown(3); return null;
-    }
-}
+    // FIX 2: Soglia alzata a 0.13
+    if(lipDist / faceWidth > 0.13) return "Chiudi la bocca.";
 
-function checkBackground(frame){
-    const targets = selectedTargets.filter(t => t!=='person');
-    if(targets.length === 0) return null; 
-    if(!objectDetector) return null;
-    try{
-        const res = objectDetector.detectForVideo(frame, performance.now());
-        const found = res.detections.some(d => targets.includes(d.categories[0].categoryName));
-        if(found) return null; 
-        return "Viso ok. Per sfondo, allontana appena.";
-    }catch(e){ return null; }
-}
+    const nose = face[1];
+    const leftEye = face[33];
+    const rightEye = face[263];
+    const midEyeY = (leftEye.y + rightEye.y) / 2;
+    
+    const noseEyeDist = Math.abs(nose.y - midEyeY);
+    const noseMouthDist = Math.abs(nose.y - upperLip.y);
+    
+    // FIX 2: Safety Check
+    if(noseMouthDist < 0.01) return null;
 
-function analyzeObjectLogic(frame, now){
-    try{
-        const dets = objectDetector.detectForVideo(frame, now);
-        let best = null, maxA = 0;
-        let targetsFound = [];
-        if(selectedTargets.length > 0) targetsFound = dets.detections.filter(d => selectedTargets.includes(d.categories?.[0]?.categoryName));
-        let candidates = (targetsFound.length > 0) ? targetsFound : dets.detections;
-
-        candidates.forEach(d=>{
-            const cat = d.categories?.[0]?.categoryName; 
-            if(currentPhotoMode === 'objects' && cat === 'person') return;
-            const area = d.boundingBox.width * d.boundingBox.height;
-            if(area > maxA){ maxA=area; best=d; }
-        });
-
-        if(best){
-            const box = best.boundingBox;
-            const vw = frame.width || frame.videoWidth;
-            const vh = frame.height || frame.videoHeight;
-            const cx = (box.originX + box.width/2)/vw;
-            const cy = (box.originY + box.height/2)/vh;
-            const w = box.width/vw;
-            const h = box.height/vh;
-            const cat = best.categories?.[0]?.categoryName;
-            const name = OBJECT_TRANSLATIONS[cat] || cat || "Oggetto";
-            
-            if(w < 0.20 && h < 0.20) return `${name} lontano. Avvicina.`;
-            if(w > 0.90 || h > 0.90) return zoomLevel>1 ? `${name} vicino. Riduci zoom.` : `${name} vicino. Allontana.`;
-
-            if(cy < 0.35) return "Alza.";
-            if(cy > 0.65) return "Abbassa.";
-            if(cx < 0.35) return "Sposta a Sinistra.";
-            if(cx > 0.65) return "Sposta a Destra.";
-            
-            announce(`${name} centrato. Scatto...`);
-            startCountdown(3);
-            return null;
-        }
-    }catch(e){}
+    const ratio = noseEyeDist / noseMouthDist;
+    if(ratio < 0.60) return "Troppo dal basso. Alza il telefono.";
+    
     return null;
 }
 
-// --- STANDARD FUNCTIONS ---
+function checkBackgroundPresence(canvas, now){
+    if(!objectDetector) return null;
+    const res = objectDetector.detectForVideo(canvas, now);
+    const found = res.detections.some(d => selectedTargets.includes(d.categories[0].categoryName));
+    
+    // FIX 3: Messaggio specifico
+    if(!found){
+        const missing = selectedTargets.map(t=>OBJECT_TRANSLATIONS[t]||t).join(", ");
+        return "Viso ok, ma manca: " + missing + ".";
+    }
+    return null;
+}
+
+function analyzeFacePosition(face){
+    let minX=1, maxX=0, minY=1, maxY=0, cx=0, cy=0;
+    face.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;cx+=p.x;cy+=p.y;});
+    cx /= face.length; cy /= face.length;
+    const width = maxX - minX;
+
+    if(minY < 0.05) return "Tagli la fronte. Abbassa.";
+    if(maxY > 0.95) return "Tagli il mento. Alza.";
+    
+    let optimalW = (currentPhotoMode==='social') ? 0.25 : 0.45; 
+    if(width > optimalW + 0.15) return "Troppo vicino. Allontana.";
+    if(width < optimalW - 0.10) return "Troppo lontano. Avvicina.";
+
+    if(cx < 0.35) return "Sposta a Sinistra.";
+    if(cx > 0.65) return "Sposta a Destra.";
+    if(cy < 0.35) return "Alza.";
+    if(cy > 0.65) return "Abbassa.";
+    return null;
+}
+
+function analyzeObjectPosition(d){
+    const box = d.boundingBox;
+    const cx = (box.originX + box.width/2)/AI_W;
+    const cy = (box.originY + box.height/2)/AI_H;
+    const w = box.width/AI_W;
+    if(w < 0.15) return "Troppo lontano. Avvicina.";
+    if(w > 0.85) return "Troppo vicino. Allontana.";
+    if(cx < 0.35) return "Sposta a Sinistra.";
+    if(cx > 0.65) return "Sposta a Destra.";
+    if(cy < 0.35) return "Alza.";
+    if(cy > 0.65) return "Abbassa.";
+    return null;
+}
+
+function checkStabilityAndSnap(currentCenter, now, msgSuccess){
+    const dx = Math.abs(currentCenter.x - lastCentroid.x);
+    const dy = Math.abs(currentCenter.y - lastCentroid.y);
+    lastCentroid = currentCenter;
+
+    if(dx > MOVE_THRESHOLD || dy > MOVE_THRESHOLD){ stabilityStartTime = 0; return; }
+
+    if(stabilityStartTime === 0){
+        stabilityStartTime = now;
+        announce(msgSuccess + ". Fermo immobile...");
+    } else {
+        if(now - stabilityStartTime > STABLE_DURATION){
+            announce("Perfetto. Scatto.");
+            startCountdown(3); 
+            stabilityStartTime = 0; 
+        }
+    }
+}
+
+// --- GESTIONE INTERFACCIA E SELEZIONE ---
+function toggleSelectionMode(){
+    isSelectionMode = !isSelectionMode;
+    const panel = document.getElementById('selection-panel');
+    const modes = document.getElementById('mode-switch');
+    const ctrls = document.getElementById('standard-controls');
+
+    if(isSelectionMode){
+        lastFocus = document.activeElement; 
+        panel.classList.remove('hidden');
+        modes.classList.add('hidden');
+        ctrls.classList.add('hidden');
+        
+        document.getElementById('detected-list').innerHTML='<div style="grid-column:1/-1;text-align:center">Scansiono oggetti...</div>';
+        prevDetectedSet = ""; 
+        if(selectionInterval) clearInterval(selectionInterval);
+        selectionInterval = setInterval(scanObjectsForList, 1000);
+        announce("Tocca per includere.");
+    } else {
+        // FIX 4: Se è in Object Mode ma non ha scelto nulla, non chiudere o avvisa
+        if(currentPhotoMode === 'objects' && selectedTargets.length === 0){
+             isSelectionMode = true; // forza aperto
+             announce("Devi scegliere almeno un oggetto per continuare.");
+             return;
+        }
+
+        panel.classList.add('hidden');
+        modes.classList.remove('hidden');
+        ctrls.classList.remove('hidden');
+        
+        if(selectionInterval) clearInterval(selectionInterval); selectionInterval=null;
+        
+        if(selectedTargets.length > 0){
+             const names = selectedTargets.map(t=>OBJECT_TRANSLATIONS[t]||t).join(", ");
+             announce("Hai scelto: " + names + ".");
+        } else {
+             announce("Nessun oggetto scelto.");
+        }
+        if(lastFocus) setTimeout(()=>lastFocus.focus(),100);
+    }
+}
+
+function clearSelection(){
+    selectedTargets = [];
+    prevDetectedSet = "";
+    scanObjectsForList();
+    announce("Selezione azzerata.");
+}
+
+function scanObjectsForList(){
+    if(!objectDetector) return;
+    if(video.videoWidth === 0) return; 
+    try{
+        // Usa HELPER ZOOM anche qui per coerenza
+        drawZoomedFrame(aiCanvas, aiCtx);
+        const res = objectDetector.detectForVideo(aiCanvas, performance.now());
+        const categories = Array.from(new Set(res.detections.map(d=>d.categories[0].categoryName))).sort();
+        
+        const sig = JSON.stringify(categories) + JSON.stringify(selectedTargets);
+        if(sig === prevDetectedSet) return;
+        prevDetectedSet = sig;
+
+        const list = document.getElementById('detected-list'); list.innerHTML='';
+        if(categories.length===0) list.innerHTML='<div style="grid-column:1/-1;text-align:center;color:#777">Nessun oggetto visibile...</div>';
+
+        categories.forEach(obj=>{
+            const b = document.createElement('button'); b.className='obj-btn';
+            const name = OBJECT_TRANSLATIONS[obj]||obj;
+            const isSel = selectedTargets.includes(obj);
+            b.innerHTML = name + (isSel ? "<br><b>(SCELTO)</b>" : "");
+            if(isSel) b.classList.add('selected');
+            b.onclick=()=>{ 
+                if(selectedTargets.includes(obj)) selectedTargets=selectedTargets.filter(t=>t!==obj); 
+                else {
+                    if(currentPhotoMode==='objects') selectedTargets = [obj];
+                    else selectedTargets.push(obj); 
+                }
+                prevDetectedSet = ""; 
+                scanObjectsForList();
+                announce(selectedTargets.includes(obj)?`Selezionato ${name}`:`Rimosso ${name}`);
+            };
+            list.appendChild(b);
+        });
+    }catch(e){}
+}
+function confirmSelection(){ toggleSelectionMode(); }
+
 function playShutterSound(){ if(audioCtx){ const o=audioCtx.createOscillator();const g=audioCtx.createGain();o.connect(g);g.connect(audioCtx.destination);o.frequency.setValueAtTime(800,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+0.1);o.start();o.stop(audioCtx.currentTime+0.1); } }
 
 function startCountdown(sec){
@@ -535,7 +548,7 @@ function startCountdown(sec){
   countdownTimerIds.forEach(clearTimeout); countdownTimerIds=[];
   isCountdownRunning = true;
   const ov = document.getElementById('countdown-overlay'); ov.style.display='block';
-  if(sec>3) announce(sec.toString()); ov.innerText=sec;
+  announce("Scatto tra " + sec); ov.innerText=sec;
   for(let i=1; i<=sec; i++){
     countdownTimerIds.push(setTimeout(()=>{
        let c=sec-i; 
@@ -548,20 +561,29 @@ function startCountdown(sec){
 function cancelCountdown(){ isCountdownRunning=false; document.getElementById('countdown-overlay').style.display='none'; countdownTimerIds.forEach(clearTimeout); countdownTimerIds=[]; }
 
 function capture(){
+  // FIX 1: Controllo video pronto
+  if(video.videoWidth === 0 || video.videoHeight === 0){ announce("Camera non pronta."); return; }
+
   playShutterSound(); isCountdownRunning=false; countdownTimerIds=[];
-  const frameToSave = getFrameForAI(); 
-  const c = document.createElement('canvas'); 
-  c.width = frameToSave.width || frameToSave.videoWidth; 
-  c.height = frameToSave.height || frameToSave.videoHeight;
-  c.getContext('2d').drawImage(frameToSave,0,0);
+  const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
+  
+  // IMPORTANTE: Disegna con zoom anche la foto finale!
+  const ctx = c.getContext('2d');
+  // Usiamo la logica drawZoomedFrame ma adattata al canvas finale full resolution
+  const cropW = video.videoWidth / zoomLevel;
+  const cropH = video.videoHeight / zoomLevel;
+  const cropX = (video.videoWidth - cropW) / 2;
+  const cropY = (video.videoHeight - cropH) / 2;
+  ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, c.width, c.height);
+
   currentPhotoBase64 = c.toDataURL('image/jpeg',0.9);
-  finalPhotoBase64 = currentPhotoBase64; 
+  
   document.getElementById('main-interface').classList.add('hidden');
-  document.getElementById('zoom-controls').classList.add('hidden');
   document.getElementById('context-menu').classList.remove('hidden');
   document.getElementById('context-menu').removeAttribute('aria-hidden');
+  lastFocus = document.activeElement; 
   if(isGuiding) toggleSmartGuide();
-  announce("Scattata.");
+  announce("Foto scattata.");
   setTimeout(()=>document.querySelector('#context-menu button').focus(),100);
 }
 
@@ -571,30 +593,26 @@ async function analyzeContext(context){
   document.getElementById('context-menu').classList.add('hidden');
   const scr = document.getElementById('result-screen');
   scr.classList.remove('hidden'); scr.removeAttribute('aria-hidden');
-  document.getElementById('result-text').textContent = "Analizzo...";
-  announce("Analizzo...");
+  document.getElementById('result-text').textContent = "Analisi in corso...";
+  announce("Analizzo immagine...");
 
   let p = "Descrivi immagine.";
-  if(context==='selfie') p = "Consulente immagine per ciechi. Descrivi: sguardo, trucco, vestiti, sfondo.";
-  if(context==='document') p = "Trascrivi testo.";
-  if(context==='environment') p = "Descrivi l'oggetto o la scena.";
+  if(context==='selfie') p = "Consulente immagine per non vedenti. Descrivi dettagliatamente: espressione, trucco, abbigliamento, capelli e sfondo. Sii onesto su qualità e appropriatezza.";
+  if(context==='document') p = "Estrai tutto il testo.";
+  if(context==='environment') p = "Descrivi la scena.";
   
   try{
     const res = await fetch(`https://generativelanguage.googleapis.com/${API_ENDPOINT}/models/${MODEL_NAME}:generateContent?key=${GEMINI_KEY}`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({contents:[{parts:[{text:p},{inline_data:{mime_type:'image/jpeg',data:currentPhotoBase64.split(',')[1]}}]}]})
     });
-    
-    if(res.status === 404) throw new Error("Modello AI non trovato. Controlla nome.");
-    if(!res.ok) throw new Error("Errore API: " + res.status);
-    
+    if(!res.ok) throw new Error("Errore API");
     const d = await res.json();
-    if(d.error) throw new Error(d.error.message);
     const txt = d.candidates?.[0]?.content?.parts?.[0]?.text || "Nessun testo.";
     document.getElementById('result-text').textContent = txt.replace(/\*/g,'');
     announce("Fatto."); setTimeout(()=>document.getElementById('result-text').focus(),100);
   }catch(e){ 
-    document.getElementById('result-text').textContent = "Errore: " + e.message;
+    document.getElementById('result-text').textContent = "Errore connessione.";
     announce("Errore analisi."); 
   }
 }
@@ -603,85 +621,43 @@ function discardPhoto(){
     document.getElementById('context-menu').classList.add('hidden');
     document.getElementById('result-screen').classList.add('hidden');
     document.getElementById('main-interface').classList.remove('hidden');
-    document.getElementById('zoom-controls').classList.remove('hidden');
-    announce("Tornato.");
+    announce("Tornato alla camera.");
+    if(lastFocus) setTimeout(()=>lastFocus.focus(),100); 
 }
-
-function toggleSelectionMode(){
-    isSelectionMode = !isSelectionMode;
-    document.getElementById('selection-panel').classList.toggle('hidden', !isSelectionMode);
-    if(isSelectionMode){
-        selectedTargets=[]; document.getElementById('detected-list').innerHTML='...';
-        prevDetectedSet = ""; 
-        if(selectionInterval) clearInterval(selectionInterval);
-        selectionInterval = setInterval(scanObjects, 1000);
-        announce("Tocca gli oggetti da includere.");
-    } else {
-        if(selectionInterval) clearInterval(selectionInterval); selectionInterval=null;
-        announce("Selezione chiusa.");
-    }
-}
-
-function scanObjects(){
-    if(!objectDetector) return;
-    try{
-        const frame = getFrameForAI();
-        const res = objectDetector.detectForVideo(frame, performance.now());
-        const categories = Array.from(new Set(res.detections.map(d=>d.categories[0].categoryName))).sort();
-        
-        const currentSetSig = JSON.stringify(categories);
-        if(currentSetSig === prevDetectedSet) return;
-        prevDetectedSet = currentSetSig;
-
-        const list = document.getElementById('detected-list'); list.innerHTML='';
-        categories.forEach(obj=>{
-            const b = document.createElement('button'); b.className='obj-btn';
-            const name = OBJECT_TRANSLATIONS[obj]||obj;
-            b.textContent = name + (selectedTargets.includes(obj)?" (V)":"");
-            if(selectedTargets.includes(obj)) b.classList.add('selected');
-            b.onclick=()=>{ 
-                if(selectedTargets.includes(obj)) selectedTargets=selectedTargets.filter(t=>t!==obj); 
-                else selectedTargets.push(obj);
-                prevDetectedSet = ""; 
-                scanObjects();
-                announce(selectedTargets.includes(obj)?`Includo ${name}`:`Tolgo ${name}`);
-            };
-            list.appendChild(b);
-        });
-    }catch(e){}
-}
-function confirmSelection(){ toggleSelectionMode(); }
 
 function openSettings(){ 
+    lastFocus = document.activeElement; 
     document.getElementById('key-screen').classList.remove('hidden'); 
-    document.getElementById('key-input').value = GEMINI_KEY;
+    const inp = document.getElementById('key-input');
+    inp.value = GEMINI_KEY;
+    setTimeout(()=>inp.focus(),50);
 }
-function closeSettings(){ document.getElementById('key-screen').classList.add('hidden'); }
+function closeSettings(){ 
+    document.getElementById('key-screen').classList.add('hidden'); 
+    if(lastFocus) setTimeout(()=>lastFocus.focus(),50);
+}
 function saveKey(){ GEMINI_KEY=document.getElementById('key-input').value.trim(); localStorage.setItem('gemini_key', GEMINI_KEY); closeSettings(); }
-function openTextEditor(){ document.getElementById('text-editor').style.display='block'; document.getElementById('caption-input').focus(); }
-function closeTextEditor(){ document.getElementById('text-editor').style.display='none'; }
-function applyTextToImage(){
-    const t = document.getElementById('caption-input').value; if(!t)return;
-    const img = new Image(); img.onload=()=>{
-        const c=document.createElement('canvas');c.width=img.width;c.height=img.height;
-        const x=c.getContext('2d');x.drawImage(img,0,0);
-        const fs=c.width*0.06; x.font=`bold ${fs}px Arial`; x.textAlign='center'; x.fillStyle='#fff';
-        x.shadowColor='black'; x.shadowBlur=10; x.fillText(t,c.width/2,c.height-fs*2);
-        finalPhotoBase64=c.toDataURL('image/jpeg',0.9);
-        announce("Testo salvato."); closeTextEditor();
-    }; img.src=currentPhotoBase64;
-}
-function downloadImage(){ const a=document.createElement('a'); a.href=finalPhotoBase64||currentPhotoBase64; a.download='foto.jpg'; a.click(); }
-async function shareImageNative(){ try{const b=await(await fetch(finalPhotoBase64||currentPhotoBase64)).blob(); await navigator.share({files:[new File([b],'f.jpg',{type:'image/jpeg'})]});}catch(e){} }
+function clearKey(){ GEMINI_KEY=""; localStorage.removeItem('gemini_key'); document.getElementById('key-input').value=""; announce("Key cancellata."); }
+function downloadImage(){ const a=document.createElement('a'); a.href=currentPhotoBase64; a.download='foto.jpg'; a.click(); }
+async function shareImageNative(){ try{const b=await(await fetch(currentPhotoBase64)).blob(); await navigator.share({files:[new File([b],'f.jpg',{type:'image/jpeg'})]});}catch(e){} }
 
-function announce(m){ const e=document.getElementById('sr-announcer');e.textContent='';setTimeout(()=>e.textContent=m,100); }
+function announce(m){ 
+    // BONUS: Anti-Spam (non ripetere stessa cosa subito)
+    if(m === lastAnnouncedMsg && performance.now() - lastGuideTime < 2000) return; 
+    lastAnnouncedMsg = m;
+    
+    const e=document.getElementById('sr-announcer');
+    e.textContent='';
+    setTimeout(()=>e.textContent=m,50); 
+}
+
 let voiceActive=false; let recog;
 function toggleVoiceControl(){
     if(!SpeechRecognitionClass)return; voiceActive=!voiceActive;
     if(voiceActive){
-        if(!recog){ recog=new SpeechRecognitionClass(); recog.lang='it-IT'; recog.continuous=true; recog.onresult=e=>{const t=e.results[e.results.length-1][0].transcript.toLowerCase(); if(t.includes('scatta'))startCountdown(5); if(t.includes('guida'))toggleSmartGuide();}; recog.onend=()=>{if(voiceActive)recog.start();}; }
-        recog.start(); announce("Vocale On.");
-    } else { recog.stop(); announce("Vocale Off."); }
+        if(!recog){ recog=new SpeechRecognitionClass(); recog.lang='it-IT'; recog.continuous=true; recog.onresult=e=>{const t=e.results[e.results.length-1][0].transcript.toLowerCase(); if(t.includes('scatta'))startCountdown(3); if(t.includes('guida'))toggleSmartGuide();}; }
+        recog.start(); announce("Vocale attivo.");
+    } else { recog.stop(); announce("Vocale spento."); }
 }
 function setupModalKeyboardHandlers(){
   const esc = (id,fn)=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Escape')fn()});
