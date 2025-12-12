@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - v23 Monitor</title>
+<title>Smart Photo Assistant - v27 Social Strict</title>
 <style>
 /* STILE BASE AD ALTO CONTRASTO */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -162,7 +162,7 @@ let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
 let lastAnnouncedMsg = ""; 
-let eyeWarningTime = 0; // Per non ripetere l'avviso occhi troppo spesso
+let eyeWarningTime = 0; 
 
 // STABILIZZAZIONE
 let stabilityStartTime = 0;
@@ -309,11 +309,10 @@ async function processLocalFrame(){
              if(bgMsg){ announce(bgMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           }
           
-          const posMsg = analyzeFacePosition(face);
+          const posMsg = analyzeFacePosition(face, now);
           if(posMsg){ announce(posMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           
-          // FIX ESPRESSIONE E MONITORAGGIO OCCHI
-          const exprMsg = analyzeExpressionAdaptive(face, now); // Passiamo 'now' per il monitoraggio
+          const exprMsg = analyzeExpressionAdaptive(face, now);
           if(exprMsg){ announce(exprMsg); lastGuideTime=now; stabilityStartTime=0; return; }
 
           checkStabilityAndSnap({x: face[1].x, y: face[1].y}, now, "Viso ok");
@@ -334,7 +333,7 @@ async function processLocalFrame(){
       
       if(target){
           const guideMsg = analyzeObjectPosition(target);
-          if(guideMsg){ announce(guideMsg); lastGuideTime=now; stabilityStartTime=0; }
+          if(guideMsg){ announce(guideMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           else {
               const box = target.boundingBox;
               const cx = (box.originX + box.width/2)/AI_W;
@@ -350,20 +349,16 @@ async function processLocalFrame(){
   if(currentPhotoMode !== 'objects' && now-lastGuideTime>3000){ announce("Non vedo volti."); lastGuideTime=now; }
 }
 
-// NUOVO: Funzione Ibrida (Blocca su problemi gravi, Avvisa su occhi)
 function analyzeExpressionAdaptive(face, now){
-    // 1. SAFETY: Larghezza viso minima
     const leftFace = face[234]; const rightFace = face[454];
     const faceWidth = Math.abs(rightFace.x - leftFace.x);
     if(faceWidth < 0.02) return null;
 
-    // 2. CHECK BOCCA (BLOCCANTE)
     const upperLip = face[13];
     const lowerLip = face[14];
     const lipDist = Math.abs(upperLip.y - lowerLip.y);
     if(lipDist / faceWidth > 0.13) return "Chiudi la bocca.";
 
-    // 3. CHECK PITCH/NASO (BLOCCANTE) - Anti Foto dal Basso
     const nose = face[1];
     const leftEye = face[33];
     const rightEye = face[263];
@@ -374,12 +369,10 @@ function analyzeExpressionAdaptive(face, now){
     const ratio = noseEyeDist / noseMouthDist;
     if(ratio < 0.60) return "Troppo dal basso. Alza il telefono.";
 
-    // 4. CHECK OCCHI (INFORMATIVO - NON BLOCCANTE)
-    // Punti occhi: Sx(159-145), Dx(386-374)
-    if(now - eyeWarningTime > 4000){ // Non ripetere ogni secondo
+    if(now - eyeWarningTime > 4000){ 
         const leftH = Math.abs(face[159].y - face[145].y) / faceWidth;
         const rightH = Math.abs(face[386].y - face[374].y) / faceWidth;
-        const EYE_OPEN_THRESH = 0.025; // Soglia empirica
+        const EYE_OPEN_THRESH = 0.025; 
         
         let eyeMsg = "";
         if(leftH < EYE_OPEN_THRESH && rightH < EYE_OPEN_THRESH) eyeMsg = "Attenzione, occhi chiusi.";
@@ -389,12 +382,9 @@ function analyzeExpressionAdaptive(face, now){
         if(eyeMsg !== ""){
             announce(eyeMsg);
             eyeWarningTime = now;
-            // IMPORTANTE: Qui NON ritorniamo stringa.
-            // Ritorniamo null così il codice prosegue allo scatto.
         }
     }
-    
-    return null; // Tutto OK per scattare
+    return null; 
 }
 
 function checkBackgroundPresence(canvas, now){
@@ -408,23 +398,44 @@ function checkBackgroundPresence(canvas, now){
     return null;
 }
 
-function analyzeFacePosition(face){
+function analyzeFacePosition(face, now){
     let minX=1, maxX=0, minY=1, maxY=0, cx=0, cy=0;
     face.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;cx+=p.x;cy+=p.y;});
     cx /= face.length; cy /= face.length;
     const width = maxX - minX;
 
-    if(minY < 0.05) return "Tagli la fronte. Abbassa.";
-    if(maxY > 0.95) return "Tagli il mento. Alza.";
+    // DEFINIAMO I MARGINI DI SICUREZZA
+    // Se è Social, usiamo margini ampi (15%)
+    // Se è Memory, usiamo margini fisici (5%)
+    const safeMargin = (currentPhotoMode === 'social') ? 0.15 : 0.05;
+
+    // 1. CONTROLLO BORDI BLOCCANTE (Safety First)
+    if(minY < safeMargin) return "Troppo in alto (taglio). Abbassa.";
+    if(maxY > (1 - safeMargin)) return "Troppo in basso (taglio). Alza.";
     
+    // Per i lati in Social, blocco se tocchi il 15% laterale
+    if(currentPhotoMode === 'social'){
+        if(minX < 0.15) return "Troppo a sinistra (taglio social). Sposta a destra.";
+        if(maxX > 0.85) return "Troppo a destra (taglio social). Sposta a sinistra.";
+    }
+
+    // 2. CONTROLLO DISTANZA (Bloccante)
     let optimalW = (currentPhotoMode==='social') ? 0.25 : 0.45; 
     if(width > optimalW + 0.15) return "Troppo vicino. Allontana.";
     if(width < optimalW - 0.10) return "Troppo lontano. Avvicina.";
 
-    if(cx < 0.35) return "Sposta a Sinistra.";
-    if(cx > 0.65) return "Sposta a Destra.";
-    if(cy < 0.35) return "Alza.";
-    if(cy > 0.65) return "Abbassa.";
+    // 3. CENTRATURA (Guida, ma permissiva in Social)
+    // Se siamo in Social e siamo arrivati qui, significa che siamo DENTRO i margini di sicurezza.
+    // Quindi permettiamo lo scatto anche se non è perfettamente 0.5
+    if(currentPhotoMode === 'memory'){
+        // Memory vuole la perfezione
+        if(cx < 0.35) return "Sposta a Sinistra.";
+        if(cx > 0.65) return "Sposta a Destra.";
+        if(cy < 0.35) return "Alza.";
+        if(cy > 0.65) return "Abbassa.";
+    } 
+    // In Social non ritorniamo nulla qui -> quindi permette lo scatto (Viso OK)
+
     return null;
 }
 
