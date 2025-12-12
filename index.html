@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - v27 Social Strict</title>
+<title>Smart Photo Assistant - v36 Stability</title>
 <style>
 /* STILE BASE AD ALTO CONTRASTO */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -141,7 +141,7 @@ let aiCtx = aiCanvas.getContext('2d');
 
 let stream = null;
 let currentPhotoBase64 = null;
-let currentFacingMode = 'environment';
+let currentFacingMode = 'user'; // PARTIAMO DIRETTI CON SELFIE PER SICUREZZA
 let currentPhotoMode = 'memory'; 
 let zoomLevel = 1; 
 let lastFocus = null; 
@@ -162,7 +162,9 @@ let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
 let lastAnnouncedMsg = ""; 
+let lastAnnounceTime = 0; 
 let eyeWarningTime = 0; 
+let edgeWarningTime = 0; 
 
 // STABILIZZAZIONE
 let stabilityStartTime = 0;
@@ -179,19 +181,30 @@ const OBJECT_TRANSLATIONS = {
     'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bowl': 'Ciotola', 'banana':'Banana', 'apple':'Mela'
 };
 
+// HELPER: MIRROR X COORDINATE IF USER CAMERA
+const mirrorX = (x) => (currentFacingMode === 'user' ? 1 - x : x);
+
+// HELPER: RESET STABILITY (Chiamata quando si cambia contesto)
+function resetStability(){
+    stabilityStartTime = 0;
+    lastCentroid = {x: 0, y: 0};
+    // Non annunciamo qui per non disturbare, resettiamo solo i valori
+}
+
 async function init(){
   document.body.addEventListener('click', initAudioContext, {once: true});
   await setupCamera();
   await loadLocalModels();
   setupModalKeyboardHandlers();
   updateButtonLabels();
-  announce("App pronta.");
+  announce("App pronta. Tieni il telefono dritto davanti a te.");
 }
 
 function initAudioContext(){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume(); }catch(e){} }
 
 function setPhotoMode(mode){
     currentPhotoMode = mode;
+    resetStability(); // RESET STABILITA'
     document.getElementById('btn-mode-memory').classList.toggle('active', mode==='memory');
     document.getElementById('btn-mode-social').classList.toggle('active', mode==='social');
     document.getElementById('btn-mode-objects').classList.toggle('active', mode==='objects');
@@ -209,6 +222,7 @@ function cycleZoom(){
     if(zoomLevel === 1) zoomLevel = 2;
     else if(zoomLevel === 2) zoomLevel = 3;
     else zoomLevel = 1;
+    resetStability(); // RESET STABILITA'
     video.style.transform = `scale(${zoomLevel})`;
     document.getElementById('btn-zoom').innerText = "ZOOM " + zoomLevel + "x";
     announce("Zoom " + zoomLevel + " per");
@@ -230,6 +244,7 @@ async function setupCamera(){
     video.srcObject = stream;
     await new Promise(r=>video.onloadedmetadata=r);
     video.play();
+    resetStability(); // RESET STABILITA'
   }catch(e){ announce("Errore camera."); }
 }
 
@@ -264,9 +279,9 @@ function toggleSmartGuide(){
   const btn = document.getElementById('btn-guide');
   if(isGuiding){
     if(isSelectionMode) toggleSelectionMode(); 
+    resetStability(); // RESET STABILITA'
     btn.textContent = "STOP GUIDA"; btn.style.background = "#006400";
     announce("Guida attiva. Braccio teso.");
-    stabilityStartTime = 0; 
     if(guideInterval) clearInterval(guideInterval);
     guideInterval = setInterval(processLocalFrame, 350);
   }else{
@@ -308,14 +323,17 @@ async function processLocalFrame(){
              const bgMsg = checkBackgroundPresence(aiCanvas, now);
              if(bgMsg){ announce(bgMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           }
-          
+
+          if(stabilityStartTime === 0 && now - lastGuideTime > 2000) announce("Vedo viso...");
+
           const posMsg = analyzeFacePosition(face, now);
           if(posMsg){ announce(posMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           
           const exprMsg = analyzeExpressionAdaptive(face, now);
           if(exprMsg){ announce(exprMsg); lastGuideTime=now; stabilityStartTime=0; return; }
 
-          checkStabilityAndSnap({x: face[1].x, y: face[1].y}, now, "Viso ok");
+          // STABILITÀ CON MIRROR E RESET
+          checkStabilityAndSnap({x: mirrorX(face[1].x), y: face[1].y}, now, "Viso dentro");
           return;
       }
   }
@@ -336,7 +354,8 @@ async function processLocalFrame(){
           if(guideMsg){ announce(guideMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           else {
               const box = target.boundingBox;
-              const cx = (box.originX + box.width/2)/AI_W;
+              // FIX MIRROR OGGETTI
+              const cx = mirrorX((box.originX + box.width/2)/AI_W);
               const cy = (box.originY + box.height/2)/AI_H;
               checkStabilityAndSnap({x:cx, y:cy}, now, target.categories[0].categoryName + " ok");
           }
@@ -402,48 +421,64 @@ function analyzeFacePosition(face, now){
     let minX=1, maxX=0, minY=1, maxY=0, cx=0, cy=0;
     face.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;cx+=p.x;cy+=p.y;});
     cx /= face.length; cy /= face.length;
+    
+    // --- FIX MIRROR UNIFICATO ---
+    const m1 = mirrorX(minX);
+    const m2 = mirrorX(maxX);
+    minX = Math.min(m1, m2);
+    maxX = Math.max(m1, m2);
+    cx = mirrorX(cx);
+    
     const width = maxX - minX;
 
-    // DEFINIAMO I MARGINI DI SICUREZZA
-    // Se è Social, usiamo margini ampi (15%)
-    // Se è Memory, usiamo margini fisici (5%)
-    const safeMargin = (currentPhotoMode === 'social') ? 0.15 : 0.05;
-
-    // 1. CONTROLLO BORDI BLOCCANTE (Safety First)
-    if(minY < safeMargin) return "Troppo in alto (taglio). Abbassa.";
-    if(maxY > (1 - safeMargin)) return "Troppo in basso (taglio). Alza.";
+    // 1. ZONA ROSSA (BLOCCANTE) - Taglio fisico (5%)
+    if(minY < 0.05) return "Stop! Tagli la fronte. Abbassa.";
+    if(maxY > 0.95) return "Stop! Tagli il mento. Alza.";
     
-    // Per i lati in Social, blocco se tocchi il 15% laterale
-    if(currentPhotoMode === 'social'){
-        if(minX < 0.15) return "Troppo a sinistra (taglio social). Sposta a destra.";
-        if(maxX > 0.85) return "Troppo a destra (taglio social). Sposta a sinistra.";
+    // 2. ZONA GIALLA (INFORMATIVA - Social)
+    if(currentPhotoMode === 'social' && now - edgeWarningTime > 5000){
+        if(minY < 0.15 || maxY > 0.85){
+            announce("Sei al limite bordi, ma scatto.");
+            edgeWarningTime = now;
+        }
+        else if(minX < 0.15 || maxX > 0.85){
+             announce("Sei ai lati, ma scatto.");
+             edgeWarningTime = now;
+        }
     }
 
-    // 2. CONTROLLO DISTANZA (Bloccante)
-    let optimalW = (currentPhotoMode==='social') ? 0.25 : 0.45; 
-    if(width > optimalW + 0.15) return "Troppo vicino. Allontana.";
-    if(width < optimalW - 0.10) return "Troppo lontano. Avvicina.";
+    // 3. DISTANZA (Airy per Social)
+    let minW = (currentPhotoMode==='social') ? 0.20 : 0.35;
+    let maxW = (currentPhotoMode==='social') ? 0.40 : 0.60;
+    
+    if(width > maxW) return "Troppo vicino. Allontana.";
+    if(width < minW) return "Troppo lontano. Avvicina.";
 
-    // 3. CENTRATURA (Guida, ma permissiva in Social)
-    // Se siamo in Social e siamo arrivati qui, significa che siamo DENTRO i margini di sicurezza.
-    // Quindi permettiamo lo scatto anche se non è perfettamente 0.5
+    // 4. CENTRATURA
     if(currentPhotoMode === 'memory'){
-        // Memory vuole la perfezione
         if(cx < 0.35) return "Sposta a Sinistra.";
         if(cx > 0.65) return "Sposta a Destra.";
         if(cy < 0.35) return "Alza.";
         if(cy > 0.65) return "Abbassa.";
-    } 
-    // In Social non ritorniamo nulla qui -> quindi permette lo scatto (Viso OK)
-
+    } else {
+        // SOCIAL: Guida morbida (inclusa Y)
+        if(cx < 0.30) return "Sposta a Sinistra.";
+        if(cx > 0.70) return "Sposta a Destra.";
+        if(cy < 0.28) return "Abbassa un po'."; 
+        if(cy > 0.72) return "Alza un po'."; 
+    }
+    
     return null;
 }
 
 function analyzeObjectPosition(d){
     const box = d.boundingBox;
-    const cx = (box.originX + box.width/2)/AI_W;
+    let cx = (box.originX + box.width/2)/AI_W;
+    cx = mirrorX(cx); // FIX MIRROR UNICO
+
     const cy = (box.originY + box.height/2)/AI_H;
     const w = box.width/AI_W;
+    
     if(w < 0.15) return "Troppo lontano. Avvicina.";
     if(w > 0.85) return "Troppo vicino. Allontana.";
     if(cx < 0.35) return "Sposta a Sinistra.";
@@ -478,6 +513,8 @@ function toggleSelectionMode(){
     const panel = document.getElementById('selection-panel');
     const modes = document.getElementById('mode-switch');
     const ctrls = document.getElementById('standard-controls');
+
+    resetStability(); // RESET
 
     if(isSelectionMode){
         lastFocus = document.activeElement; 
@@ -582,6 +619,8 @@ function capture(){
   const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
   
   const ctx = c.getContext('2d');
+  
+  // TORNATI ALLA LOGICA SENZA CORNICE (FULL SCREEN)
   const cropW = video.videoWidth / zoomLevel;
   const cropH = video.videoHeight / zoomLevel;
   const cropX = (video.videoWidth - cropW) / 2;
@@ -653,9 +692,12 @@ function clearKey(){ GEMINI_KEY=""; localStorage.removeItem('gemini_key'); docum
 function downloadImage(){ const a=document.createElement('a'); a.href=currentPhotoBase64; a.download='foto.jpg'; a.click(); }
 async function shareImageNative(){ try{const b=await(await fetch(currentPhotoBase64)).blob(); await navigator.share({files:[new File([b],'f.jpg',{type:'image/jpeg'})]});}catch(e){} }
 
+// FIX 3: Timer separato per la voce
 function announce(m){ 
-    if(m === lastAnnouncedMsg && performance.now() - lastGuideTime < 2000) return; 
+    const now = performance.now();
+    if(m === lastAnnouncedMsg && now - lastAnnounceTime < 2500) return; 
     lastAnnouncedMsg = m;
+    lastAnnounceTime = now;
     const e=document.getElementById('sr-announcer');
     e.textContent='';
     setTimeout(()=>e.textContent=m,50); 
