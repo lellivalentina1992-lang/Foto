@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - v36 Stability</title>
+<title>Smart Photo Assistant - v41 Final RC</title>
 <style>
 /* STILE BASE AD ALTO CONTRASTO */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -94,7 +94,7 @@ button:active{background:#555;transform:scale(.98)}
         
         <button onclick="flipCamera()" id="btn-flip">RUOTA CAM</button>
         <button onclick="toggleVoiceControl()" id="btn-voice">VOCALE</button>
-        <button onclick="openSettings()" style="font-size:0.9rem;background:#333;grid-column:1/-1">IMPOSTA API KEY</button>
+        <button onclick="openSettings()" style="font-size:0.9rem;background:#333;grid-column:1/-1">IMPOSTAZIONI</button>
     </div>
   </div>
 </div>
@@ -121,9 +121,14 @@ button:active{background:#555;transform:scale(.98)}
 </div>
 
 <div id="key-screen" class="hidden">
-  <h2>API Key</h2>
-  <input type="text" id="key-input" style="width:80%;padding:15px;color:black">
-  <button onclick="saveKey()" style="padding:20px;width:80%;margin-top:20px">SALVA</button>
+  <h2>Impostazioni</h2>
+  <input type="text" id="key-input" placeholder="Gemini API Key" style="width:80%;padding:15px;color:black;margin-bottom:10px">
+  
+  <button id="btn-tts-toggle" onclick="toggleTTS()" style="width:80%;padding:20px;background:#555;margin-bottom:10px">
+      VOCE SINTETICA: OFF
+  </button>
+
+  <button onclick="saveKey()" style="padding:20px;width:80%;background:#006400">SALVA KEY</button>
   <button onclick="clearKey()" style="margin-top:10px;padding:20px;width:80%;background:#8B0000">CANCELLA KEY</button>
   <button onclick="closeSettings()" style="margin-top:10px;padding:20px;width:80%;background:#333">CHIUDI</button>
 </div>
@@ -141,10 +146,15 @@ let aiCtx = aiCanvas.getContext('2d');
 
 let stream = null;
 let currentPhotoBase64 = null;
-let currentFacingMode = 'user'; // PARTIAMO DIRETTI CON SELFIE PER SICUREZZA
+let currentFacingMode = 'user'; 
 let currentPhotoMode = 'memory'; 
 let zoomLevel = 1; 
 let lastFocus = null; 
+
+// SETTINGS & TTS
+let useTTS = (localStorage.getItem('gemini_tts') === '1'); 
+let ttsTimer = null; // Per debounce
+let pendingTTS = "";
 
 // AI
 let objectDetector = null;
@@ -181,18 +191,31 @@ const OBJECT_TRANSLATIONS = {
     'handbag': 'Borsa', 'tie': 'Cravatta', 'suitcase': 'Valigia', 'bowl': 'Ciotola', 'banana':'Banana', 'apple':'Mela'
 };
 
-// HELPER: MIRROR X COORDINATE IF USER CAMERA
 const mirrorX = (x) => (currentFacingMode === 'user' ? 1 - x : x);
 
-// HELPER: RESET STABILITY (Chiamata quando si cambia contesto)
 function resetStability(){
     stabilityStartTime = 0;
     lastCentroid = {x: 0, y: 0};
-    // Non annunciamo qui per non disturbare, resettiamo solo i valori
+}
+
+// NUOVO: Aggiorna Live Region in base al TTS
+function updateVoiceMode(){
+    const el = document.getElementById('sr-announcer');
+    // Se TTS è attivo, ARIA è 'off' (TalkBack muto). Se TTS è spento, ARIA è 'assertive' (TalkBack parla).
+    el.setAttribute('aria-live', useTTS ? 'off' : 'assertive');
+    
+    // Aggiorna UI Pulsante
+    const btn = document.getElementById('btn-tts-toggle');
+    if(btn){
+        btn.innerText = "VOCE SINTETICA: " + (useTTS ? "ON" : "OFF");
+        btn.style.background = useTTS ? "#006400" : "#555";
+    }
 }
 
 async function init(){
   document.body.addEventListener('click', initAudioContext, {once: true});
+  updateVoiceMode(); // Applica subito la logica di esclusione
+  
   await setupCamera();
   await loadLocalModels();
   setupModalKeyboardHandlers();
@@ -204,7 +227,7 @@ function initAudioContext(){ try{ audioCtx = new (window.AudioContext||window.we
 
 function setPhotoMode(mode){
     currentPhotoMode = mode;
-    resetStability(); // RESET STABILITA'
+    resetStability(); 
     document.getElementById('btn-mode-memory').classList.toggle('active', mode==='memory');
     document.getElementById('btn-mode-social').classList.toggle('active', mode==='social');
     document.getElementById('btn-mode-objects').classList.toggle('active', mode==='objects');
@@ -222,7 +245,7 @@ function cycleZoom(){
     if(zoomLevel === 1) zoomLevel = 2;
     else if(zoomLevel === 2) zoomLevel = 3;
     else zoomLevel = 1;
-    resetStability(); // RESET STABILITA'
+    resetStability();
     video.style.transform = `scale(${zoomLevel})`;
     document.getElementById('btn-zoom').innerText = "ZOOM " + zoomLevel + "x";
     announce("Zoom " + zoomLevel + " per");
@@ -240,11 +263,35 @@ function updateButtonLabels(){
 async function setupCamera(){
   try{
     if(stream) stream.getTracks().forEach(t=>t.stop());
-    stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:currentFacingMode, width:{ideal:1280}, height:{ideal:720}} });
+
+    const tryGet = (w,h) => navigator.mediaDevices.getUserMedia({
+      video:{ facingMode: currentFacingMode, width:{ideal:w}, height:{ideal:h}, frameRate:{ideal:30, max:30} }
+    });
+
+    try{
+      // 1080p: Compromesso ideale
+      stream = await tryGet(1920, 1080);
+    }catch(e){
+      try{
+         stream = await tryGet(1280, 720);
+      }catch(e2){
+         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
+      }
+    }
+
     video.srcObject = stream;
     await new Promise(r=>video.onloadedmetadata=r);
-    video.play();
-    resetStability(); // RESET STABILITA'
+    await video.play();
+    resetStability();
+
+    const track = stream.getVideoTracks()[0];
+    let caps = {};
+    try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch(e) { caps = {}; }
+
+    if(caps.focusMode && caps.focusMode.includes('continuous')){
+      try{ await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){}
+    }
+
   }catch(e){ announce("Errore camera."); }
 }
 
@@ -279,7 +326,7 @@ function toggleSmartGuide(){
   const btn = document.getElementById('btn-guide');
   if(isGuiding){
     if(isSelectionMode) toggleSelectionMode(); 
-    resetStability(); // RESET STABILITA'
+    resetStability(); 
     btn.textContent = "STOP GUIDA"; btn.style.background = "#006400";
     announce("Guida attiva. Braccio teso.");
     if(guideInterval) clearInterval(guideInterval);
@@ -332,7 +379,6 @@ async function processLocalFrame(){
           const exprMsg = analyzeExpressionAdaptive(face, now);
           if(exprMsg){ announce(exprMsg); lastGuideTime=now; stabilityStartTime=0; return; }
 
-          // STABILITÀ CON MIRROR E RESET
           checkStabilityAndSnap({x: mirrorX(face[1].x), y: face[1].y}, now, "Viso dentro");
           return;
       }
@@ -354,7 +400,6 @@ async function processLocalFrame(){
           if(guideMsg){ announce(guideMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           else {
               const box = target.boundingBox;
-              // FIX MIRROR OGGETTI
               const cx = mirrorX((box.originX + box.width/2)/AI_W);
               const cy = (box.originY + box.height/2)/AI_H;
               checkStabilityAndSnap({x:cx, y:cy}, now, target.categories[0].categoryName + " ok");
@@ -365,7 +410,10 @@ async function processLocalFrame(){
       return;
   }
   
-  if(currentPhotoMode !== 'objects' && now-lastGuideTime>3000){ announce("Non vedo volti."); lastGuideTime=now; }
+  if(currentPhotoMode !== 'objects' && now-lastGuideTime>4000){ 
+      announce("Non vedo volti. Allontana il telefono."); 
+      lastGuideTime=now; 
+  }
 }
 
 function analyzeExpressionAdaptive(face, now){
@@ -422,7 +470,6 @@ function analyzeFacePosition(face, now){
     face.forEach(p=>{if(p.x<minX)minX=p.x;if(p.x>maxX)maxX=p.x;if(p.y<minY)minY=p.y;if(p.y>maxY)maxY=p.y;cx+=p.x;cy+=p.y;});
     cx /= face.length; cy /= face.length;
     
-    // --- FIX MIRROR UNIFICATO ---
     const m1 = mirrorX(minX);
     const m2 = mirrorX(maxX);
     minX = Math.min(m1, m2);
@@ -431,11 +478,11 @@ function analyzeFacePosition(face, now){
     
     const width = maxX - minX;
 
-    // 1. ZONA ROSSA (BLOCCANTE) - Taglio fisico (5%)
+    if(width > 0.60) return "Molto vicina! Allontana il telefono.";
+
     if(minY < 0.05) return "Stop! Tagli la fronte. Abbassa.";
     if(maxY > 0.95) return "Stop! Tagli il mento. Alza.";
     
-    // 2. ZONA GIALLA (INFORMATIVA - Social)
     if(currentPhotoMode === 'social' && now - edgeWarningTime > 5000){
         if(minY < 0.15 || maxY > 0.85){
             announce("Sei al limite bordi, ma scatto.");
@@ -447,21 +494,18 @@ function analyzeFacePosition(face, now){
         }
     }
 
-    // 3. DISTANZA (Airy per Social)
     let minW = (currentPhotoMode==='social') ? 0.20 : 0.35;
     let maxW = (currentPhotoMode==='social') ? 0.40 : 0.60;
     
-    if(width > maxW) return "Troppo vicino. Allontana.";
     if(width < minW) return "Troppo lontano. Avvicina.";
+    if(width > maxW) return "Troppo vicino per questa modalità. Allontana.";
 
-    // 4. CENTRATURA
     if(currentPhotoMode === 'memory'){
         if(cx < 0.35) return "Sposta a Sinistra.";
         if(cx > 0.65) return "Sposta a Destra.";
         if(cy < 0.35) return "Alza.";
         if(cy > 0.65) return "Abbassa.";
     } else {
-        // SOCIAL: Guida morbida (inclusa Y)
         if(cx < 0.30) return "Sposta a Sinistra.";
         if(cx > 0.70) return "Sposta a Destra.";
         if(cy < 0.28) return "Abbassa un po'."; 
@@ -474,7 +518,7 @@ function analyzeFacePosition(face, now){
 function analyzeObjectPosition(d){
     const box = d.boundingBox;
     let cx = (box.originX + box.width/2)/AI_W;
-    cx = mirrorX(cx); // FIX MIRROR UNICO
+    cx = mirrorX(cx); 
 
     const cy = (box.originY + box.height/2)/AI_H;
     const w = box.width/AI_W;
@@ -507,14 +551,14 @@ function checkStabilityAndSnap(currentCenter, now, msgSuccess){
     }
 }
 
-// --- GESTIONE INTERFACCIA E SELEZIONE ---
+// GESTIONE INTERFACCIA
 function toggleSelectionMode(){
     isSelectionMode = !isSelectionMode;
     const panel = document.getElementById('selection-panel');
     const modes = document.getElementById('mode-switch');
     const ctrls = document.getElementById('standard-controls');
 
-    resetStability(); // RESET
+    resetStability();
 
     if(isSelectionMode){
         lastFocus = document.activeElement; 
@@ -606,7 +650,12 @@ function startCountdown(sec){
     countdownTimerIds.push(setTimeout(()=>{
        let c=sec-i; 
        if(c>0){ ov.innerText=c; if(c<=3&&audioCtx){const o=audioCtx.createOscillator();o.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.05);} }
-       else{ ov.style.display='none'; capture(); }
+       else{ 
+           // FIX COUNTDOWN STATE
+           ov.style.display='none'; 
+           isCountdownRunning = false; 
+           capture(); 
+       }
     }, i*1000));
   }
 }
@@ -620,7 +669,6 @@ function capture(){
   
   const ctx = c.getContext('2d');
   
-  // TORNATI ALLA LOGICA SENZA CORNICE (FULL SCREEN)
   const cropW = video.videoWidth / zoomLevel;
   const cropH = video.videoHeight / zoomLevel;
   const cropX = (video.videoWidth - cropW) / 2;
@@ -638,7 +686,6 @@ function capture(){
   setTimeout(()=>document.querySelector('#context-menu button').focus(),100);
 }
 
-// --- ANALISI GEMINI ---
 async function analyzeContext(context){
   if(!GEMINI_KEY){ announce("Serve API Key."); return; }
   document.getElementById('context-menu').classList.add('hidden');
@@ -681,6 +728,7 @@ function openSettings(){
     document.getElementById('key-screen').classList.remove('hidden'); 
     const inp = document.getElementById('key-input');
     inp.value = GEMINI_KEY;
+    updateVoiceMode();
     setTimeout(()=>inp.focus(),50);
 }
 function closeSettings(){ 
@@ -692,15 +740,39 @@ function clearKey(){ GEMINI_KEY=""; localStorage.removeItem('gemini_key'); docum
 function downloadImage(){ const a=document.createElement('a'); a.href=currentPhotoBase64; a.download='foto.jpg'; a.click(); }
 async function shareImageNative(){ try{const b=await(await fetch(currentPhotoBase64)).blob(); await navigator.share({files:[new File([b],'f.jpg',{type:'image/jpeg'})]});}catch(e){} }
 
-// FIX 3: Timer separato per la voce
+function toggleTTS(){
+    useTTS = !useTTS;
+    localStorage.setItem('gemini_tts', useTTS ? '1' : '0'); 
+    updateVoiceMode();
+    announce("Voce sintetica " + (useTTS ? "attivata" : "disattivata"));
+}
+
+// NUOVO: DEBOUNCE SPEAK
+function speakDebounced(text){
+  if(!('speechSynthesis' in window)) return;
+  pendingTTS = text;
+  clearTimeout(ttsTimer);
+  ttsTimer = setTimeout(() => {
+    window.speechSynthesis.cancel(); // Stop immediato al precedente
+    const u = new SpeechSynthesisUtterance(pendingTTS);
+    u.lang = 'it-IT';
+    window.speechSynthesis.speak(u);
+  }, 450); // 450ms di pausa per accumulare messaggi rapidi
+}
+
 function announce(m){ 
     const now = performance.now();
     if(m === lastAnnouncedMsg && now - lastAnnounceTime < 2500) return; 
     lastAnnouncedMsg = m;
     lastAnnounceTime = now;
+    
+    // 1. ARIA Live (Solo se TTS è OFF, altrimenti è 'off')
     const e=document.getElementById('sr-announcer');
     e.textContent='';
     setTimeout(()=>e.textContent=m,50); 
+    
+    // 2. TTS Esplicito (con Debounce)
+    if(useTTS) speakDebounced(m);
 }
 
 let voiceActive=false; let recog;
