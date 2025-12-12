@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>Smart Photo Assistant - v22 Zoom Edition</title>
+<title>Smart Photo Assistant - v23 Monitor</title>
 <style>
 /* STILE BASE AD ALTO CONTRASTO */
 body{font-family:'Segoe UI',Roboto,Arial,sans-serif;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -143,7 +143,7 @@ let stream = null;
 let currentPhotoBase64 = null;
 let currentFacingMode = 'environment';
 let currentPhotoMode = 'memory'; 
-let zoomLevel = 1; // NUOVO: Stato Zoom
+let zoomLevel = 1; 
 let lastFocus = null; 
 
 // AI
@@ -162,6 +162,7 @@ let isCountdownRunning = false;
 let countdownTimerIds = [];
 let selectedTargets = []; 
 let lastAnnouncedMsg = ""; 
+let eyeWarningTime = 0; // Per non ripetere l'avviso occhi troppo spesso
 
 // STABILIZZAZIONE
 let stabilityStartTime = 0;
@@ -204,13 +205,10 @@ function setPhotoMode(mode){
     }
 }
 
-// NUOVO: Funzione Zoom
 function cycleZoom(){
     if(zoomLevel === 1) zoomLevel = 2;
     else if(zoomLevel === 2) zoomLevel = 3;
     else zoomLevel = 1;
-    
-    // Effetto visivo CSS
     video.style.transform = `scale(${zoomLevel})`;
     document.getElementById('btn-zoom').innerText = "ZOOM " + zoomLevel + "x";
     announce("Zoom " + zoomLevel + " per");
@@ -280,30 +278,25 @@ function toggleSmartGuide(){
   }
 }
 
-// NUOVO: Funzione Helper per disegnare con Zoom
 function drawZoomedFrame(targetCanvas, targetCtx){
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if(vw === 0 || vh === 0) return false;
-
-    // Calcolo crop per zoom digitale
     const cropW = vw / zoomLevel;
     const cropH = vh / zoomLevel;
     const cropX = (vw - cropW) / 2;
     const cropY = (vh - cropH) / 2;
-
     targetCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, targetCanvas.width, targetCanvas.height);
     return true;
 }
 
 async function processLocalFrame(){
   if(video.readyState !== 4 || isCountdownRunning) return;
-  if(video.videoWidth === 0) return; // FIX 1
+  if(video.videoWidth === 0) return;
   
   const now = performance.now(); 
   if(now - lastGuideTime < 1500 && stabilityStartTime === 0) return; 
 
-  // USO NUOVO HELPER ZOOM
   drawZoomedFrame(aiCanvas, aiCtx);
   
   if(currentPhotoMode !== 'objects' && faceLandmarker){
@@ -319,8 +312,8 @@ async function processLocalFrame(){
           const posMsg = analyzeFacePosition(face);
           if(posMsg){ announce(posMsg); lastGuideTime=now; stabilityStartTime=0; return; }
           
-          // FIX 2: Math Safety nel controllo espressione
-          const exprMsg = analyzeExpressionAdaptive(face);
+          // FIX ESPRESSIONE E MONITORAGGIO OCCHI
+          const exprMsg = analyzeExpressionAdaptive(face, now); // Passiamo 'now' per il monitoraggio
           if(exprMsg){ announce(exprMsg); lastGuideTime=now; stabilityStartTime=0; return; }
 
           checkStabilityAndSnap({x: face[1].x, y: face[1].y}, now, "Viso ok");
@@ -357,43 +350,57 @@ async function processLocalFrame(){
   if(currentPhotoMode !== 'objects' && now-lastGuideTime>3000){ announce("Non vedo volti."); lastGuideTime=now; }
 }
 
-function analyzeExpressionAdaptive(face){
+// NUOVO: Funzione Ibrida (Blocca su problemi gravi, Avvisa su occhi)
+function analyzeExpressionAdaptive(face, now){
+    // 1. SAFETY: Larghezza viso minima
+    const leftFace = face[234]; const rightFace = face[454];
+    const faceWidth = Math.abs(rightFace.x - leftFace.x);
+    if(faceWidth < 0.02) return null;
+
+    // 2. CHECK BOCCA (BLOCCANTE)
     const upperLip = face[13];
     const lowerLip = face[14];
     const lipDist = Math.abs(upperLip.y - lowerLip.y);
-    
-    const leftFace = face[234]; const rightFace = face[454];
-    const faceWidth = Math.abs(rightFace.x - leftFace.x);
-    
-    // FIX 2: Safety Check
-    if(faceWidth < 0.02) return null; // Tracking perso o troppo piccolo
-
-    // FIX 2: Soglia alzata a 0.13
     if(lipDist / faceWidth > 0.13) return "Chiudi la bocca.";
 
+    // 3. CHECK PITCH/NASO (BLOCCANTE) - Anti Foto dal Basso
     const nose = face[1];
     const leftEye = face[33];
     const rightEye = face[263];
     const midEyeY = (leftEye.y + rightEye.y) / 2;
-    
     const noseEyeDist = Math.abs(nose.y - midEyeY);
     const noseMouthDist = Math.abs(nose.y - upperLip.y);
-    
-    // FIX 2: Safety Check
     if(noseMouthDist < 0.01) return null;
-
     const ratio = noseEyeDist / noseMouthDist;
     if(ratio < 0.60) return "Troppo dal basso. Alza il telefono.";
+
+    // 4. CHECK OCCHI (INFORMATIVO - NON BLOCCANTE)
+    // Punti occhi: Sx(159-145), Dx(386-374)
+    if(now - eyeWarningTime > 4000){ // Non ripetere ogni secondo
+        const leftH = Math.abs(face[159].y - face[145].y) / faceWidth;
+        const rightH = Math.abs(face[386].y - face[374].y) / faceWidth;
+        const EYE_OPEN_THRESH = 0.025; // Soglia empirica
+        
+        let eyeMsg = "";
+        if(leftH < EYE_OPEN_THRESH && rightH < EYE_OPEN_THRESH) eyeMsg = "Attenzione, occhi chiusi.";
+        else if(leftH < EYE_OPEN_THRESH) eyeMsg = "Occhio sinistro chiuso.";
+        else if(rightH < EYE_OPEN_THRESH) eyeMsg = "Occhio destro chiuso.";
+        
+        if(eyeMsg !== ""){
+            announce(eyeMsg);
+            eyeWarningTime = now;
+            // IMPORTANTE: Qui NON ritorniamo stringa.
+            // Ritorniamo null così il codice prosegue allo scatto.
+        }
+    }
     
-    return null;
+    return null; // Tutto OK per scattare
 }
 
 function checkBackgroundPresence(canvas, now){
     if(!objectDetector) return null;
     const res = objectDetector.detectForVideo(canvas, now);
     const found = res.detections.some(d => selectedTargets.includes(d.categories[0].categoryName));
-    
-    // FIX 3: Messaggio specifico
     if(!found){
         const missing = selectedTargets.map(t=>OBJECT_TRANSLATIONS[t]||t).join(", ");
         return "Viso ok, ma manca: " + missing + ".";
@@ -473,9 +480,8 @@ function toggleSelectionMode(){
         selectionInterval = setInterval(scanObjectsForList, 1000);
         announce("Tocca per includere.");
     } else {
-        // FIX 4: Se è in Object Mode ma non ha scelto nulla, non chiudere o avvisa
         if(currentPhotoMode === 'objects' && selectedTargets.length === 0){
-             isSelectionMode = true; // forza aperto
+             isSelectionMode = true; 
              announce("Devi scegliere almeno un oggetto per continuare.");
              return;
         }
@@ -507,7 +513,6 @@ function scanObjectsForList(){
     if(!objectDetector) return;
     if(video.videoWidth === 0) return; 
     try{
-        // Usa HELPER ZOOM anche qui per coerenza
         drawZoomedFrame(aiCanvas, aiCtx);
         const res = objectDetector.detectForVideo(aiCanvas, performance.now());
         const categories = Array.from(new Set(res.detections.map(d=>d.categories[0].categoryName))).sort();
@@ -561,15 +566,11 @@ function startCountdown(sec){
 function cancelCountdown(){ isCountdownRunning=false; document.getElementById('countdown-overlay').style.display='none'; countdownTimerIds.forEach(clearTimeout); countdownTimerIds=[]; }
 
 function capture(){
-  // FIX 1: Controllo video pronto
   if(video.videoWidth === 0 || video.videoHeight === 0){ announce("Camera non pronta."); return; }
-
   playShutterSound(); isCountdownRunning=false; countdownTimerIds=[];
   const c = document.createElement('canvas'); c.width=video.videoWidth; c.height=video.videoHeight;
   
-  // IMPORTANTE: Disegna con zoom anche la foto finale!
   const ctx = c.getContext('2d');
-  // Usiamo la logica drawZoomedFrame ma adattata al canvas finale full resolution
   const cropW = video.videoWidth / zoomLevel;
   const cropH = video.videoHeight / zoomLevel;
   const cropX = (video.videoWidth - cropW) / 2;
@@ -642,10 +643,8 @@ function downloadImage(){ const a=document.createElement('a'); a.href=currentPho
 async function shareImageNative(){ try{const b=await(await fetch(currentPhotoBase64)).blob(); await navigator.share({files:[new File([b],'f.jpg',{type:'image/jpeg'})]});}catch(e){} }
 
 function announce(m){ 
-    // BONUS: Anti-Spam (non ripetere stessa cosa subito)
     if(m === lastAnnouncedMsg && performance.now() - lastGuideTime < 2000) return; 
     lastAnnouncedMsg = m;
-    
     const e=document.getElementById('sr-announcer');
     e.textContent='';
     setTimeout(()=>e.textContent=m,50); 
