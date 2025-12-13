@@ -3,865 +3,114 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-<title>AI Photo Hub – Safe Zones 2024 + Auto-Placement (Centro Protetto)</title>
+<title>AI Photo Hub – Versione Schema Chiaro</title>
 <style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column}
-  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-  .hidden{display:none !important}
-  #main-container{flex-grow:1;display:flex;flex-direction:column;padding:15px;gap:15px;justify-content:center}
-  button{
-    border:3px solid #555;border-radius:18px;font-size:1.2rem;font-weight:800;text-transform:uppercase;
-    color:#fff;background:#222;padding:18px 10px;width:100%;touch-action:manipulation;margin-bottom:10px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.5);
-  }
-  button:active{transform:scale(0.98);background:#444}
-  .btn-camera{background:#004080;border-color:#4a90e2;height:22vh;font-size:1.55rem}
-  .btn-share{background:#d93025;border-color:#f28b82}
-  .btn-api{background:#10a37f;border-color:#55efc4}
-  .btn-gemini{background:#1a73e8;border-color:#8ab4f8}
-  .btn-openai{background:#10a37f;border-color:#55efc4}
-  .btn-claude{background:#b85cff;border-color:#e3b3ff}
-  .btn-all{background:#444;border-color:#888}
-  .btn-overlay{background:#b85cff;border-color:#e3b3ff}
-  .btn-copy{background:#444;border-color:#aaa}
-  .screen{position:fixed;inset:0;background:#000;z-index:60;padding:18px;display:flex;flex-direction:column;justify-content:center;gap:10px;overflow-y:auto}
-  #result-screen{position:fixed;inset:0;background:#000;z-index:120;padding:14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
-  #result-text{background:#111;border:1px solid #555;padding:14px;font-size:1.05rem;line-height:1.55;white-space:pre-wrap;border-radius:10px}
-  .small-note{color:#aaa;font-size:0.9rem;font-weight:normal;text-transform:none}
-  #chat-box{background:#0f0f0f;border:1px solid #333;border-radius:10px;padding:10px;max-height:30vh;overflow:auto}
-  .chat-msg{padding:8px 10px;border-radius:10px;margin:8px 0;white-space:pre-wrap;line-height:1.5}
-  .chat-user{background:#1b1b1b;border:1px solid #2a2a2a}
-  .chat-ai{background:#121a14;border:1px solid #1e2a21}
-  #chat-input{width:100%;padding:14px;background:#222;color:#fff;border:1px solid #555;border-radius:10px;font-size:1.05rem}
-  .row{display:flex;gap:10px}
-  .row > *{flex:1}
-  #prompt-preview{width:100%;min-height:28vh;background:#111;border:1px solid #444;color:#fff;border-radius:10px;padding:10px;line-height:1.45;font-size:0.98rem;white-space:pre-wrap}
-
-  #overlay-screen{position:fixed;inset:0;background:#000;z-index:150;padding:16px;display:flex;flex-direction:column;gap:10px;overflow:auto}
-  #overlay-text{width:100%;padding:14px;background:#222;color:#fff;border:1px solid #555;border-radius:10px;font-size:1.05rem}
-  #overlay-status{color:#aaa;font-size:0.95rem}
-  #overlay-preview{width:100%;max-width:560px;border:1px solid #444;border-radius:10px}
-  .pill{display:inline-block;padding:6px 10px;border:1px solid #444;border-radius:999px;background:#111;color:#ddd;font-size:.9rem;margin:0 6px 10px 0}
-  .select{width:100%;padding:14px;background:#111;color:#fff;border:1px solid #444;border-radius:12px;font-size:1.05rem}
-  .checkrow{display:flex;align-items:center;gap:12px;background:#111;border:1px solid #333;border-radius:12px;padding:12px}
-  .checkrow label{font-weight:700}
-  .checkrow input{transform:scale(1.6)}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;padding:0;background:#000;color:#fff;height:100vh;display:flex;flex-direction:column}
+.hidden{display:none!important}
+button{width:100%;padding:18px;font-size:1.2rem;font-weight:800;border-radius:16px;border:2px solid #555;background:#222;color:#fff;margin-bottom:10px}
+button:active{transform:scale(.98)}
+.screen{position:fixed;inset:0;background:#000;padding:16px;overflow:auto}
+#result-text{white-space:pre-wrap;background:#111;border:1px solid #444;padding:12px;border-radius:10px}
 </style>
 </head>
 <body>
 
-<div id="sr-announcer" class="sr-only" aria-live="assertive"></div>
-
-<div id="main-container">
-  <h1 style="text-align:center;color:#D4AF37;margin:0;font-size:1.5rem">AI HUB</h1>
-  <input type="file" id="inp-cam" accept="image/*" capture="environment" onchange="handlePhoto(this)" class="hidden">
-  <button class="btn-camera" onclick="triggerCamera()">SCATTA FOTO<br><span style="font-size:1rem;text-transform:none">(una sola scelta)</span></button>
+<div id="main" class="screen">
+  <h1>AI PHOTO HUB</h1>
+  <input type="file" id="cam" accept="image/*" capture="environment" class="hidden" onchange="onPhoto(this)">
+  <button onclick="cam.click()">SCATTA FOTO</button>
 </div>
 
-<div id="choice-screen" class="screen hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0 0 6px 0">Cosa vuoi fare?</h2>
-  <button class="btn-share" onclick="startShareWithPrompt()">CONDIVIDI CON PROMPT<br><span class="small-note">scegli contesto → copia/mostra prompt → apri condivisione</span></button>
-  <button class="btn-api" onclick="startUseAPI()">USA API<br><span class="small-note">scegli provider o “usa tutte” + chat + testo in foto</span></button>
-  <button style="background:#333;margin-top:8px" onclick="discardPhoto()">ANNULLA</button>
+<div id="context" class="screen hidden">
+  <h2>Contesto</h2>
+  <button onclick="setContext('selfie')">SELFIE</button>
+  <button onclick="setContext('paesaggio')">PAESAGGIO</button>
+  <button onclick="setContext('cibo')">CIBO</button>
+  <button onclick="setContext('oggetto')">OGGETTO</button>
+  <button onclick="setContext('testo')">TESTO</button>
+  <button onclick="setContext('abbigliamento')">ABBIGLIAMENTO</button>
+  <button onclick="setContext('altro')">ALTRO</button>
 </div>
 
-<div id="context-screen" class="screen hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0 0 6px 0">Perché hai fatto la foto?</h2>
-  <button onclick="setContext('selfie')">SELFIE<br><span class="small-note">io + sfondo/oggetto, sguardo, tagli</span></button>
-  <button onclick="setContext('paesaggio')">PAESAGGIO<br><span class="small-note">esterno o interno ampio, composizione</span></button>
-  <button onclick="setContext('cibo')">CIBO<br><span class="small-note">piatto, presentazione, tagli</span></button>
-  <button onclick="setContext('oggetto')">OGGETTO / PRODOTTO<br><span class="small-note">cos’è, dettagli, tagli</span></button>
-  <button onclick="setContext('testo')">TESTO<br><span class="small-note">leggibilità + cosa rifare</span></button>
-  <button onclick="setContext('abbigliamento')">ABBIGLIAMENTO<br><span class="small-note">macchie, pieghe, abbinamento</span></button>
-  <button onclick="setContext('altro')">ALTRO<br><span class="small-note">qualunque cosa non rientri sopra</span></button>
-  <button style="background:#333;margin-top:8px" onclick="backFromContext()">INDIETRO</button>
-</div>
-
-<div id="shareprep-screen" class="screen hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0 0 6px 0">Prompt pronto</h2>
-  <div class="small-note">Di solito il prompt viene copiato e la condivisione si apre automaticamente. Se qualcosa fallisce, usa i pulsanti qui sotto.</div>
-
-  <!-- Il prompt resta nascosto finché non lo chiedi (per velocità e accessibilità) -->
-  <div id="prompt-preview" class="hidden" tabindex="0"></div>
-
-  <div class="row">
-    <button id="btn-copy-prompt" class="btn-copy" onclick="copyPromptManualThenMaybeShare()">COPIA PROMPT</button>
-    <button id="btn-share-now" class="btn-share hidden" onclick="shareAfterManualCopy()">CONDIVIDI</button>
-  </div>
-
-  <button id="btn-show-prompt" class="btn-copy hidden" onclick="togglePromptPreview()">MOSTRA PROMPT</button>
-
-  <button style="background:#333" onclick="backFromSharePrep()">INDIETRO</button>
-</div>
-
-<div id="api-screen" class="screen hidden" aria-hidden="true"> class="screen hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0 0 6px 0">API disponibili</h2>
-  <div style="text-align:center;margin-bottom:4px">
-    <span class="pill">Gemini</span><span class="pill">OpenAI</span><span class="pill">Claude</span>
-  </div>
-  <button class="btn-gemini" onclick="chooseProvider('gemini')">GEMINI<br><span class="small-note">buona base</span></button>
-  <button class="btn-openai" onclick="chooseProvider('openai')">OPENAI<br><span class="small-note">più precisa</span></button>
-  <button class="btn-claude" onclick="chooseProvider('claude')">CLAUDE<br><span class="small-note">alternativa</span></button>
-  <button class="btn-all" onclick="chooseProvider('all')">USA TUTTE<br><span class="small-note">incrocio prudente + riassunto locale</span></button>
-  <button style="background:#333;margin-top:8px" onclick="backToChoices()">INDIETRO</button>
-</div>
-
-<div id="overlay-screen" class="hidden" aria-hidden="true">
-  <h2 style="text-align:center;margin:0">Aggiungi testo in foto</h2>
-
-  <label class="small-note" for="platform-select">Piattaforma (safe zone 2024)</label>
-  <select id="platform-select" class="select" onchange="announcePlatform()">
-    <option value="tiktok">TikTok (worst-case) 1080×1920</option>
-    <option value="instagramStory">Instagram Story 1080×1920</option>
-  </select>
-
-  <div class="checkrow">
-    <input id="protect-center" type="checkbox" checked />
-    <label for="protect-center">PROTEGGI IL CENTRO (consigliato)</label>
-  </div>
-
-  <div id="overlay-status">
-    Sicurezza testo: posizionamento AUTOMATICO dentro safe zone 2024. “Proteggi il centro” evita di coprire la zona più probabile del soggetto.
-  </div>
-
-  <textarea id="overlay-text" rows="3" placeholder="Scrivi il testo da mettere in foto..."></textarea>
-
-  <div class="row">
-    <button onclick="applyOverlayWithAI()" style="background:#006400;border-color:#4be38b">APPLICA CON AI</button>
-    <button onclick="applyOverlayQuick()" style="background:#444">APPLICA RAPIDO</button>
-  </div>
-
-  <div class="row">
-    <button id="btn-reposition" class="btn-overlay hidden" onclick="repositionOverlay()">RIPOSIZIONA</button>
-  </div>
-
-  <canvas id="overlay-preview" class="hidden"></canvas>
-
-  <div class="row">
-    <button onclick="downloadOverlay()" style="background:#1a73e8;border-color:#8ab4f8">SCARICA</button>
-    <button onclick="shareOverlay()" class="btn-share">CONDIVIDI</button>
-  </div>
-
-  <button style="background:#333" onclick="closeOverlay()">CHIUDI</button>
-</div>
-
-<div id="result-screen" class="hidden" aria-hidden="true">
-  <h2 style="color:#D4AF37;text-align:center;margin:0" id="res-title">Risultato</h2>
-  <div id="result-text" tabindex="0">Elaborazione...</div>
-
-  <div class="row">
-    <button class="btn-copy" onclick="showPromptInResult()">MOSTRA PROMPT</button>
-    <button class="btn-copy" onclick="copyPromptFromResult()">COPIA PROMPT</button>
-  </div>
-
-  <button id="btn-open-overlay" class="btn-overlay hidden" onclick="openOverlay()">
-    AGGIUNGI TESTO IN FOTO<br><span class="small-note">auto-placement + safe zone 2024 + riposiziona</span>
-  </button>
-
-  <h3 style="margin:8px 0 0 0;font-size:1.05rem;color:#D4AF37">Chat</h3>
-  <div id="chat-box" aria-label="Chat"></div>
-  <textarea id="chat-input" rows="2" placeholder="Chiedi: crop social, cosa rifare, come inquadrare meglio..."></textarea>
-
-  <div class="row">
-    <button onclick="sendChat()" style="background:#006400;border-color:#4be38b">INVIA</button>
-    <button onclick="closeResult()" style="background:#555">CHIUDI</button>
-  </div>
+<div id="result" class="screen hidden">
+  <h2>Prompt generato</h2>
+  <div id="result-text"></div>
+  <button onclick="copyPrompt()">COPIA PROMPT</button>
+  <button onclick="reset()">RICOMINCIA</button>
 </div>
 
 <script>
-let currentPhotoBase64=null, flowMode=null, pendingProvider=null, currentContext=null;
-let chatHistory=[], lastAnalysisText="", lastVerdict=null;
-let overlayCanvas=null, overlayBlob=null, lastBuiltPrompt="";
+let photo=null, ctx=null, prompt="";
 
-let lastOverlaySpec=null;              // style + current anchor
-let lastPlacementList=null;            // sorted candidate anchors
-let lastPlacementIndex=0;              // current index
+function onPhoto(inp){photo=inp.files[0];show('context');hide('main');}
+function setContext(c){ctx=c;prompt=buildPrompt(c);document.getElementById('result-text').innerText=prompt;show('result');hide('context');}
+function show(id){document.getElementById(id).classList.remove('hidden');}
+function hide(id){document.getElementById(id).classList.add('hidden');}
+function reset(){photo=null;ctx=null;prompt="";show('main');hide('result');}
+async function copyPrompt(){await navigator.clipboard.writeText(prompt);alert('Prompt copiato');}
 
-const SAFE_ZONES_2024={
-  instagramStory:{name:"Instagram Story",w:1080,h:1920,top:270,bottom:384,left:80,right:80},
-  tiktok:{name:"TikTok",w:1080,h:1920,top:288,bottom:480,left:80,right:80},
-};
-
-function announce(m){const el=document.getElementById('sr-announcer');el.textContent='';setTimeout(()=>el.textContent=m,50);}
-function show(id){const el=document.getElementById(id);el.classList.remove('hidden');el.removeAttribute('aria-hidden');}
-function hide(id){const el=document.getElementById(id);el.classList.add('hidden');el.setAttribute('aria-hidden','true');}
-function triggerCamera(){document.getElementById('inp-cam').click();}
-function handlePhoto(input){
-  if(input.files&&input.files[0]){
-    const r=new FileReader();
-    r.onload=e=>{
-      currentPhotoBase64=e.target.result;
-      document.getElementById('main-container').classList.add('hidden');
-      show('choice-screen');
-      flowMode=null;pendingProvider=null;currentContext=null;
-      lastVerdict=null;lastAnalysisText="";lastBuiltPrompt="";
-      announce("Foto presa. Scegli cosa fare.");
-    };
-    r.readAsDataURL(input.files[0]);
-  }
-}
-
-/* NAV */
-function startShareWithPrompt(){flowMode='share';hide('choice-screen');show('context-screen');announce("Scegli contesto per il prompt.");}
-function startUseAPI(){flowMode='api';hide('choice-screen');show('api-screen');announce("Scegli provider o usa tutte.");}
-function backToChoices(){hide('api-screen');show('choice-screen');announce("Indietro.");}
-function backFromContext(){hide('context-screen'); if(flowMode==='share')show('choice-screen'); else if(flowMode==='api')show('api-screen'); else show('choice-screen');}
-function chooseProvider(p){pendingProvider=p;hide('api-screen');show('context-screen');announce("Scegli contesto per l'analisi.");}
-function setContext(ctx){
-  currentContext=ctx;hide('context-screen');
-  lastBuiltPrompt=buildPrompt(currentContext);
-  if(flowMode==='share'){
-    // Flusso rapido: copia automatica → prova ad aprire condivisione.
-    // Se qualcosa fallisce: mostra solo i pulsanti necessari (prima COPIA, poi CONDIVIDI).
-    startSmartShareFlow();
-    return;
-  }
-  if(flowMode==='api'){runProviderOrAll();return;}
-  show('choice-screen');
-}
-function backFromSharePrep(){hide('shareprep-screen');show('context-screen');announce("Scegli contesto.");}
-
-/* PROMPTS (unchanged, compact) */
 function promptBase(){return `Sei un revisore severo di immagini.
-Obiettivo: aiutare una persona non vedente a capire se una foto è UTILIZZABILE e PUBBLICABILE sui social.
-REGOLA: se "No" → SOLO azioni pratiche, niente analisi lunga.
-Non inventare: se incerto scrivi "NON È CHIARO".
-SAFE ZONE 2024: IG Story top270/bottom384 L/R80. TikTok top288/bottom480 L/R80.`.trim();}
-function responseSchemaConditional(){return `Schema:
-A) PUBBLICABILE SOCIAL: Sì/Quasi/No + 1 motivo.
-Se Sì/Quasi: B) tagli 1:1/4:5/9:16 (dove). C) difetti reali. D) estetica solo se incide. E) azioni. F) non è chiaro.
-Se No: SOLO E e F.`.trim();}
-function contextPrompt(ctx){
-  const m={
-    selfie:`CONTESTO: SELFIE. Persone (se chiaro), guardano in camera, sorriso, occhi chiusi/ombra. Sfondo/oggetto visibile? Inquadrato bene? Tagli viso/testa/mento.`, 
-    paesaggio:`CONTESTO: PAESAGGIO. Soggetto principale (se c’è), orizzonte, elementi tagliati, luci/ombre estreme.`,
-    cibo:`CONTESTO: CIBO. Piatto, tagli, fuoco, ombre/riflessi, sfondo.`,
-    oggetto:`CONTESTO: OGGETTO/PRODOTTO. Cos’è (solo se chiaro), parti tagliate, dettagli non visibili.`,
-    testo:`CONTESTO: TESTO. Priorità leggibilità; se illeggibile: come rifare.`,
-    abbigliamento:`CONTESTO: ABBIGLIAMENTO. Macchie/pieghe/tagli, colori/contrasto.`,
-    altro:`CONTESTO: ALTRO. Prudente e utile.`,
-  };
-  return (m[ctx]||m.altro).trim();
-}
-function buildPrompt(ctx){return [promptBase(),responseSchemaConditional(),contextPrompt(ctx)].join("\n\n");}
+Obiettivo: aiutare una persona non vedente a capire ESATTAMENTE cosa si vede, quali problemi concreti ci sono e come rifare la foto.
 
-/* COPY / SHARE */
-async function copyToClipboard(t){try{await navigator.clipboard.writeText(t);return true;}catch(e){return false;}}
-async function copyPromptNow(){announce((await copyToClipboard(lastBuiltPrompt||""))?"Prompt copiato.":"Non posso copiare automaticamente.");}
-async function shareNow(){await shareWithPrompt(lastBuiltPrompt);}
-function showPromptInResult(){setResultText(lastBuiltPrompt||"(Prompt non disponibile)");announce("Prompt mostrato.");}
-async function copyPromptFromResult(){announce((await copyToClipboard(lastBuiltPrompt||""))?"Prompt copiato.":"Non posso copiare automaticamente.");}
-/* SMART SHARE FLOW (no preview unless needed) */
-function resetSharePrepUI(){
-  const preview=document.getElementById('prompt-preview');
-  preview.innerText="";
-  preview.classList.add('hidden');
-  document.getElementById('btn-share-now').classList.add('hidden');
-  document.getElementById('btn-copy-prompt').classList.remove('hidden');
-  document.getElementById('btn-show-prompt').classList.add('hidden');
-}
-function showShareButtons({showCopy, showShare, showShowPrompt}){
-  document.getElementById('btn-copy-prompt').classList.toggle('hidden', !showCopy);
-  document.getElementById('btn-share-now').classList.toggle('hidden', !showShare);
-  document.getElementById('btn-show-prompt').classList.toggle('hidden', !showShowPrompt);
-}
-function togglePromptPreview(){
-  const preview=document.getElementById('prompt-preview');
-  const hidden=preview.classList.toggle('hidden');
-  if(!hidden && !preview.innerText) preview.innerText=lastBuiltPrompt||"";
-  announce(hidden ? "Prompt nascosto." : "Prompt mostrato.");
-}
+REGOLE:
+- Breve ma comprensibile.
+- Vietato essere vago.
+- Ogni problema in formato:
+  PROBLEMA → EFFETTO → SOLUZIONE (1 riga ciascuno)
+- Se non sei sicuro: "NON È CHIARO".
 
-async function tryNativeShare(prompt){
-  try{
-    const r=await fetch(currentPhotoBase64); 
-    const b=await r.blob();
-    const f=new File([b],"foto.jpg",{type:"image/jpeg"});
+SAFE ZONE 2024:
+Instagram Story: top 270 / bottom 384 / L-R 80
+TikTok: top 288 / bottom 480 / L-R 80`;}
 
-    if(navigator.canShare && navigator.canShare({files:[f]})){
-      await navigator.share({title:"Foto + Prompt",text:prompt,files:[f]});
-      return true;
-    } 
-    if(navigator.share){
-      await navigator.share({title:"Prompt",text:prompt});
-      return true;
-    }
-    return false;
-  }catch(e){
-    return false;
-  }
-}
+function schema(){return `Schema risposta:
+A) PUBBLICABILE SOCIAL: Sì / Quasi / No (1 frase)
 
-async function startSmartShareFlow(){
-  resetSharePrepUI();
-  // Tentativo automatico: copia → share
-  const copied = await copyToClipboard(lastBuiltPrompt||"");
-  if(copied){
-    announce("Prompt copiato. Apro la condivisione…");
-    const shared = await tryNativeShare(lastBuiltPrompt||"");
-    if(shared){
-      // finito: torno alle scelte
-      hide('shareprep-screen');
-      show('choice-screen');
-      return;
-    }
-    // Share non apribile: mostra solo CONDIVIDI (manuale)
-    showShareButtons({showCopy:false, showShare:true, showShowPrompt:false});
-    show('shareprep-screen');
-    announce("Non riesco ad aprire la condivisione. Premi Condividi.");
-    return;
-  }
+Se Sì o Quasi:
+B) TAGLI SOCIAL
+C) PROBLEMI (formato obbligatorio)
+D) ESTETICA (solo se rilevante)
+E) AZIONI IMMEDIATE
+F) NON È CHIARO
 
-  // Copia automatica fallita: mostra SOLO COPIA PROMPT (manuale) + opzionale MOSTRA PROMPT
-  showShareButtons({showCopy:true, showShare:false, showShowPrompt:true});
-  show('shareprep-screen');
-  announce("Copia automatica non riuscita. Premi Copia prompt.");
-}
+Se No:
+SCRIVI SOLO E e F`;}
 
-async function copyPromptManualThenMaybeShare(){
-  const ok = await copyToClipboard(lastBuiltPrompt||"");
-  if(ok){
-    announce("Prompt copiato. Apro la condivisione…");
-    const shared = await tryNativeShare(lastBuiltPrompt||"");
-    if(shared){
-      hide('shareprep-screen');
-      show('choice-screen');
-      return;
-    }
-    // solo ora mostra CONDIVIDI
-    showShareButtons({showCopy:false, showShare:true, showShowPrompt:false});
-    announce("Non riesco ad aprire la condivisione. Premi Condividi.");
-  }else{
-    // resta su COPIA PROMPT
-    showShareButtons({showCopy:true, showShare:false, showShowPrompt:true});
-    announce("Non riesco a copiare. Riprova Copia prompt.");
-  }
-}
+function contextPrompt(c){
+const m={
+selfie:`CONTESTO: SELFIE
+- Quante persone: una / più persone / non chiaro
+- Guardano in camera: sì / no / non chiaro
+- Controlli obbligatori: testa o mento tagliati, occhi chiusi/ombra, distanza, decentramento
+Usa SEMPRE formato PROBLEMA → EFFETTO → SOLUZIONE`,
+paesaggio:`CONTESTO: PAESAGGIO
+- Soggetto principale
+- Orizzonte
+- Elementi tagliati
+Formato PROBLEMA → EFFETTO → SOLUZIONE`,
+cibo:`CONTESTO: CIBO
+- Piatto visibile
+- Fuoco e ombre
+Formato PROBLEMA → EFFETTO → SOLUZIONE`,
+oggetto:`CONTESTO: OGGETTO
+- Cos'è (se chiaro)
+- Parti tagliate
+Formato PROBLEMA → EFFETTO → SOLUZIONE`,
+testo:`CONTESTO: TESTO
+- Leggibilità prioritaria
+- Se illeggibile: come rifare
+Formato PROBLEMA → EFFETTO → SOLUZIONE`,
+abbigliamento:`CONTESTO: ABBIGLIAMENTO
+- Macchie, pieghe, tagli
+Formato PROBLEMA → EFFETTO → SOLUZIONE`,
+altro:`CONTESTO: ALTRO
+- Prudenza
+- Niente supposizioni
+Formato PROBLEMA → EFFETTO → SOLUZIONE`
+};
+return m[c]||m.altro;}
 
-async function shareAfterManualCopy(){
-  const shared = await tryNativeShare(lastBuiltPrompt||"");
-  if(shared){
-    hide('shareprep-screen');
-    show('choice-screen');
-  }else{
-    announce("Condivisione non supportata. Il prompt potrebbe essere copiato.");
-  }
-}
-
-
-async function shareWithPrompt(prompt){
-  if(!prompt) prompt=buildPrompt(currentContext);
-  await copyToClipboard(prompt);
-  try{
-    const r=await fetch(currentPhotoBase64); const b=await r.blob();
-    const f=new File([b],"foto.jpg",{type:"image/jpeg"});
-    if(navigator.canShare&&navigator.canShare({files:[f]})) await navigator.share({title:"Foto + Prompt",text:prompt,files:[f]});
-    else if(navigator.share) await navigator.share({title:"Prompt",text:prompt});
-    else alert("Condivisione non supportata. Prompt copiato (se possibile).");
-  }catch(e){ alert("Errore condivisione. Prompt copiato (se possibile)."); }
-  finally{ hide('shareprep-screen'); show('choice-screen'); }
-}
-
-/* RESULT + CHAT */
-function setResultText(t){document.getElementById('result-text').innerText=t;lastAnalysisText=t;lastVerdict=parseVerdictFromText(t);}
-function resetChat(){chatHistory=[];document.getElementById('chat-box').innerHTML="";}
-function addChat(role,text){
-  chatHistory.push({role,text});
-  const div=document.createElement('div');
-  div.className="chat-msg "+(role==='user'?'chat-user':'chat-ai');
-  div.innerText=(role==='user'?"TU: ":"AI: ")+text;
-  const box=document.getElementById('chat-box'); box.appendChild(div); box.scrollTop=box.scrollHeight;
-}
-function showOverlayButton(){document.getElementById('btn-open-overlay').classList.remove('hidden');}
-function parseVerdictFromText(t){
-  if(!t) return null;
-  const s=(t+"").toLowerCase();
-  const m=s.match(/a\)\s*pubblicabile social[\s\S]{0,160}/i);
-  const seg=m?m[0]:s.slice(0,240);
-  if(seg.includes(" no")) return "No";
-  if(seg.includes(" quasi")) return "Quasi";
-  if(seg.includes(" sì")||seg.includes(" si")) return "Sì";
-  return null;
-}
-
-/* BACKEND */
-async function callAnalyze(provider,prompt,imageDataUrl){
-  const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider,prompt,imageDataUrl})});
-  if(res.status===429){const d=await res.json().catch(()=>({}));return {ok:false,provider,text:(d.message||"Troppe richieste.")};}
-  const d=await res.json().catch(()=>({}));
-  if(!res.ok) return {ok:false,provider,text:"Errore: "+(d.error||res.status)};
-  return {ok:true,provider,text:d.text||"Nessuna risposta."};
-}
-
-async function runProviderOrAll(){
-  const prompt=lastBuiltPrompt||buildPrompt(currentContext);
-  hide('choice-screen');hide('api-screen');hide('context-screen');hide('shareprep-screen');
-  show('result-screen');resetChat();showOverlayButton();
-  if(pendingProvider==='all'){
-    setResultText("Interrogo tutte le API…");
-    const providers=['gemini','openai','claude'];
-    const results=await Promise.all(providers.map(p=>callAnalyze(p,prompt,currentPhotoBase64)));
-    setResultText(summarizeAll(results)+"\n\n---\nDETTAGLIO\n\n"+results.map(r=>`### ${r.provider.toUpperCase()}\n${r.text||""}`).join("\n\n"));
-    addChat('assistant',"Chiedimi: crop social, come rifare la foto, o testo in foto.");
-    return;
-  }
-  setResultText("Analisi in corso…");
-  const r=await callAnalyze(pendingProvider,prompt,currentPhotoBase64);
-  setResultText(r.text);
-  addChat('assistant',"Chiedimi: crop social, come migliorare, o testo in foto.");
-}
-
-/* SUMMARY (same minimal) */
-function extractSection(text,letter){
-  const s=(text||"").replace(/\r/g,'');
-  const re=new RegExp(`^${letter}\\)\\s*[\\s\\S]*?(?=^[A-F]\\)|\\Z)`, "mi");
-  const m=s.match(re); return m?m[0].trim():"";
-}
-function normalizeLines(lines){return (lines||[]).map(x=>x.replace(/^[-•\u2022]\s*/,'').trim()).filter(Boolean);}
-function sectionBodyLines(sec){if(!sec) return []; const l=sec.split("\n").map(x=>x.trim()).filter(Boolean); return l.slice(1).length?l.slice(1):l;}
-function tally(lines){const map=new Map(); for(const it of lines){const k=it.toLowerCase().replace(/\s+/g,' ').trim(); if(!k) continue; map.set(k,(map.get(k)||0)+1);} return [...map.entries()].sort((a,b)=>b[1]-a[1]).map(([text,n])=>({text,n}));}
-function pickConsensus(sections,max=3){const all=[]; for(const sec of sections) all.push(...normalizeLines(sectionBodyLines(sec))); return tally(all).slice(0,max).map(x=>`- (${x.n}/${sections.length}) ${x.text}`);}
-function majorityVerdict(results){
-  const vs=results.map(r=>parseVerdictFromText(r.text)).filter(Boolean);
-  if(!vs.length) return null;
-  const c=vs.reduce((a,v)=>(a[v]=(a[v]||0)+1,a),{});
-  const order=["No","Quasi","Sì"]; let best=null,bn=-1;
-  for(const v of order){const n=c[v]||0; if(n>bn){bn=n;best=v;}}
-  return best;
-}
-function summarizeAll(results){
-  const ok=results.filter(r=>r.ok&&r.text&&!r.text.startsWith("Errore"));
-  if(ok.length===0) return "RIASSUNTO\nNessuna risposta disponibile.";
-  const v=majorityVerdict(ok);
-  const sec={A:[],B:[],C:[],D:[],E:[],F:[]};
-  for(const r of ok){for(const L of ["A","B","C","D","E","F"]){const s=extractSection(r.text,L); if(s) sec[L].push(s);}}
-  const A=pickConsensus(sec.A,2), E=pickConsensus(sec.E,5), F=pickConsensus(sec.F,2);
-  if(v==="No") return ["RIASSUNTO (NO → solo azioni)","A) PUBBLICABILE SOCIAL:",...(A.length?A:[`- (0/${ok.length}) non disponibile`]),"E) AZIONI IMMEDIATE:",...(E.length?E:[`- (0/${ok.length}) non disponibile`]),"F) NON È CHIARO:",...(F.length?F:[`- (0/${ok.length}) tutto chiaro`])].join("\n");
-  const B=pickConsensus(sec.B,3), C=pickConsensus(sec.C,5), D=pickConsensus(sec.D,3);
-  return ["RIASSUNTO (incrocio prudente)","A) PUBBLICABILE SOCIAL:",...(A.length?A:[`- (0/${ok.length}) non disponibile`]),"B) RISCHIO TAGLI SOCIAL:",...(B.length?B:[`- (0/${ok.length}) non disponibile`]),"C) DIFETTI / ERRORI:",...(C.length?C:[`- (0/${ok.length}) non disponibile`]),"D) PUNTI DEBOLI ESTETICI:",...(D.length?D:[`- (0/${ok.length}) non disponibile`]),"E) AZIONI IMMEDIATE:",...(E.length?E:[`- (0/${ok.length}) non disponibile`]),"F) NON È CHIARO:",...(F.length?F:[`- (0/${ok.length}) tutto chiaro`])].join("\n");
-}
-
-async function sendChat(){
-  const inp=document.getElementById('chat-input');
-  const userText=(inp.value||"").trim(); if(!userText) return;
-  inp.value=""; addChat('user',userText);
-
-  const provider=(pendingProvider==='all')?'openai':pendingProvider;
-  const verdict=lastVerdict||parseVerdictFromText(lastAnalysisText)||"NON È CHIARO";
-  const rules=(verdict==="No")?`Ultima valutazione: "No". SOLO azioni pratiche, breve.`:`Ultima valutazione: "${verdict}". Breve ma completa.`;
-  const prompt=`${rules}
-Se social: 1:1/4:5/9:16 e dove taglia. SAFE ZONE 2024: Story top270/bottom384; TikTok top288/bottom480; L/R 80.
-Contesto: ${currentContext||"altro"}.
-Analisi precedente:
-${lastAnalysisText}
-
-Domanda:
-${userText}`.trim();
-  const r=await callAnalyze(provider,prompt,currentPhotoBase64);
-  addChat('assistant',r.text);
-}
-
-/* OVERLAY */
-function announcePlatform(){
-  const v=document.getElementById('platform-select').value;
-  announce(v==="tiktok"?"Piattaforma: TikTok.":"Piattaforma: Instagram Story.");
-}
-function openOverlay(){
-  overlayCanvas=document.getElementById('overlay-preview');
-  overlayCanvas.classList.add('hidden'); overlayBlob=null;
-  lastOverlaySpec=null; lastPlacementList=null; lastPlacementIndex=0;
-  document.getElementById('btn-reposition').classList.add('hidden');
-  document.getElementById('overlay-text').value="";
-  hide('result-screen'); show('overlay-screen');
-  announce("Editor testo aperto.");
-}
-function closeOverlay(){hide('overlay-screen'); show('result-screen'); announce("Torno al risultato.");}
-
-function getSafeTemplate(){
-  const key=document.getElementById('platform-select').value;
-  return SAFE_ZONES_2024[key] || SAFE_ZONES_2024.tiktok;
-}
-function safeRectPixels(canvasW, canvasH, tpl){
-  const left=(tpl.left/tpl.w)*canvasW;
-  const right=canvasW-(tpl.right/tpl.w)*canvasW;
-  const top=(tpl.top/tpl.h)*canvasH;
-  const bottom=canvasH-(tpl.bottom/tpl.h)*canvasH;
-  return {left,right,top,bottom,width:right-left,height:bottom-top};
-}
-function centerProtectedRect(safe){
-  // Protect central 40% x 40% of safe rect
-  const w=safe.width*0.4, h=safe.height*0.4;
-  return {x:safe.left+(safe.width-w)/2, y:safe.top+(safe.height-h)/2, w, h};
-}
-
-/* scoring */
-function edgeScoreForRect(imgData,w,h,rect){
-  const data=imgData.data;
-  const x0=Math.max(1,Math.floor(rect.x)), y0=Math.max(1,Math.floor(rect.y));
-  const x1=Math.min(w-2,Math.floor(rect.x+rect.w)), y1=Math.min(h-2,Math.floor(rect.y+rect.h));
-  let sum=0, count=0;
-  const idx=(x,y)=>(y*w+x)*4;
-  for(let y=y0; y<y1; y+=2){
-    for(let x=x0; x<x1; x+=2){
-      const i=idx(x,y);
-      const g=0.2126*data[i]+0.7152*data[i+1]+0.0722*data[i+2];
-      const ix=idx(x+1,y), iy=idx(x,y+1);
-      const gx=0.2126*data[ix]+0.7152*data[ix+1]+0.0722*data[ix+2];
-      const gy=0.2126*data[iy]+0.7152*data[iy+1]+0.0722*data[iy+2];
-      sum += Math.abs(gx-g)+Math.abs(gy-g);
-      count++;
-    }
-  }
-  return count?sum/count:1e9;
-}
-async function facePenaltyRects(canvas){
-  if(!('FaceDetector' in window)) return [];
-  try{
-    const det=new FaceDetector({fastMode:true, maxDetectedFaces:10});
-    const bmp=await createImageBitmap(canvas);
-    const faces=await det.detect(bmp);
-    return (faces||[]).map(f=>({x:f.boundingBox.x,y:f.boundingBox.y,w:f.boundingBox.width,h:f.boundingBox.height}));
-  }catch(e){ return []; }
-}
-function rectsOverlap(a,b){
-  return !(a.x+a.w<b.x || b.x+b.w<a.x || a.y+a.h<b.y || b.y+b.h<a.y);
-}
-function overlapPenalty(candidate, avoidRects){
-  let p=0;
-  for(const r of avoidRects) if(rectsOverlap(candidate,r)) p += 1;
-  return p;
-}
-
-function estimateTextBox(canvasW, canvasH, text, fontSizePct, maxWidthPct){
-  const tmp=document.createElement('canvas'); tmp.width=canvasW; tmp.height=canvasH;
-  const ctx=tmp.getContext('2d');
-  const minDim=Math.min(canvasW,canvasH);
-  const fontPx=Math.max(18, Math.round((fontSizePct/100)*minDim)); // MIN leggibile
-  ctx.font=`700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-  const maxW=(maxWidthPct/100)*canvasW;
-  const lines=wrapText(ctx,text,maxW);
-  const lineH=Math.round(fontPx*1.2);
-  let blockW=0; for(const ln of lines) blockW=Math.max(blockW, ctx.measureText(ln).width);
-  const blockH=lines.length*lineH;
-  return {blockW, blockH, lineH, fontPx, lines, maxW};
-}
-
-function generateCandidates(safe, boxW, boxH){
-  const pad = Math.max(14, Math.min(safe.width,safe.height)*0.02);
-  const w = Math.min(boxW + pad*2, safe.width);
-  const h = Math.min(boxH + pad*2, safe.height);
-
-  const cx = safe.left + safe.width/2;
-  const cy = safe.top + safe.height/2;
-  const yUpper = safe.top + safe.height*0.28;
-  const yLower = safe.top + safe.height*0.72;
-  const xLeft = safe.left + safe.width*0.28;
-  const xRight = safe.left + safe.width*0.72;
-
-  const mk = (x,y)=>({x:x-w/2, y:y-h/2, w, h, anchorX:x, anchorY:y});
-  const clampRect = (r)=>{
-    r.x = Math.max(safe.left, Math.min(safe.right-r.w, r.x));
-    r.y = Math.max(safe.top, Math.min(safe.bottom-r.h, r.y));
-    r.anchorX = r.x + r.w/2;
-    r.anchorY = r.y + r.h/2;
-    return r;
-  };
-  // include extra corners but still inside safe
-  const yTop = safe.top + safe.height*0.18;
-  const yBot = safe.top + safe.height*0.82;
-  const xL = safe.left + safe.width*0.18;
-  const xR = safe.left + safe.width*0.82;
-
-  return [
-    mk(cx,yUpper), mk(cx,cy), mk(cx,yLower),
-    mk(xLeft,cy), mk(xRight,cy),
-    mk(xL,yTop), mk(xR,yTop), mk(xL,yBot), mk(xR,yBot),
-  ].map(clampRect);
-}
-
-async function rankPlacements(baseCanvas, safe, textBox){
-  const ctx=baseCanvas.getContext('2d');
-  const imgData=ctx.getImageData(0,0,baseCanvas.width,baseCanvas.height);
-  const candidates=generateCandidates(safe, textBox.blockW, textBox.blockH);
-
-  const avoid=await facePenaltyRects(baseCanvas);
-
-  const protectCenter = document.getElementById('protect-center').checked;
-  const centerRect = protectCenter ? centerProtectedRect(safe) : null;
-
-  const scored=[];
-  for(const c of candidates){
-    if(centerRect && rectsOverlap(c, centerRect)) continue; // avoid center
-    const score=edgeScoreForRect(imgData, baseCanvas.width, baseCanvas.height, c) + (overlapPenalty(c, avoid)*1000);
-    scored.push({c, score});
-  }
-  // fallback: if everything excluded by center protection, include center
-  if(scored.length===0){
-    for(const c of candidates){
-      const score=edgeScoreForRect(imgData, baseCanvas.width, baseCanvas.height, c) + (overlapPenalty(c, avoid)*1000);
-      scored.push({c, score});
-    }
-  }
-  scored.sort((a,b)=>a.score-b.score);
-  return scored.map(x=>x.c);
-}
-
-function defaultStyleSpec(text){
-  return { xPct:50, yPct:50, maxWidthPct:70, fontSizePct:6, fill:"#ffffff", align:"center",
-    boxFill:"rgba(0,0,0,0.55)", boxPadPct:1.6, stroke:null, strokeWidthPct:0, text };
-}
-
-/* AI chooses ONLY style */
-function extractJsonObject(s){
-  if(!s) return null;
-  const first=s.indexOf("{"), last=s.lastIndexOf("}");
-  if(first===-1||last===-1||last<=first) return null;
-  return s.slice(first,last+1);
-}
-function normalizeStyleSpec(spec, text){
-  const def=defaultStyleSpec(text);
-  const out={...def};
-  const num=(v,lo,hi,fb)=>{const x=Number(v); return Number.isFinite(x)?Math.min(hi,Math.max(lo,x)):fb;};
-  out.maxWidthPct=num(spec.maxWidthPct,35,90,def.maxWidthPct);
-  out.fontSizePct=num(spec.fontSizePct,2.5,12,def.fontSizePct);
-  out.boxPadPct=num(spec.boxPadPct,0.8,4,def.boxPadPct);
-  out.strokeWidthPct=num(spec.strokeWidthPct,0,1.5,def.strokeWidthPct);
-  if(typeof spec.fill==="string"&&spec.fill.startsWith("#")) out.fill=spec.fill;
-  if(spec.align==="left"||spec.align==="center"||spec.align==="right") out.align=spec.align;
-  out.boxFill=(typeof spec.boxFill==="string"||spec.boxFill===null)?spec.boxFill:def.boxFill;
-  out.stroke=(typeof spec.stroke==="string"||spec.stroke===null)?spec.stroke:def.stroke;
-  return out;
-}
-
-async function applyOverlayQuick(){
-  const text=(document.getElementById('overlay-text').value||"").trim();
-  if(!text){announce("Scrivi il testo.");return;}
-  const spec=defaultStyleSpec(text);
-  await autoPlaceAndDraw(spec);
-  document.getElementById('overlay-status').innerText="Applicato: auto-placement locale + safe zone 2024.";
-}
-
-async function applyOverlayWithAI(){
-  const text=(document.getElementById('overlay-text').value||"").trim();
-  if(!text){announce("Scrivi il testo.");return;}
-  document.getElementById('overlay-status').innerText="Scelgo stile con AI + posizionamento automatico sicuro…";
-
-  const provider=(pendingProvider==='all')?'openai':(pendingProvider||'openai');
-  const tpl=getSafeTemplate();
-  const layoutPrompt=`
-Sei un graphic editor per social. La posizione la decide l'app localmente, quindi dammi SOLO lo STILE.
-Piattaforma: ${tpl.name} (safe zone 2024: top ${tpl.top}px, bottom ${tpl.bottom}px, left/right ${tpl.left}px).
-Testo ESATTO: [${text}]
-Dammi SOLO un JSON valido:
-{
-  "maxWidthPct": number,
-  "fontSizePct": number,
-  "fill": "#RRGGBB",
-  "align": "left|center|right",
-  "boxFill": "rgba(r,g,b,a)" o null,
-  "boxPadPct": number,
-  "stroke": "rgba(r,g,b,a)" o null,
-  "strokeWidthPct": number
-}
-Regole: leggibilità massima; se sfondo complesso usa boxFill scuro semitrasparente; evita poco contrasto.`.trim();
-
-  try{
-    const r=await callAnalyze(provider, layoutPrompt, currentPhotoBase64);
-    const extracted=extractJsonObject(r.text||"");
-    if(!extracted) throw new Error("JSON non valido");
-    const style=normalizeStyleSpec(JSON.parse(extracted), text);
-    await autoPlaceAndDraw(style);
-    document.getElementById('overlay-status').innerText="Fatto: stile AI + auto-placement locale + safe zone 2024.";
-  }catch(e){
-    await applyOverlayQuick();
-  }
-}
-
-async function autoPlaceAndDraw(spec){
-  const img=await loadImage(currentPhotoBase64);
-  const base=document.createElement('canvas');
-  base.width=img.naturalWidth||img.width;
-  base.height=img.naturalHeight||img.height;
-  const bctx=base.getContext('2d');
-  bctx.drawImage(img,0,0,base.width,base.height);
-
-  const tpl=getSafeTemplate();
-  const safe=safeRectPixels(base.width, base.height, tpl);
-
-  // text length control: keep readable by MIN fontPx=18; if too many lines, reduce width and/or font
-  // We don't hard-limit lines. We try to fit without going below min readable.
-  let style={...spec};
-  for(let attempt=0; attempt<4; attempt++){
-    const tb=estimateTextBox(base.width, base.height, style.text, style.fontSizePct, style.maxWidthPct);
-    if(tb.lines.length <= 4) break; // OK: max 4 lines
-    // try widen then shrink font (not below readable min because estimate clamps)
-    if(style.maxWidthPct < 90) style.maxWidthPct = Math.min(90, style.maxWidthPct + 8);
-    else style.fontSizePct = Math.max(2.5, style.fontSizePct - 0.7);
-  }
-
-  const textBox=estimateTextBox(base.width, base.height, style.text, style.fontSizePct, style.maxWidthPct);
-  lastPlacementList = await rankPlacements(base, safe, textBox);
-  lastPlacementIndex = 0;
-
-  const best = lastPlacementList[0];
-  style.xPct = (best.anchorX/base.width)*100;
-  style.yPct = (best.anchorY/base.height)*100;
-
-  lastOverlaySpec = {...style};
-  await drawOverlay(style, tpl);
-
-  // enable reposition
-  document.getElementById('btn-reposition').classList.remove('hidden');
-}
-
-async function repositionOverlay(){
-  if(!lastOverlaySpec || !lastPlacementList || lastPlacementList.length < 2){
-    announce("Nessuna alternativa disponibile.");
-    return;
-  }
-  lastPlacementIndex = (lastPlacementIndex + 1) % lastPlacementList.length;
-  const tpl=getSafeTemplate();
-
-  const img=await loadImage(currentPhotoBase64);
-  const w=img.naturalWidth||img.width;
-  const h=img.naturalHeight||img.height;
-
-  const c = lastPlacementList[lastPlacementIndex];
-  const spec = {...lastOverlaySpec};
-  spec.xPct = (c.anchorX/w)*100;
-  spec.yPct = (c.anchorY/h)*100;
-  lastOverlaySpec = spec;
-  await drawOverlay(spec, tpl);
-  announce("Riposizionato.");
-}
-
-async function drawOverlay(spec, tpl){
-  const img=await loadImage(currentPhotoBase64);
-  const c=overlayCanvas||document.getElementById('overlay-preview');
-  const ctx=c.getContext('2d');
-  c.width=img.naturalWidth||img.width;
-  c.height=img.naturalHeight||img.height;
-  ctx.clearRect(0,0,c.width,c.height);
-  ctx.drawImage(img,0,0,c.width,c.height);
-
-  const safe=safeRectPixels(c.width,c.height,tpl);
-
-  const minDim=Math.min(c.width,c.height);
-  const fontPx=Math.max(18, Math.round((spec.fontSizePct/100)*minDim)); // MIN leggibile
-  ctx.font=`700 ${fontPx}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-  ctx.textBaseline="middle";
-  ctx.textAlign=spec.align;
-
-  const maxW=(spec.maxWidthPct/100)*c.width;
-  const lines=wrapText(ctx,spec.text,maxW);
-  const lineH=Math.round(fontPx*1.2);
-  const blockH=lines.length*lineH;
-  let blockW=0; for(const ln of lines) blockW=Math.max(blockW, ctx.measureText(ln).width);
-  const pad=(spec.boxPadPct/100)*minDim;
-
-  let x=(spec.xPct/100)*c.width;
-  let y=(spec.yPct/100)*c.height;
-
-  const halfH=blockH/2+pad;
-  const halfW=blockW/2+pad;
-  let leftEdge=x-halfW, rightEdge=x+halfW;
-  if(spec.align==="left"){leftEdge=x-pad; rightEdge=x+blockW+pad;}
-  if(spec.align==="right"){leftEdge=x-blockW-pad; rightEdge=x+pad;}
-  if(leftEdge<safe.left) x += (safe.left-leftEdge);
-  if(rightEdge>safe.right) x -= (rightEdge-safe.right);
-  if(y-halfH<safe.top) y=safe.top+halfH;
-  if(y+halfH>safe.bottom) y=safe.bottom-halfH;
-
-  let boxXLeft=x-blockW/2;
-  if(spec.align==="left") boxXLeft=x;
-  if(spec.align==="right") boxXLeft=x-blockW;
-  const boxYTop=y-blockH/2;
-
-  if(spec.boxFill){
-    ctx.fillStyle=spec.boxFill;
-    roundRect(ctx, boxXLeft-pad, boxYTop-pad, blockW+pad*2, blockH+pad*2, Math.max(8,pad));
-    ctx.fill();
-  }
-
-  if(spec.stroke && spec.strokeWidthPct>0){
-    ctx.strokeStyle=spec.stroke;
-    ctx.lineWidth=Math.max(1,(spec.strokeWidthPct/100)*minDim);
-    for(let i=0;i<lines.length;i++){
-      const yy=boxYTop+(i+0.5)*lineH;
-      ctx.strokeText(lines[i], x, yy, maxW);
-    }
-  }
-
-  ctx.fillStyle=spec.fill;
-  for(let i=0;i<lines.length;i++){
-    const yy=boxYTop+(i+0.5)*lineH;
-    ctx.fillText(lines[i], x, yy, maxW);
-  }
-
-  c.classList.remove('hidden');
-  overlayBlob = await new Promise(resolve => c.toBlob(resolve, "image/jpeg", 0.92));
-}
-
-function wrapText(ctx,text,maxWidth){
-  const words=text.split(/\s+/); const lines=[]; let line="";
-  for(const w of words){
-    const test=line?line+" "+w:w;
-    if(ctx.measureText(test).width<=maxWidth) line=test;
-    else { if(line) lines.push(line); line=w; }
-  }
-  if(line) lines.push(line);
-  // no hard limit: but keep sane; if too much, it will be many lines and we will suggest shorten by usability
-  return lines.slice(0, 10);
-}
-function roundRect(ctx,x,y,w,h,r){
-  const rr=Math.min(r,w/2,h/2);
-  ctx.beginPath();
-  ctx.moveTo(x+rr,y);
-  ctx.arcTo(x+w,y,x+w,y+h,rr);
-  ctx.arcTo(x+w,y+h,x,y+h,rr);
-  ctx.arcTo(x,y+h,x,y,rr);
-  ctx.arcTo(x,y,x+w,y,rr);
-  ctx.closePath();
-}
-function loadImage(src){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.onerror=reject;
-    img.src=src;
-  });
-}
-async function downloadOverlay(){
-  if(!overlayBlob){announce("Prima applica il testo.");return;}
-  const url=URL.createObjectURL(overlayBlob);
-  const a=document.createElement('a');
-  a.href=url; a.download="foto_testo.jpg";
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url); announce("Download avviato.");
-}
-async function shareOverlay(){
-  if(!overlayBlob){announce("Prima applica il testo.");return;}
-  try{
-    const f=new File([overlayBlob],"foto_testo.jpg",{type:"image/jpeg"});
-    if(navigator.canShare&&navigator.canShare({files:[f]})){
-      await navigator.share({files:[f],title:"Foto con testo"});
-      announce("Menu aperto.");
-    } else announce("Condivisione non supportata.");
-  }catch(e){announce("Errore condivisione.");}
-}
-
-/* CLOSE / RESET */
-function closeResult(){hide('result-screen');show('choice-screen');announce("Torno alle scelte.");}
-function discardPhoto(){
-  hide('choice-screen');hide('context-screen');hide('api-screen');hide('result-screen');hide('overlay-screen');hide('shareprep-screen');
-  document.getElementById('main-container').classList.remove('hidden');
-  document.getElementById('inp-cam').value="";
-  currentPhotoBase64=null;flowMode=null;pendingProvider=null;currentContext=null;
-  overlayBlob=null;lastAnalysisText="";lastVerdict=null;lastBuiltPrompt="";
-  lastOverlaySpec=null;lastPlacementList=null;lastPlacementIndex=0;
-  resetChat();announce("Home.");
-}
-window.onload=()=>announce("Hub Foto pronto.");
+function buildPrompt(c){return [promptBase(),schema(),contextPrompt(c)].join("\n\n");}
 </script>
 </body>
 </html>
