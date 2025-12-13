@@ -79,16 +79,22 @@
 
 <div id="shareprep-screen" class="screen hidden" aria-hidden="true">
   <h2 style="text-align:center;margin:0 0 6px 0">Prompt pronto</h2>
-  <div class="small-note">Prompt completo (base + schema + contesto). Puoi copiarlo o condividerlo.</div>
-  <div id="prompt-preview" tabindex="0"></div>
+  <div class="small-note">Di solito il prompt viene copiato e la condivisione si apre automaticamente. Se qualcosa fallisce, usa i pulsanti qui sotto.</div>
+
+  <!-- Il prompt resta nascosto finché non lo chiedi (per velocità e accessibilità) -->
+  <div id="prompt-preview" class="hidden" tabindex="0"></div>
+
   <div class="row">
-    <button class="btn-copy" onclick="copyPromptNow()">COPIA PROMPT</button>
-    <button class="btn-share" onclick="shareNow()">CONDIVIDI</button>
+    <button id="btn-copy-prompt" class="btn-copy" onclick="copyPromptManualThenMaybeShare()">COPIA PROMPT</button>
+    <button id="btn-share-now" class="btn-share hidden" onclick="shareAfterManualCopy()">CONDIVIDI</button>
   </div>
+
+  <button id="btn-show-prompt" class="btn-copy hidden" onclick="togglePromptPreview()">MOSTRA PROMPT</button>
+
   <button style="background:#333" onclick="backFromSharePrep()">INDIETRO</button>
 </div>
 
-<div id="api-screen" class="screen hidden" aria-hidden="true">
+<div id="api-screen" class="screen hidden" aria-hidden="true"> class="screen hidden" aria-hidden="true">
   <h2 style="text-align:center;margin:0 0 6px 0">API disponibili</h2>
   <div style="text-align:center;margin-bottom:4px">
     <span class="pill">Gemini</span><span class="pill">OpenAI</span><span class="pill">Claude</span>
@@ -205,8 +211,9 @@ function setContext(ctx){
   currentContext=ctx;hide('context-screen');
   lastBuiltPrompt=buildPrompt(currentContext);
   if(flowMode==='share'){
-    document.getElementById('prompt-preview').innerText=lastBuiltPrompt;
-    show('shareprep-screen');announce("Prompt pronto.");
+    // Flusso rapido: copia automatica → prova ad aprire condivisione.
+    // Se qualcosa fallisce: mostra solo i pulsanti necessari (prima COPIA, poi CONDIVIDI).
+    startSmartShareFlow();
     return;
   }
   if(flowMode==='api'){runProviderOrAll();return;}
@@ -244,6 +251,103 @@ async function copyPromptNow(){announce((await copyToClipboard(lastBuiltPrompt||
 async function shareNow(){await shareWithPrompt(lastBuiltPrompt);}
 function showPromptInResult(){setResultText(lastBuiltPrompt||"(Prompt non disponibile)");announce("Prompt mostrato.");}
 async function copyPromptFromResult(){announce((await copyToClipboard(lastBuiltPrompt||""))?"Prompt copiato.":"Non posso copiare automaticamente.");}
+/* SMART SHARE FLOW (no preview unless needed) */
+function resetSharePrepUI(){
+  const preview=document.getElementById('prompt-preview');
+  preview.innerText="";
+  preview.classList.add('hidden');
+  document.getElementById('btn-share-now').classList.add('hidden');
+  document.getElementById('btn-copy-prompt').classList.remove('hidden');
+  document.getElementById('btn-show-prompt').classList.add('hidden');
+}
+function showShareButtons({showCopy, showShare, showShowPrompt}){
+  document.getElementById('btn-copy-prompt').classList.toggle('hidden', !showCopy);
+  document.getElementById('btn-share-now').classList.toggle('hidden', !showShare);
+  document.getElementById('btn-show-prompt').classList.toggle('hidden', !showShowPrompt);
+}
+function togglePromptPreview(){
+  const preview=document.getElementById('prompt-preview');
+  const hidden=preview.classList.toggle('hidden');
+  if(!hidden && !preview.innerText) preview.innerText=lastBuiltPrompt||"";
+  announce(hidden ? "Prompt nascosto." : "Prompt mostrato.");
+}
+
+async function tryNativeShare(prompt){
+  try{
+    const r=await fetch(currentPhotoBase64); 
+    const b=await r.blob();
+    const f=new File([b],"foto.jpg",{type:"image/jpeg"});
+
+    if(navigator.canShare && navigator.canShare({files:[f]})){
+      await navigator.share({title:"Foto + Prompt",text:prompt,files:[f]});
+      return true;
+    } 
+    if(navigator.share){
+      await navigator.share({title:"Prompt",text:prompt});
+      return true;
+    }
+    return false;
+  }catch(e){
+    return false;
+  }
+}
+
+async function startSmartShareFlow(){
+  resetSharePrepUI();
+  // Tentativo automatico: copia → share
+  const copied = await copyToClipboard(lastBuiltPrompt||"");
+  if(copied){
+    announce("Prompt copiato. Apro la condivisione…");
+    const shared = await tryNativeShare(lastBuiltPrompt||"");
+    if(shared){
+      // finito: torno alle scelte
+      hide('shareprep-screen');
+      show('choice-screen');
+      return;
+    }
+    // Share non apribile: mostra solo CONDIVIDI (manuale)
+    showShareButtons({showCopy:false, showShare:true, showShowPrompt:false});
+    show('shareprep-screen');
+    announce("Non riesco ad aprire la condivisione. Premi Condividi.");
+    return;
+  }
+
+  // Copia automatica fallita: mostra SOLO COPIA PROMPT (manuale) + opzionale MOSTRA PROMPT
+  showShareButtons({showCopy:true, showShare:false, showShowPrompt:true});
+  show('shareprep-screen');
+  announce("Copia automatica non riuscita. Premi Copia prompt.");
+}
+
+async function copyPromptManualThenMaybeShare(){
+  const ok = await copyToClipboard(lastBuiltPrompt||"");
+  if(ok){
+    announce("Prompt copiato. Apro la condivisione…");
+    const shared = await tryNativeShare(lastBuiltPrompt||"");
+    if(shared){
+      hide('shareprep-screen');
+      show('choice-screen');
+      return;
+    }
+    // solo ora mostra CONDIVIDI
+    showShareButtons({showCopy:false, showShare:true, showShowPrompt:false});
+    announce("Non riesco ad aprire la condivisione. Premi Condividi.");
+  }else{
+    // resta su COPIA PROMPT
+    showShareButtons({showCopy:true, showShare:false, showShowPrompt:true});
+    announce("Non riesco a copiare. Riprova Copia prompt.");
+  }
+}
+
+async function shareAfterManualCopy(){
+  const shared = await tryNativeShare(lastBuiltPrompt||"");
+  if(shared){
+    hide('shareprep-screen');
+    show('choice-screen');
+  }else{
+    announce("Condivisione non supportata. Il prompt potrebbe essere copiato.");
+  }
+}
+
 
 async function shareWithPrompt(prompt){
   if(!prompt) prompt=buildPrompt(currentContext);
