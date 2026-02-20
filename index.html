@@ -1,324 +1,196 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
-  <meta name="theme-color" content="#000000" />
-  <title>AI Photo Hub</title>
-  <style>
-    :root{color-scheme:dark}
-    body{
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
-      margin:0;padding:0;background:#000;color:#fff;
-      height:100vh;display:flex;flex-direction:column
-    }
-    .hidden{display:none!important}
-    .screen{position:fixed;inset:0;background:#000;padding:16px;overflow:auto}
-    h1,h2{margin:8px 0 16px}
-    button{
-      width:100%;
-      padding:18px;
-      font-size:1.15rem;
-      font-weight:900;
-      border-radius:16px;
-      border:2px solid #555;
-      background:#222;
-      color:#fff;
-      margin:0 0 10px;
-    }
-    button:active{transform:scale(.98)}
-    .subtle{
-      color:#bbb;
-      font-size:0.95rem;
-      line-height:1.35;
-      margin:10px 0 14px;
-    }
-    .status{
-      background:#111;
-      border:1px solid #444;
-      border-radius:12px;
-      padding:12px;
-      margin:12px 0;
-      white-space:pre-wrap;
-    }
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row button{flex:1 1 180px}
-    input[type="file"]{display:none}
-    /* textarea fallback invisibile ma usabile */
-    #fallback-ta{
-      position:fixed;
-      left:-9999px;top:-9999px;
-      width:1px;height:1px;opacity:0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lettore Totale Offline</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        /* STILE AD ALTO CONTRASTO PER ACCESSIBILITÀ */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000; /* Nero */
+            color: #FFFF00; /* Giallo puro */
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #status-bar {
+            background-color: #FFFF00;
+            color: #000;
+            padding: 15px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-align: center;
+            min-height: 30px;
+        }
+
+        #camera-view {
+            flex: 1;
+            position: relative;
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+            background: #000;
+        }
+
+        button {
+            width: 100%;
+            padding: 30px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 5px solid #FFFF00;
+            background-color: #000;
+            color: #FFFF00;
+            border-radius: 20px;
+        }
+
+        button:active {
+            background-color: #FFFF00;
+            color: #000;
+        }
+    </style>
 </head>
 <body>
 
-  <!-- MAIN -->
-  <div id="main" class="screen">
-    <h1>AI PHOTO HUB</h1>
-    <p class="subtle">
-      Flusso: scatta foto → scegli contesto → copia/condividi.
-      Il prompt NON viene mai mostrato.
-    </p>
-    <input type="file" id="cam" accept="image/*" capture="environment" onchange="onPhoto(this)">
-    <button onclick="document.getElementById('cam').click()">SCATTA FOTO</button>
-  </div>
-
-  <!-- CONTEXT -->
-  <div id="context" class="screen hidden">
-    <h2>Contesto</h2>
-    <button onclick="setContext('selfie')">SELFIE</button>
-    <button onclick="setContext('paesaggio')">PAESAGGIO</button>
-    <button onclick="setContext('cibo')">CIBO</button>
-    <button onclick="setContext('oggetto')">OGGETTO</button>
-    <button onclick="setContext('testo')">TESTO</button>
-    <button onclick="setContext('abbigliamento')">ABBIGLIAMENTO</button>
-    <button onclick="setContext('altro')">ALTRO</button>
-    <button onclick="reset()">ANNULLA</button>
-  </div>
-
-  <!-- RESULT -->
-  <div id="result" class="screen hidden">
-    <h2>Pronto</h2>
-
-    <!-- Stato, NON il prompt -->
-    <div id="status" class="status" role="status" aria-live="polite">
-      Seleziona “COPIA” oppure “CONDIVIDI”.
+    <div id="status-bar" role="status" aria-live="polite">
+        Inizializzazione in corso...
     </div>
 
-    <div class="row">
-      <button onclick="copyPrompt()">COPIA</button>
-      <button onclick="sharePhotoAndPrompt()">CONDIVIDI</button>
+    <div id="camera-view">
+        <video id="webcam" autoplay playsinline muted></video>
     </div>
 
-    <div class="row">
-      <button onclick="copyPrompt()">RICOPIA</button>
-      <button onclick="sharePhotoAndPrompt()">RICONVIDI</button>
+    <div id="controls">
+        <button id="btn-ocr">Leggi Testo Scritto</button>
+        <button id="btn-stop">Ferma Voce</button>
     </div>
 
-    <button onclick="reset()">RICOMINCIA</button>
-  </div>
+    <script>
+        const video = document.getElementById('webcam');
+        const statusDisplay = document.getElementById('status-bar');
+        const btnOcr = document.getElementById('btn-ocr');
+        const btnStop = document.getElementById('btn-stop');
 
-  <!-- Fallback copy -->
-  <textarea id="fallback-ta" aria-hidden="true"></textarea>
+        // FUNZIONE VOCALE (Web Speech API)
+        function annuncia(testo) {
+            // Cancella eventuali code di lettura
+            window.speechSynthesis.cancel();
+            const msg = new SpeechSynthesisUtterance(testo);
+            msg.lang = 'it-IT';
+            msg.rate = 1.0;
+            window.speechSynthesis.speak(msg);
+            statusDisplay.textContent = testo;
+        }
 
-<script>
-  let photo = null;
-  let ctx = null;
-  let prompt = "";
+        // AVVIO FOTOCAMERA
+        async function avviaCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: "environment", // Usa la camera posteriore
+                        focusMode: "continuous"
+                    }
+                });
+                video.srcObject = stream;
+                annuncia("Fotocamera attiva. L'app cercherà codici automaticamente. Premi il tasto grande per leggere il testo.");
+            } catch (err) {
+                annuncia("Errore fotocamera. Controlla i permessi.");
+                console.error(err);
+            }
+        }
 
-  function show(id){ document.getElementById(id).classList.remove('hidden'); }
-  function hide(id){ document.getElementById(id).classList.add('hidden'); }
+        // RICONOSCIMENTO QR E BARCODE (NATIVO)
+        async function scanCodici() {
+            if (!('BarcodeDetector' in window)) {
+                console.warn("Rilevamento codici nativo non supportato.");
+                return;
+            }
 
-  function setStatus(msg){
-    document.getElementById('status').innerText = msg;
-  }
+            const detector = new BarcodeDetector();
+            
+            // Loop di scansione ogni 800ms
+            setInterval(async () => {
+                try {
+                    const barcodes = await detector.detect(video);
+                    if (barcodes.length > 0) {
+                        const valore = barcodes[0].rawValue;
+                        navigator.vibrate(200); // Feedback tattile
+                        annuncia("Codice rilevato: " + valore);
+                    }
+                } catch (e) {}
+            }, 800);
+        }
 
-  function onPhoto(inp){
-    photo = inp.files && inp.files[0] ? inp.files[0] : null;
-    if(!photo){
-      setStatus("Foto non acquisita. Riprova.");
-      return;
-    }
-    show('context'); hide('main');
-  }
+        // RICONOSCIMENTO TESTO (OCR)
+        async function leggiTesto() {
+            annuncia("Analisi in corso. Tieni il telefono fermo.");
+            
+            // Creazione di uno screenshot dal video
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
 
-  async function setContext(c){
-    ctx = c;
-    prompt = buildPrompt(c);
+            try {
+                // Esecuzione Tesseract (carica i dati ITA in locale)
+                const result = await Tesseract.recognize(canvas, 'ita');
+                const testoLetto = result.data.text.trim();
 
-    show('result'); hide('context');
+                if (testoLetto.length > 2) {
+                    navigator.vibrate([100, 50, 100]);
+                    annuncia("Testo trovato: " + testoLetto);
+                } else {
+                    annuncia("Nessun testo leggibile trovato. Riprova.");
+                }
+            } catch (err) {
+                annuncia("Errore durante l'elaborazione del testo.");
+                console.error(err);
+            }
+        }
 
-    // Auto-copia immediata per farti perdere meno tempo (se funziona)
-    const ok = await tryClipboardWrite(prompt);
-    if(ok){
-      setStatus("Prompt copiato. Ora puoi condividere (foto + prompt).");
-    }else{
-      setStatus("Prompt pronto. Premi COPIA (fallback) o CONDIVIDI.");
-    }
-  }
+        // GESTIONE EVENTI
+        btnOcr.addEventListener('click', leggiTesto);
+        btnStop.addEventListener('click', () => {
+            window.speechSynthesis.cancel();
+            annuncia("Lettura interrotta.");
+        });
 
-  function reset(){
-    photo = null; ctx = null; prompt = "";
-    // reset input file per permettere di selezionare la stessa foto
-    const cam = document.getElementById('cam');
-    cam.value = "";
-    show('main'); hide('context'); hide('result');
-  }
+        // REGISTRAZIONE SERVICE WORKER (Necessario per offline)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => console.log("Service Worker Registrato"))
+                    .catch(err => console.log("Errore SW:", err));
+            });
+        }
 
-  // --- COPY (robusto su iOS) ---
-  async function copyPrompt(){
-    if(!prompt){
-      setStatus("Nessun prompt da copiare. Scatta una foto e scegli contesto.");
-      return;
-    }
-    // prova Clipboard API
-    const ok = await tryClipboardWrite(prompt);
-    if(ok){
-      setStatus("Copiato.");
-      return;
-    }
-    // fallback: textarea + select + execCommand
-    const ok2 = fallbackCopy(prompt);
-    setStatus(ok2 ? "Copiato (fallback)." : "Copia non riuscita. Tieni premuto sul testo in app Note e incolla lì.");
-  }
-
-  async function tryClipboardWrite(text){
-    try{
-      if(navigator.clipboard && window.isSecureContext){
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    }catch(e){}
-    return false;
-  }
-
-  function fallbackCopy(text){
-    try{
-      const ta = document.getElementById('fallback-ta');
-      ta.value = text;
-      ta.focus();
-      ta.select();
-      ta.setSelectionRange(0, ta.value.length);
-      const ok = document.execCommand('copy');
-      ta.blur();
-      return !!ok;
-    }catch(e){
-      return false;
-    }
-  }
-
-  // --- SHARE (foto + prompt) con conversione JPG se HEIC crea errore ---
-  async function sharePhotoAndPrompt(){
-    if(!photo){
-      setStatus("Nessuna foto. Scatta prima.");
-      return;
-    }
-    if(!prompt){
-      setStatus("Nessun prompt. Scegli il contesto prima di condividere.");
-      return;
-    }
-
-    if(!navigator.share){
-      setStatus("Condivisione non supportata qui. Usa COPIA e poi condividi manualmente.");
-      return;
-    }
-
-    // 1) prova a condividere il file originale
-    try{
-      if(navigator.canShare && navigator.canShare({ files: [photo] })){
-        await navigator.share({ files:[photo], text: prompt, title: "AI Photo Hub" });
-        setStatus("Condiviso (foto + prompt).");
-        return;
-      }
-    }catch(e){
-      // continua con conversione
-    }
-
-    // 2) prova conversione a JPG (spesso risolve “impossibile utilizzare l’immagine” su iOS)
-    try{
-      setStatus("Conversione in JPG…");
-      const jpgFile = await convertToJpg(photo);
-
-      if(navigator.canShare && navigator.canShare({ files: [jpgFile] })){
-        await navigator.share({ files:[jpgFile], text: prompt, title: "AI Photo Hub" });
-        setStatus("Condiviso (JPG + prompt).");
-        return;
-      }
-    }catch(e){
-      // continua col solo testo
-    }
-
-    // 3) ultimo fallback: solo testo
-    try{
-      await navigator.share({ text: prompt, title: "AI Photo Hub" });
-      setStatus("Condiviso solo il prompt (la foto non era accettata).");
-    }catch(e){
-      setStatus("Condivisione non riuscita. Usa COPIA e incolla manualmente.");
-    }
-  }
-
-  async function convertToJpg(file){
-    // createImageBitmap non è sempre perfetto con HEIC su tutte le versioni,
-    // ma spesso basta. Se fallisce, ricadiamo su “solo testo”.
-    const img = await createImageBitmap(file);
-    const c = document.createElement("canvas");
-    c.width = img.width;
-    c.height = img.height;
-    c.getContext("2d").drawImage(img, 0, 0);
-    const blob = await new Promise((res, rej) => {
-      c.toBlob(b => b ? res(b) : rej(new Error("toBlob failed")), "image/jpeg", 0.92);
-    });
-    return new File([blob], "foto.jpg", { type: "image/jpeg" });
-  }
-
-  // --- PROMPT BUILDER ---
-  function promptBase(){return `Sei un revisore severo di immagini.
-Obiettivo: aiutare una persona non vedente a capire ESATTAMENTE cosa si vede, quali problemi concreti ci sono e come rifare la foto.
-
-REGOLE:
-- Breve ma comprensibile.
-- Vietato essere vago.
-- Ogni problema in formato:
-  PROBLEMA → EFFETTO → SOLUZIONE (1 riga ciascuno)
-- Se non sei sicuro: "NON È CHIARO".
-
-SAFE ZONE 2024:
-Instagram Story: top 270 / bottom 384 / L-R 80
-TikTok: top 288 / bottom 480 / L-R 80`;}
-
-  function schema(){return `Schema risposta:
-A) PUBBLICABILE SOCIAL: Sì / Quasi / No (1 frase)
-
-Se Sì o Quasi:
-B) TAGLI SOCIAL
-C) PROBLEMI (formato obbligatorio)
-D) ESTETICA (solo se rilevante)
-E) AZIONI IMMEDIATE
-F) NON È CHIARO
-
-Se No:
-SCRIVI SOLO E e F`;}
-
-  function contextPrompt(c){
-    const m={
-      selfie:`CONTESTO: SELFIE
-- Quante persone: una / più persone / non chiaro
-- Guardano in camera: sì / no / non chiaro
-- Controlli obbligatori: testa o mento tagliati, occhi chiusi/ombra, distanza, decentramento
-Usa SEMPRE formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      paesaggio:`CONTESTO: PAESAGGIO
-- Soggetto principale
-- Orizzonte
-- Elementi tagliati
-Formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      cibo:`CONTESTO: CIBO
-- Piatto visibile
-- Fuoco e ombre
-Formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      oggetto:`CONTESTO: OGGETTO
-- Cos'è (se chiaro)
-- Parti tagliate
-Formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      testo:`CONTESTO: TESTO
-- Leggibilità prioritaria
-- Se illeggibile: come rifare
-Formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      abbigliamento:`CONTESTO: ABBIGLIAMENTO
-- Macchie, pieghe, tagli
-Formato PROBLEMA → EFFETTO → SOLUZIONE`,
-      altro:`CONTESTO: ALTRO
-- Prudenza
-- Niente supposizioni
-Formato PROBLEMA → EFFETTO → SOLUZIONE`
-    };
-    return m[c]||m.altro;
-  }
-
-  function buildPrompt(c){
-    return [promptBase(), schema(), contextPrompt(c)].join("\n\n");
-  }
-</script>
+        // PARTENZA
+        window.onload = () => {
+            avviaCamera();
+            scanCodici();
+        };
+    </script>
 </body>
 </html>
