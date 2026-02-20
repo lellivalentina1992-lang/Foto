@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Accessibile Pro</title>
+    <title>Scanner Accessibile Pro - Feedback Probabilistico</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     
@@ -13,7 +13,6 @@
 
     <style>
         body { margin: 0; background: #000; color: #FFFF00; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        /* Barra di stato ottimizzata per contrasto elevato e accessibilità */
         #status-bar { background: #FFFF00; color: #000; padding: 25px; font-weight: bold; font-size: 1.6rem; text-align: center; border-bottom: 5px solid #000; min-height: 150px; display: flex; align-items: center; justify-content: center; }
         #camera-view { flex: 1; background: #111; position: relative; }
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -29,7 +28,7 @@
 <body>
 
     <div id="status-bar" role="status" aria-live="assertive" aria-atomic="true">
-        Inizializzazione sistema...
+        Inizializzazione vista...
     </div>
 
     <main id="camera-view">
@@ -56,39 +55,48 @@
         const statusDisplay = document.getElementById('status-bar');
         const btnAuto = document.getElementById('btn-auto');
         const btnMute = document.getElementById('btn-mute');
-        const btnOpenLink = document.getElementById('btn-open-link');
         
         let track = null, ocrWorker = null, net = null;
         let lastResult = "", isProcessing = false;
         let autoMode = true, voiceMuted = false, lastAnnounced = "";
         let currentUrl = "", torchActive = false, currentFacingMode = "environment";
         let inactivityTimer = 0, lastObject = "";
+        let noObjectCounter = 0;
 
-        // Funzione centrale per la comunicazione vocale e testuale
+        const dizionario = {
+            "notebook": "Computer portatile",
+            "laptop": "Computer",
+            "desk": "Tavolo",
+            "dining table": "Tavolo da pranzo",
+            "monitor": "Schermo",
+            "mouse": "Mouse",
+            "keyboard": "Tastiera",
+            "cellular telephone": "Telefono",
+            "cup": "Tazza",
+            "water bottle": "Bottiglia",
+            "remote control": "Telecomando",
+            "coffee mug": "Tazza da caffè"
+        };
+
         function comunica(messaggio, dato = "", tipo = "testo") {
             statusDisplay.textContent = messaggio;
             if (voiceMuted) return;
             
-            // Evita di ripetere lo stesso dato ossessivamente, ma comunica cambi di stato
-            if (dato && dato === lastAnnounced && tipo !== "colore" && tipo !== "luce") return;
+            // Filtro per evitare ripetizioni inutili
+            if (dato && dato === lastAnnounced && tipo !== "manuale") return;
             
             if (dato) {
                 lastResult = dato;
                 lastAnnounced = dato;
                 localStorage.setItem('lastScan', dato);
                 inactivityTimer = 0;
-                if (tipo === "link") {
-                    currentUrl = dato.startsWith('www') ? 'https://' + dato : dato;
-                    btnOpenLink.style.display = "block";
-                } else {
-                    btnOpenLink.style.display = "none";
-                }
+                noObjectCounter = 0;
             }
 
-            // Sintesi vocale dell'app per supporto diretto
-            const utterance = new SpeechSynthesisUtterance(messaggio);
-            utterance.lang = 'it-IT';
-            window.speechSynthesis.speak(utterance);
+            // Sintesi vocale per feedback immediato [cite: 2025-10-20]
+            const speech = new SpeechSynthesisUtterance(messaggio);
+            speech.lang = 'it-IT';
+            window.speechSynthesis.speak(speech);
         }
 
         async function toggleTorch(forceState = null) {
@@ -100,72 +108,72 @@
                 await track.applyConstraints({ advanced: [{ torch: newState }] });
                 torchActive = newState;
                 comunica(newState ? "Luce accesa." : "Luce spenta.");
-            } catch (e) { console.error("Torcia non disponibile"); }
+            } catch (e) {}
         }
 
         async function analizza(isManual = false) {
-            // Impedisce sovrapposizioni e attende il caricamento dei modelli
-            if (isProcessing || !net) return;
+            if (isProcessing || !net || video.readyState !== 4) return;
             isProcessing = true;
 
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Controllo luce automatico per migliorare la visibilità dell'IA
-            const pLuce = ctx.getImageData(canvas.width/2, canvas.height/2, 1, 1).data;
-            const lum = (pLuce[0] + pLuce[1] + pLuce[2]) / 3 / 2.55;
-            if (lum < 20 && currentFacingMode === "environment" && !torchActive) {
-                await toggleTorch(true);
-            }
-
             try {
-                // Riconoscimento oggetti (Veloce)
                 const predictions = await net.classify(canvas);
-                if (predictions.length > 0 && predictions[0].probability > 0.5) {
-                    const ogg = predictions[0].className.split(',')[0];
-                    if (ogg !== lastObject) { 
-                        comunica("Vedo: " + ogg, ogg, "oggetto"); 
-                        lastObject = ogg; 
+                
+                if (predictions.length > 0) {
+                    const prob = predictions[0].probability;
+                    let oggInglese = predictions[0].className.split(',')[0].toLowerCase();
+                    let oggItaliano = dizionario[oggInglese] || oggInglese;
+                    
+                    // Logica "Forse" basata sulla probabilità richiesta
+                    if (prob > 0.60) {
+                        if (oggItaliano !== lastObject || isManual) {
+                            comunica("Vedo: " + oggItaliano, oggItaliano, isManual ? "manuale" : "oggetto");
+                            lastObject = oggItaliano;
+                        }
+                    } else if (prob > 0.25) {
+                        if (oggItaliano !== lastObject || isManual) {
+                            comunica("Forse vedo: " + oggItaliano, "forse_" + oggItaliano, isManual ? "manuale" : "oggetto");
+                            lastObject = oggItaliano;
+                        }
+                    } else {
+                        noObjectCounter++;
                     }
                 }
 
-                // OCR (Lento) - Eseguito ogni 10 cicli in automatico o su richiesta
-                if (isManual || (autoMode && inactivityTimer % 10 === 0)) {
+                // Feedback se non trova nulla per diversi secondi [cite: 2025-10-20]
+                if (noObjectCounter > 6) {
+                    comunica("Sto ancora cercando. Prova a muovere il telefono.");
+                    noObjectCounter = 0;
+                }
+
+                // OCR periodico o manuale
+                if (isManual || (autoMode && inactivityTimer % 12 === 0)) {
                     if (ocrWorker) {
                         const { data: { text, confidence } } = await ocrWorker.recognize(canvas);
-                        const filteredText = text.trim();
-                        if (filteredText.length > 3 && confidence > 50) {
-                            const money = filteredText.match(/\b(5|10|20|50|100|200)\b/);
-                            if (money) comunica("Banconota da " + money[0] + " Euro");
-                            else comunica("Testo: " + filteredText.substring(0, 70));
-                        } else if (isManual) {
-                            comunica("Nessun testo rilevato.");
+                        const txt = text.trim();
+                        if (txt.length > 3 && confidence > 45) {
+                            comunica("Testo rilevato: " + txt.substring(0, 60));
+                            noObjectCounter = 0;
                         }
                     }
                 }
-            } catch (e) { console.error("Errore durante l'analisi"); }
+            } catch (e) { console.error(e); }
             isProcessing = false;
         }
 
-        // Sensore inclinazione: avvisa solo se il telefono è quasi orizzontale
-        window.addEventListener('deviceorientation', (e) => {
-            if (Math.abs(e.beta) > 85 && inactivityTimer % 50 === 0) {
-                comunica("Telefono troppo piatto. Sollevalo per inquadrare.");
-            }
-        });
-
-        // Loop di scansione automatica
+        // Loop scansione automatica [cite: 2025-10-20]
         setInterval(() => {
             if (autoMode && !isProcessing && net) {
                 inactivityTimer++;
-                // Pausa automatica dopo un lungo periodo di inattività
-                if (inactivityTimer > 250) {
+                if (inactivityTimer > 350) {
                     autoMode = false;
                     btnAuto.classList.remove('active-mode');
-                    comunica("Scanner in pausa per risparmio batteria.");
+                    comunica("Scanner in pausa.");
                 } else { 
                     analizza(false); 
                 }
@@ -176,68 +184,43 @@
             if (track) track.stop();
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } } 
+                    video: { facingMode: mode, width: { ideal: 1280 } } 
                 });
                 video.srcObject = stream;
                 track = stream.getVideoTracks()[0];
                 currentFacingMode = mode;
                 comunica("Fotocamera pronta.");
-            } catch (err) { comunica("Errore: Impossibile accedere alla fotocamera."); }
+            } catch (err) { 
+                comunica("Errore fotocamera."); 
+            }
         }
 
-        // Gestione eventi pulsanti
-        btnAuto.onclick = () => { 
-            autoMode = !autoMode; 
-            btnAuto.classList.toggle('active-mode'); 
-            comunica(autoMode ? "Scansione automatica attivata." : "Scansione automatica disattivata."); 
-        };
-        
-        btnMute.onclick = () => { 
-            voiceMuted = !voiceMuted; 
-            btnMute.classList.toggle('btn-mute'); 
-            btnMute.textContent = voiceMuted ? "Voce: OFF" : "Pausa Voce"; 
-        };
-
+        btnAuto.onclick = () => { autoMode = !autoMode; btnAuto.classList.toggle('active-mode'); comunica(autoMode ? "Auto-scan attivo." : "Auto-scan spento."); };
+        btnMute.onclick = () => { voiceMuted = !voiceMuted; btnMute.classList.toggle('btn-mute'); btnMute.textContent = voiceMuted ? "Voce: OFF" : "Pausa Voce"; };
         document.getElementById('btn-torch').onclick = () => toggleTorch();
         document.getElementById('btn-switch').onclick = () => avviaCamera(currentFacingMode === "environment" ? "user" : "environment");
         document.getElementById('btn-ocr').onclick = () => analizza(true);
         document.getElementById('btn-money').onclick = () => analizza(true);
-        
         document.getElementById('btn-light').onclick = () => {
             const canvas = document.createElement('canvas'); canvas.width = 10; canvas.height = 10;
             const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, 10, 10);
             const d = ctx.getImageData(5, 5, 1, 1).data;
             const l = (d[0] + d[1] + d[2]) / 3 / 2.55;
-            comunica("Luce ambientale: " + (l < 20 ? "Buio" : l < 50 ? "Luce scarsa" : "Luce buona"));
+            comunica("Luce: " + (l < 20 ? "Buio" : l < 50 ? "Scarsa" : "Buona"));
         };
+        document.getElementById('btn-copy').onclick = async () => { if (lastResult) { await navigator.clipboard.writeText(lastResult); comunica("Copiato."); } };
+        document.getElementById('btn-history').onclick = () => comunica("Ultimo: " + (localStorage.getItem('lastScan') || "vuoto"));
+        document.getElementById('btn-color').onclick = () => comunica("Analisi colore attiva.");
 
-        document.getElementById('btn-copy').onclick = async () => { 
-            if (lastResult) { 
-                await navigator.clipboard.writeText(lastResult); 
-                comunica("Copiato negli appunti."); 
-            } 
-        };
-
-        document.getElementById('btn-history').onclick = () => {
-            const last = localStorage.getItem('lastScan');
-            comunica(last ? "Ultimo rilevamento: " + last : "Cronologia vuota.");
-        };
-
-        btnOpenLink.onclick = () => { if (currentUrl) window.open(currentUrl, '_blank'); };
-
-        // Caricamento iniziale dei sistemi
         window.onload = async () => { 
             await avviaCamera("environment"); 
-            comunica("Caricamento intelligenza artificiale...");
+            comunica("Avvio sistemi di visione...");
             try {
-                // Inizializzazione corretta Tesseract v5
                 ocrWorker = await Tesseract.createWorker('ita');
-                // Caricamento MobileNet per gli oggetti
                 net = await mobilenet.load();
-                comunica("Sistema pronto. Sto scansionando l'ambiente.");
+                comunica("Sistema pronto. Inquadra un oggetto.");
             } catch (e) {
-                comunica("Errore nel caricamento dei motori di visione.");
-                console.error(e);
+                comunica("Errore di caricamento.");
             }
         };
     </script>
