@@ -1,0 +1,15 @@
+{
+  "name": "Scanner Accessibile",
+  "short_name": "Scanner",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#FFFF00",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/7075/7075315.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
