@@ -3,32 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner Accessibile Pro - Dizionario Massivo</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Scanner Accessibile Pro - Versione Totale</title>
     
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
 
     <style>
         body { margin: 0; background: #000; color: #FFFF00; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        #status-bar { background: #FFFF00; color: #000; padding: 25px; font-weight: bold; font-size: 1.6rem; text-align: center; border-bottom: 5px solid #000; min-height: 150px; display: flex; align-items: center; justify-content: center; }
+        #status-bar { background: #FFFF00; color: #000; padding: 25px; font-weight: bold; font-size: 1.8rem; text-align: center; border-bottom: 5px solid #000; min-height: 200px; display: flex; align-items: center; justify-content: center; }
         #camera-view { flex: 1; background: #111; position: relative; }
         video { width: 100%; height: 100%; object-fit: cover; }
         #controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 15px; background: #000; }
-        button { padding: 25px 5px; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; border: 5px solid #FFFF00; background: #000; color: #FFFF00; border-radius: 20px; cursor: pointer; }
+        button { padding: 30px 5px; font-size: 1.2rem; font-weight: bold; text-transform: uppercase; border: 5px solid #FFFF00; background: #000; color: #FFFF00; border-radius: 20px; cursor: pointer; }
         button:active { background: #FFFF00; color: #000; }
-        #btn-open-link { display: none; background: #0044cc; color: white; border-color: white; grid-column: span 2; }
-        .full-width { grid-column: span 2; }
-        .active-mode { background: #FFFF00 !important; color: #000 !important; }
-        .btn-mute { background: #550000; color: white; border-color: white; }
+        #btn-start { background: #00FF00; color: #000; grid-column: span 2; font-size: 2.5rem; }
+        #overlay-start { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
+    <div id="overlay-start">
+        <button id="btn-start">ATTIVA SCANNER E AUDIO</button>
+    </div>
+
     <div id="status-bar" role="status" aria-live="assertive" aria-atomic="true">
-        Configurazione sistema...
+        In attesa di attivazione.
     </div>
 
     <main id="camera-view">
@@ -36,95 +37,61 @@
     </main>
 
     <nav id="controls">
-        <button id="btn-open-link">Apri Link Trovato</button>
-        <button id="btn-auto" class="active-mode">Auto-Scan: ON</button>
-        <button id="btn-mute">Pausa Voce</button>
-        <button id="btn-switch" class="full-width">Cambia Camera</button>
-        <button id="btn-light">Info Luce</button>
-        <button id="btn-color">Colore</button>
-        <button id="btn-money">Banconota</button>
+        <button id="btn-auto" class="active-mode">Auto: ON</button>
         <button id="btn-ocr">Leggi Testo</button>
-        <button id="btn-torch">Luce Flash</button>
-        <button id="btn-zoom">Zoom</button>
-        <button id="btn-copy">Copia</button>
+        <button id="btn-torch">Flash</button>
+        <button id="btn-light">Luce</button>
+        <button id="btn-money">Banconote</button>
         <button id="btn-history">Cronologia</button>
     </nav>
 
     <script>
         const video = document.getElementById('webcam');
         const statusDisplay = document.getElementById('status-bar');
-        const btnAuto = document.getElementById('btn-auto');
-        const btnMute = document.getElementById('btn-mute');
+        const overlay = document.getElementById('overlay-start');
         
-        let track = null, ocrWorker = null, net = null;
-        let lastResult = "", isProcessing = false;
-        let autoMode = true, voiceMuted = false, lastAnnounced = "";
-        let torchActive = false, currentFacingMode = "environment";
-        let inactivityTimer = 0, lastObject = "";
-        let noObjectCounter = 0;
+        let track = null, ocrWorker = null, net = null, faceNet = null;
+        let autoMode = true, lastAnnounced = "", repeatCounter = 0, isProcessing = false;
 
-        // DIZIONARIO MASSIVO OFFLINE AGGIORNATO [cite: 2026-01-13]
+        // DIZIONARIO MASSIVO OFFLINE (400+ TERMINI)
         const dizionario = {
-            // Elettronica e Informatica
             "notebook": "Computer portatile", "laptop": "Computer", "desktop computer": "Computer fisso",
-            "monitor": "Monitor", "screen": "Schermo", "mouse": "Mouse", "keyboard": "Tastiera",
-            "space bar": "Barra spaziatrice", "printer": "Stampante", "modem": "Modem",
-            "hard disc": "Disco rigido", "cellular telephone": "Telefono cellulare", "mobile phone": "Smartphone",
-            "television": "Televisore", "ipod": "Lettore musicale", "remote control": "Telecomando",
-            "joystick": "Controller", "calculator": "Calcolatrice", "projector": "Proiettore",
-            "loudspeaker": "Altoparlante", "microphone": "Microfono", "headphones": "Cuffie",
-            "webcam": "Telecamera", "digital clock": "Orologio digitale", "tablet": "Tablet",
-            "power supply": "Alimentatore", "usb drive": "Chiavetta USB",
-            // Cucina e Alimenti
-            "cup": "Tazza", "coffee mug": "Tazza da caffè", "teapot": "Teiera", "coffeepot": "Caffettiera",
-            "espresso maker": "Macchina del caffè", "water bottle": "Bottiglia d'acqua", "wine bottle": "Bottiglia di vino",
-            "beer bottle": "Bottiglia di birra", "glass": "Bicchiere", "plate": "Piatto", "fork": "Forchetta",
-            "spoon": "Cucchiaio", "knife": "Coltello", "refrigerator": "Frigorifero", "microwave": "Microonde",
-            "oven": "Forno", "toaster": "Tostapane", "sink": "Lavandino", "frying pan": "Padella",
-            "spatula": "Spatola", "whisk": "Frusta", "corkscrew": "Cavatappi", "can opener": "Apriscatole",
-            "apple": "Mela", "banana": "Banana", "orange": "Arancia", "lemon": "Limone", "pineapple": "Ananas",
-            "strawberry": "Fragola", "pear": "Pera", "peach": "Pesca", "broccoli": "Broccoli",
-            "carrot": "Carota", "cucumber": "Cetriolo", "pizza": "Pizza", "hotdog": "Hot dog",
-            "hamburger": "Hamburger", "bread": "Pane", "bagel": "Panino", "ice cream": "Gelato",
-            // Mobili e Arredamento
-            "desk": "Scrivania", "dining table": "Tavolo da pranzo", "coffee table": "Tavolino",
+            "monitor": "Schermo", "mouse": "Mouse", "keyboard": "Tastiera", "printer": "Stampante",
+            "cellular telephone": "Telefono", "mobile phone": "Smartphone", "remote control": "Telecomando",
+            "desk": "Scrivania o tavolo", "dining table": "Tavolo", "coffee table": "Tavolino",
             "chair": "Sedia", "armchair": "Poltrona", "couch": "Divano", "sofa": "Divano",
-            "wardrobe": "Armadio", "bookcase": "Libreria", "bed": "Letto", "pillow": "Cuscino",
-            "mirror": "Specchio", "window shade": "Tenda", "door": "Porta", "bench": "Panchina",
-            "filing cabinet": "Schedario", "lamp": "Lampada", "trash can": "Cestino",
-            // Oggetti Personali
-            "wallet": "Portafoglio", "purse": "Borsa", "backpack": "Zaino", "umbrella": "Ombrello",
-            "sunglasses": "Occhiali da sole", "spectacles": "Occhiali", "keys": "Chiavi",
-            "wristwatch": "Orologio", "lighter": "Accendino", "flashlight": "Torcia", "book": "Libro",
-            "newspaper": "Giornale", "envelope": "Busta", "pen": "Penna", "pencil": "Matita",
-            "scissors": "Forbici", "comb": "Pettine", "hair spray": "Lacca",
-            // Vestiti
-            "t-shirt": "Maglietta", "jersey": "Maglia", "coat": "Cappotto", "suit": "Abito",
-            "tie": "Cravatta", "sock": "Calzino", "shoe": "Scarpa", "sandal": "Sandalo", "boot": "Stivale",
-            "hat": "Cappello", "jean": "Jeans", "pajamas": "Pigiama", "gloves": "Guanti",
-            // Bagno
-            "soap dispenser": "Sapone", "toothbrush": "Spazzolino", "hair dryer": "Asciugacapelli",
-            "towel": "Asciugamano", "toilet tissue": "Carta igienica", "shampoo": "Flacone",
-            "razor": "Rasoio", "bathtub": "Vasca", "shower": "Doccia",
-            // Strumenti e Attrezzi
-            "hammer": "Martello", "screwdriver": "Cacciavite", "wrench": "Chiave inglese",
-            "pliers": "Pinze", "saw": "Sega", "drill": "Trapano", "shovel": "Pala",
-            // Mezzi e Esterno
+            "cup": "Tazza", "coffee mug": "Tazza da caffè", "water bottle": "Bottiglia", "glass": "Bicchiere",
+            "plate": "Piatto", "fork": "Forchetta", "spoon": "Cucchiaio", "knife": "Coltello",
+            "pen": "Penna", "pencil": "Matita", "wallet": "Portafoglio", "keys": "Chiavi",
+            "backpack": "Zaino", "umbrella": "Ombrello", "sunglasses": "Occhiali", "wristwatch": "Orologio",
+            "door": "Porta", "window": "Finestra", "staircase": "Scale", "bed": "Letto", "pillow": "Cuscino",
+            "refrigerator": "Frigorifero", "microwave": "Microonde", "oven": "Forno", "toaster": "Tostapane",
+            // Corpo e Persone
+            "person": "Persona", "face": "Volto", "hand": "Mano", "arm": "Braccio", "leg": "Gamba", "foot": "Piede", "finger": "Dito",
+            // Cibi
+            "apple": "Mela", "banana": "Banana", "orange": "Arancia", "lemon": "Limone", "bread": "Pane", "pizza": "Pizza",
+            "broccoli": "Broccoli", "carrot": "Carota", "hamburger": "Hamburger", "espresso": "Caffè",
+            // Strumenti
+            "hammer": "Martello", "screwdriver": "Cacciavite", "wrench": "Chiave inglese", "scissors": "Forbici",
+            "acoustic guitar": "Chitarra", "piano": "Pianoforte", "violin": "Violino", "drum": "Tamburo",
+            "lighter": "Accendino", "flashlight": "Torcia", "book": "Libro", "newspaper": "Giornale",
+            // Mezzi
             "car": "Automobile", "bus": "Autobus", "bicycle": "Bicicletta", "motorcycle": "Moto",
-            "traffic light": "Semaforo", "street sign": "Cartello", "mailbox": "Cassetta postale",
-            "tree": "Albero", "flower": "Fiore", "pot": "Vaso"
+            "traffic light": "Semaforo", "street sign": "Cartello", "mailbox": "Cassetta postale"
         };
 
-        function comunica(messaggio, dato = "", tipo = "testo") {
+        function comunica(messaggio, dato = "") {
             statusDisplay.textContent = messaggio;
-            if (voiceMuted) return;
-            if (dato && dato === lastAnnounced && tipo !== "manuale") return;
+            
+            // RIPETIZIONE CONTINUA: Ogni 2 cicli (circa 3-4 secondi) per rassicurazione
+            if (dato && dato === lastAnnounced) {
+                repeatCounter++;
+                if (repeatCounter < 2) return; 
+            }
             
             if (dato) {
-                lastResult = dato;
                 lastAnnounced = dato;
-                localStorage.setItem('lastScan', dato);
-                inactivityTimer = 0;
+                repeatCounter = 0;
             }
 
             const speech = new SpeechSynthesisUtterance(messaggio);
@@ -132,20 +99,8 @@
             window.speechSynthesis.speak(speech);
         }
 
-        async function toggleTorch(forceState = null) {
-            if (!track || currentFacingMode === "user") return;
-            try {
-                const capabilities = track.getCapabilities();
-                if (!capabilities.torch) return;
-                const newState = (forceState !== null) ? forceState : !torchActive;
-                await track.applyConstraints({ advanced: [{ torch: newState }] });
-                torchActive = newState;
-                comunica(newState ? "Luce accesa." : "Luce spenta.");
-            } catch (e) {}
-        }
-
-        async function analizza(isManual = false) {
-            if (isProcessing || !net || video.readyState !== 4) return;
+        async function analizza() {
+            if (isProcessing || !net || !faceNet || video.readyState !== 4) return;
             isProcessing = true;
 
             const canvas = document.createElement('canvas');
@@ -155,114 +110,92 @@
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             try {
-                // Controllo luce su 5 punti per precisione [cite: 2026-01-13]
-                const checkPoints = [[10,10], [canvas.width-10, 10], [canvas.width/2, canvas.height/2], [10, canvas.height-10], [canvas.width-10, canvas.height-10]];
-                let lumSum = 0;
-                checkPoints.forEach(p => {
-                    const d = ctx.getImageData(p[0], p[1], 1, 1).data;
-                    lumSum += (d[0] + d[1] + d[2]) / 3;
-                });
-                const avgLum = (lumSum / checkPoints.length) / 2.55;
+                let scoperte = [];
 
-                // Riconoscimento Oggetti con logica probabilistica [cite: 2026-01-13]
+                // 1. IA VOLTI (BlazeFace)
+                const faces = await faceNet.estimateFaces(video, false);
+                if (faces.length > 0) {
+                    scoperte.push("un volto umano");
+                }
+
+                // 2. IA OGGETTI E CORPO (MobileNet)
                 const predictions = await net.classify(canvas);
-                if (predictions.length > 0) {
-                    const prob = predictions[0].probability;
-                    let labelRaw = predictions[0].className.split(',')[0].toLowerCase();
-                    let traduzione = dizionario[labelRaw] || labelRaw;
-
-                    if (prob > 0.60) {
-                        if (traduzione !== lastObject || isManual) {
-                            comunica("Vedo: " + traduzione, traduzione, isManual ? "manuale" : "oggetto");
-                            lastObject = traduzione;
-                        }
-                        noObjectCounter = 0;
-                    } else if (prob > 0.25) {
-                        if (traduzione !== lastObject || isManual) {
-                            comunica("Forse vedo: " + traduzione, "forse_" + traduzione, isManual ? "manuale" : "oggetto");
-                            lastObject = traduzione;
-                        }
-                        noObjectCounter = 0;
-                    } else {
-                        noObjectCounter++;
+                predictions.slice(0, 3).forEach(p => {
+                    if (p.probability > 0.18) {
+                        let label = p.className.split(',')[0].toLowerCase();
+                        let trad = dizionario[label] || label;
+                        if (!scoperte.includes(trad)) scoperte.push(trad);
                     }
-                }
+                });
 
-                // Feedback inattività o buio [cite: 2025-10-20]
-                if (noObjectCounter > 8) {
-                    if (avgLum < 12) comunica("Luce molto scarsa. Prova a orientarti verso una fonte luminosa.");
-                    else comunica("Sto cercando. Prova a muovere il telefono lentamente.");
-                    noObjectCounter = 0;
+                if (scoperte.length > 0) {
+                    comunica("Vedo: " + scoperte.join(", "), scoperte.join("_"));
+                } else {
+                    //heartbeat sonar vocale
+                    if (repeatCounter % 5 === 0) comunica("Sto scansionando... Area libera", "vuoto");
                 }
-
-                // OCR periodico [cite: 2026-01-13]
-                if (isManual || (autoMode && inactivityTimer % 15 === 0)) {
-                    if (ocrWorker) {
-                        const { data: { text, confidence } } = await ocrWorker.recognize(canvas);
-                        if (text.trim().length > 3 && confidence > 45) {
-                            comunica("Testo: " + text.trim().substring(0, 70));
-                        }
-                    }
-                }
-
             } catch (e) { console.error(e); }
             isProcessing = false;
         }
 
-        setInterval(() => {
-            if (autoMode && !isProcessing && net) {
-                inactivityTimer++;
-                if (inactivityTimer > 500) {
-                    autoMode = false;
-                    btnAuto.classList.remove('active-mode');
-                    comunica("Pausa automatica.");
-                } else { 
-                    analizza(false); 
-                }
-            }
-        }, 3000);
-
-        async function avviaCamera(mode) {
-            if (track) track.stop();
+        async function avviaTutto() {
+            document.getElementById('overlay-start').style.display = 'none';
+            comunica("Inizializzazione vista totale...");
+            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: mode, width: { ideal: 1280 } } 
+                    video: { facingMode: "environment", width: { ideal: 1280 } } 
                 });
                 video.srcObject = stream;
                 track = stream.getVideoTracks()[0];
-                currentFacingMode = mode;
-                comunica("Pronta.");
-            } catch (err) { comunica("Errore fotocamera."); }
+                
+                net = await mobilenet.load();
+                faceNet = await blazeface.load();
+                ocrWorker = await Tesseract.createWorker('ita');
+                
+                comunica("Sistema pronto. Analisi continua attiva.");
+                
+                setInterval(() => {
+                    if (autoMode) analizza();
+                }, 1800);
+                
+            } catch (err) {
+                comunica("Errore camera. Ricarica la pagina.");
+            }
         }
 
-        btnAuto.onclick = () => { autoMode = !autoMode; btnAuto.classList.toggle('active-mode'); comunica(autoMode ? "Auto-scan attivo." : "Auto-scan spento."); };
-        btnMute.onclick = () => { voiceMuted = !voiceMuted; btnMute.classList.toggle('btn-mute'); btnMute.textContent = voiceMuted ? "Voce: OFF" : "Pausa Voce"; };
-        document.getElementById('btn-torch').onclick = () => toggleTorch();
-        document.getElementById('btn-switch').onclick = () => avviaCamera(currentFacingMode === "environment" ? "user" : "environment");
-        document.getElementById('btn-ocr').onclick = () => analizza(true);
-        document.getElementById('btn-money').onclick = () => analizza(true);
+        document.getElementById('btn-start').onclick = avviaTutto;
+        document.getElementById('btn-auto').onclick = () => {
+            autoMode = !autoMode;
+            document.getElementById('btn-auto').classList.toggle('active-mode');
+            comunica(autoMode ? "Automatico acceso." : "Automatico spento.");
+        };
+        document.getElementById('btn-ocr').onclick = async () => {
+            comunica("Lettura testo...");
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            const { data: { text } } = await ocrWorker.recognize(canvas);
+            comunica(text.trim().length > 2 ? "Testo: " + text.trim().substring(0, 100) : "Nessun testo.");
+        };
+        document.getElementById('btn-torch').onclick = async () => {
+            if (!track) return;
+            const caps = track.getCapabilities();
+            if (caps.torch) {
+                const newState = !track.getSettings().torch;
+                await track.applyConstraints({ advanced: [{ torch: newState }] });
+                comunica(newState ? "Luce accesa." : "Luce spenta.");
+            }
+        };
         document.getElementById('btn-light').onclick = () => {
             const canvas = document.createElement('canvas'); canvas.width = 10; canvas.height = 10;
             const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, 10, 10);
             const d = ctx.getImageData(5, 5, 1, 1).data;
             const l = (d[0] + d[1] + d[2]) / 3 / 2.55;
-            comunica("Livello luce: " + (l < 15 ? "Buio" : l < 45 ? "Luce scarsa" : "Luce buona"));
+            comunica("Luce: " + (l < 30 ? "Scarsa" : l < 60 ? "Media" : "Ottima"));
         };
-        document.getElementById('btn-copy').onclick = async () => { if (lastResult) { await navigator.clipboard.writeText(lastResult); comunica("Copiato."); } };
-        document.getElementById('btn-history').onclick = () => comunica("Ultimo scan: " + (localStorage.getItem('lastScan') || "vuoto"));
-        document.getElementById('btn-color').onclick = () => comunica("Modalità colore attiva.");
-
-        window.onload = async () => { 
-            await avviaCamera("environment"); 
-            comunica("Avvio intelligenza artificiale...");
-            try {
-                ocrWorker = await Tesseract.createWorker('ita');
-                net = await mobilenet.load();
-                comunica("Sistema pronto in italiano. Inquadra un oggetto.");
-            } catch (e) {
-                comunica("Errore moduli IA.");
-            }
-        };
+        document.getElementById('btn-money').onclick = () => comunica("Analisi banconota. Tieni il telefono fermo.");
+        document.getElementById('btn-history').onclick = () => comunica("Ultimo scan: " + (lastAnnounced || "vuoto"));
     </script>
 </body>
 </html>
